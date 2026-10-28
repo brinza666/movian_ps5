@@ -11,7 +11,9 @@ Built with ps5-payload-sdk 0.45 crt and import stubs (`x86_64-sie-ps5`).
 This particular ELF was linked with host gcc, because the SDK's
 prospero-clang wrapper had no host LLVM here. Scanout is `sceVideoOut`
 direct memory, pixel format `A8B8G8R8` (`0x8000000022000000`).
-MPEG-1 is pl_mpeg. H.264 and HEVC are FFmpeg 7.1, software only.
+MPEG-1 is pl_mpeg. H.264 and HEVC are demuxed with FFmpeg 7.1.
+The picture is decoded with libSceVideodec2 when that module loads,
+and with FFmpeg on the CPU when it does not.
 
 ## Send it
 
@@ -28,7 +30,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256 of this tree's `payload.elf`:
 
 ```
-2b72518e0f3631efacfb7897c7b87aa41f9e47a80efd8908f89d1d7e87c2f2d8
+f0b436bb69864c2e04328f146cb8e0e77b3877b0ca2d0de376eae4a1711e5e2a
 ```
 
 The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
@@ -53,7 +55,9 @@ first frame. The entry point is `_start`. The older loader that looks
 for `payload_main` on port 9020 will not run this file. Send it to the
 ELF loader on port 9021.
 
-After the bars it scans USB and combines two buses. An amber border
+After the bars it loads the hardware decoder, scans USB, and combines
+two buses. A toast says `SPLICER hardware decoder` if libSceVideodec2
+opened, or `SPLICER software decoder` if it did not. An amber border
 stays on the picture so the output cannot collapse to a black frame.
 
 Pad and audio are loaded with `dlopen` after the bars. If either
@@ -67,23 +71,33 @@ frame. That build is not this file. Startup still runs the SDK's
 
 ## What it plays
 
-Two decoders are linked. REA is not one of them.
+REA is not a decoder. Neither are etaHEN, kstuff, the package manager,
+or ShadowMountPlus. Those four are the environment already running on
+the console. This file uses the module-loading calls they already
+import (`sceKernelLoadStartModule`, `sceKernelDlsym`,
+`sceSysmoduleLoadModule` / `sceSysmoduleLoadModuleInternal`) to open
+sysmodule 207, libSceVideodec2. The call is resolved with `dlsym` after
+the color bars, so a missing module does not stop the first frame.
+Details of what REA measured are in [PAYLOADS.md](PAYLOADS.md).
 
 MPEG-1, via pl_mpeg (`plm_decode`):
 
 - `.mpg` `.mpeg` `.mpv` `.m1v` `.m2v`
 - MPEG-1 Layer II audio is played
 
-H.264 and HEVC, via FFmpeg (`avcodec_send_packet`). Not `sceVideodec2`.
-An elfldr payload does not get that hardware decoder. etaHEN, kstuff,
-the package manager and ShadowMountPlus do not decode video either.
-What REA actually found in those files is in [PAYLOADS.md](PAYLOADS.md).
+H.264 and HEVC. Demux is FFmpeg. The picture is libSceVideodec2 when
+the probe succeeds, otherwise `avcodec_send_packet`.
 
 - `.mp4` `.m4v` `.mov` `.mkv` `.ts` `.m2ts` `.mts`
-- H.264 and HEVC, 8-bit or 10-bit 4:2:0, up to 1920×1088
-- picture only. Audio inside those containers is not decoded
+- hardware: 8-bit H.264, 8-bit and 10-bit HEVC, 4:2:0, up to 3840×2176
+- software fallback: same codecs, up to 1920×1088
+- the HUD marks the bus `HW` or `SW`
+- picture only on those containers. Their audio is not decoded
 - a Matroska file with zlib-compressed headers will not open
-- 4K, VP9, AV1 and AVI are not opened
+- VP9, AV1 and AVI are not opened
+- this ELF was not booted on a console here. Scanout stays `sceVideoOut`.
+  If the hardware decoder refuses the process, the toast says software
+  and 1080p still plays through FFmpeg.
 
 Paths: `/mnt/usb0`, `/mnt/usb1`, `/data/video`, `/data/splicer`,
 `/user/splicer`, and files directly in `/data`.

@@ -10,7 +10,7 @@ ELF := payload.elf
 CFLAGS := -O2 -fPIC -fno-stack-protector -fno-plt -Wall -Wno-unused-function -Wno-unused-variable \
 	-nostdinc -isystem $(PS5_PAYLOAD_SDK)/target/include \
 	-Ithird_party -I$(FFMPEG_SRC)
-OBJS := main.o mpeg_dec.o avdec.o
+OBJS := main.o mpeg_dec.o avdec.o hwdec.o
 
 all: $(ELF)
 
@@ -18,8 +18,10 @@ main.o: src/main.c src/avdec.h third_party/pl_mpeg.h
 	gcc $(CFLAGS) -c -o $@ src/main.c
 mpeg_dec.o: src/mpeg_dec.c
 	gcc $(CFLAGS) -c -o $@ src/mpeg_dec.c
-avdec.o: src/avdec.c src/avdec.h
+avdec.o: src/avdec.c src/avdec.h src/hwdec.h
 	gcc $(CFLAGS) -c -o $@ src/avdec.c
+hwdec.o: src/hwdec.c src/hwdec.h
+	gcc $(CFLAGS) -c -o $@ src/hwdec.c
 
 $(ELF): $(OBJS)
 	ld -pie -T $(PS5_PAYLOAD_SDK)/target/lib/main.script --eh-frame-hdr --build-id=none \

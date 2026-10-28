@@ -16,6 +16,15 @@ any of the four.
 
 kstuff and etaHEN are the homebrew environment already running on the console. ShadowMountPlus is how disks and `/data/homebrew` get mounted. The package manager installs titled apps. None of that decodes a frame.
 
-Players that do open MKV and HEVC on that setup (VLC, EVO Player) are titled apps. EVO's architecture notes say an elfldr payload does not get `sceVideodec2` or `sceAgc`. Hardware decode stays in those apps. This splicer is still an elfldr payload, so H.264 and HEVC in it are FFmpeg software decode, capped at 1920×1088.
+What they do unlock, and what this splicer now calls, is code loading:
 
-REA 6.8.0 still has no video decoder. Playback is not sent through `rea`.
+- `sceKernelLoadStartModule`
+- `sceKernelDlsym`
+- `sceSysmoduleLoadModule` and `sceSysmoduleLoadModuleInternal`
+
+Those symbols are resolved with `dlsym` after the color bars, from libraries already mapped (`libkernel_web`) or loaded by path (`libSceSysmodule.sprx`, then sysmodule 207). Sysmodule 207 is libSceVideodec2. The splicer then resolves `sceVideodec2QueryComputeMemoryInfo`, `sceVideodec2AllocateComputeQueue`, `sceVideodec2CreateDecoder` and `sceVideodec2Decode`, and feeds them Annex-B access units from the FFmpeg demuxer. Pictures come back as NV12 or P010 and are copied into the existing `sceVideoOut` frames. Direct memory for that decoder is `sceKernelAllocateDirectMemory` / `sceKernelMapDirectMemory`, also resolved at runtime, not added as a new required library.
+
+If any of those symbols is missing, or the decoder returns no picture, the same file is decoded with FFmpeg on the CPU, capped at 1920×1088. Hardware accepts up to 3840×2176. MPEG-1 stays on pl_mpeg either way. No kernel patch was added to this ELF. REA 6.8.0 still has no video decoder. Playback is not sent through `rea`.
+
+This file was not booted on a console here. A titled app is still what VLC and EVO use for the same device. The probe is the attempt to use it from the elfldr payload once kstuff is already running. The toast after the bars says which path opened.
+

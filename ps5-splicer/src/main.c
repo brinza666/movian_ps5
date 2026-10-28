@@ -2,8 +2,10 @@
  *
  * Native x86-64 payload. Scanout is sceVideoOut (direct memory, A8B8G8R8).
  * MPEG-1 is pl_mpeg. MP4, MKV and MPEG-TS that carry H.264 or HEVC are
- * software-decoded with FFmpeg (no sceVideodec2 — an elfldr payload does
- * not get that). REA is not a decoder.
+ * demuxed with FFmpeg. Decode tries libSceVideodec2 (sysmodule 207),
+ * loaded with sceKernelLoadStartModule / sceSysmoduleLoadModule, the
+ * same module calls the running HEN already makes. If that module does
+ * not open, FFmpeg decodes in software. REA is not a decoder.
  *
  * The scanout sequence follows the public hbldr sample (GPL-3.0):
  *   Copyright (C) 2023 John Törnblom
@@ -26,6 +28,7 @@
 
 #include "pl_mpeg.h"
 #include "avdec.h"
+#include "hwdec.h"
 #include "font8x8_basic.h"
 
 #define MAX_FILES 48
@@ -1034,10 +1037,14 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	shade(dst, stride, vis_w, vis_h, 0, y0, vis_w, vis_h - y0);
 	snprintf(line1, sizeof line1, "SPLICER  %s  audio %s  focus %s  %s%s",
 		 LAY_NAME[g_layout], am, focus, g_status, g_paused ? "  PAUSED" : "");
-	snprintf(line2, sizeof line2, "%c A  %-28.28s %s",
-		 g_focus == 0 ? '>' : ' ', g_bus[0].name, g_bus[0].plm ? ta : "live");
-	snprintf(line3, sizeof line3, "%c B  %-28.28s %s    %d reel%s",
-		 g_focus == 1 ? '>' : ' ', g_bus[1].name, g_bus[1].plm ? tb : "live",
+	snprintf(line2, sizeof line2, "%c A  %-22.22s %s %s",
+		 g_focus == 0 ? '>' : ' ', g_bus[0].name,
+		 (g_bus[0].plm || g_bus[0].av) ? ta : "live",
+		 g_bus[0].av ? avdec_mode(g_bus[0].av) : (g_bus[0].plm ? "M1" : ""));
+	snprintf(line3, sizeof line3, "%c B  %-22.22s %s %s   %d reel%s",
+		 g_focus == 1 ? '>' : ' ', g_bus[1].name,
+		 (g_bus[1].plm || g_bus[1].av) ? tb : "live",
+		 g_bus[1].av ? avdec_mode(g_bus[1].av) : (g_bus[1].plm ? "M1" : ""),
 		 g_nfiles, g_nfiles == 1 ? "" : "s");
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + 4 * scale, line1, COL_AMBER, scale);
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (12 * scale), line2, COL_PAPER, scale);
@@ -1051,11 +1058,11 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 		if (cx < 16)
 			cx = 16;
 		shade(dst, stride, vis_w, vis_h, cx - 12, cy - 12, 40 * 8 * scale, 8 * scale * 5);
-		draw_text(dst, stride, vis_w, vis_h, cx, cy, "NO MPEG REELS ON USB", COL_AMBER, scale);
+		draw_text(dst, stride, vis_w, vis_h, cx, cy, "NO REELS ON USB", COL_AMBER, scale);
 		draw_text(dst, stride, vis_w, vis_h, cx, cy + 10 * scale,
-			  "Put .mpg files on /mnt/usb0", COL_PAPER, scale);
+			  "Put a video on /mnt/usb0", COL_PAPER, scale);
 		draw_text(dst, stride, vis_w, vis_h, cx, cy + 20 * scale,
-			  "MPEG-1 video + mp2 audio. MP4 will not open.", COL_PAPER, scale);
+			  "MPEG-1, or H.264/HEVC in MP4 MKV TS", COL_PAPER, scale);
 	}
 	draw_text(dst, stride, vis_w, vis_h, 16, 16, "A", COL_AMBER, scale);
 	draw_text(dst, stride, vis_w, vis_h, g_layout == LAY_SBS ? vis_w / 2 + 16 : 16,
@@ -1322,10 +1329,14 @@ render_loop(void)
 		} else {
 			if (frame_id == 180) {
 				notify("SPLICER scanning USB");
+				hwdec_probe();
 				g_nfiles = 0;
 				scan_media();
 				load_buses();
-				snprintf(g_status, sizeof g_status, "%d reels", g_nfiles);
+				snprintf(g_status, sizeof g_status, "%d reels %s", g_nfiles,
+					 hwdec_status());
+				notify(hwdec_ready() ? "SPLICER hardware decoder" :
+						       "SPLICER software decoder");
 			}
 			if (!extras) {
 				load_optional();

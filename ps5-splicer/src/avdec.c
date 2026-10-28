@@ -1,4 +1,5 @@
 #include "avdec.h"
+#include "hwdec.h"
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -21,6 +22,12 @@ struct avdec {
 	double duration;
 	AVRational tb;
 	enum AVPixelFormat pix;
+	hwdec_t *hw;
+	int nal_size;
+	int sent_prefix;
+	uint8_t *prefix;
+	int prefix_n;
+	uint8_t *scratch;
 };
 
 static int
@@ -117,9 +124,151 @@ frame_pts(avdec_t *a)
 }
 
 static int
+hw_pull(avdec_t *a)
+{
+	int spins = 0;
+	if (a->prefix_n && !a->sent_prefix) {
+		a->sent_prefix = 1;
+		hwdec_feed(a->hw, a->prefix, a->prefix_n);
+	}
+	for (;;) {
+		int r;
+		int n;
+		if (++spins > 64)
+			return 0;
+		if (a->eof) {
+			av_seek_frame(a->fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+			hwdec_reset(a->hw);
+			a->sent_prefix = 0;
+			a->eof = 0;
+			a->pts = 0;
+			return 0;
+		}
+		r = av_read_frame(a->fmt, a->pkt);
+		if (r < 0) {
+			a->eof = 1;
+			continue;
+		}
+		if (a->pkt->stream_index != a->vindex) {
+			av_packet_unref(a->pkt);
+			continue;
+		}
+		{
+			double step = 1.0 / 30.0;
+			AVRational rate = a->fmt->streams[a->vindex]->avg_frame_rate;
+			if (a->pkt->duration > 0)
+				step = av_q2d(a->tb) * (double)a->pkt->duration;
+			else if (rate.num > 0 && rate.den > 0)
+				step = av_q2d(av_inv_q(rate));
+			if (step < 1.0 / 120.0)
+				step = 1.0 / 30.0;
+			n = hwdec_packet_annexb(a->pkt->data, a->pkt->size, a->nal_size,
+						a->scratch, 6 << 20);
+			av_packet_unref(a->pkt);
+			if (n <= 0)
+				continue;
+			r = hwdec_feed(a->hw, a->scratch, n);
+			if (r < 0)
+				return -1;
+			if (r > 0) {
+				a->pts += step;
+				return 1;
+			}
+		}
+	}
+}
+
+static int
+try_hardware(avdec_t *a, AVStream *st)
+{
+	AVCodecParameters *par = st->codecpar;
+	int hevc = par->codec_id == AV_CODEC_ID_HEVC;
+	int ten = par->format == AV_PIX_FMT_YUV420P10LE || par->format == AV_PIX_FMT_P010LE;
+	int w = par->width;
+	int h = par->height;
+	int packets = 0;
+	int got = 0;
+	if (par->codec_id == AV_CODEC_ID_H264 && ten)
+		return -1;
+	if (!hwdec_ready())
+		return -1;
+	if (w < 16 || h < 16 || w > 3840 || h > 2176 || ((w | h) & 1))
+		return -1;
+	if (!a->pkt)
+		return -1;
+	a->prefix = (uint8_t *)malloc(64 * 1024);
+	a->scratch = (uint8_t *)malloc(6 << 20);
+	if (!a->prefix || !a->scratch)
+		goto giveup;
+	a->prefix_n = hwdec_extradata_annexb(hevc, par->extradata, par->extradata_size,
+					     a->prefix, 64 * 1024, &a->nal_size);
+	if (a->prefix_n < 0)
+		a->prefix_n = 0;
+	if (hwdec_open(&a->hw, hevc, ten, w, h) != 0)
+		goto giveup;
+	a->w = w;
+	a->h = h;
+	a->rgba = (uint8_t *)malloc((size_t)w * (size_t)h * 4);
+	if (!a->rgba)
+		goto giveup;
+	memset(a->rgba, 0, (size_t)w * (size_t)h * 4);
+	hwdec_bind(a->hw, a->rgba, w, h);
+	a->tb = st->time_base;
+	while (packets < 48 && !got) {
+		int n, r;
+		if (a->prefix_n && !a->sent_prefix) {
+			a->sent_prefix = 1;
+			hwdec_feed(a->hw, a->prefix, a->prefix_n);
+		}
+		r = av_read_frame(a->fmt, a->pkt);
+		if (r < 0)
+			break;
+		if (a->pkt->stream_index != a->vindex) {
+			av_packet_unref(a->pkt);
+			continue;
+		}
+		packets++;
+		n = hwdec_packet_annexb(a->pkt->data, a->pkt->size, a->nal_size,
+					a->scratch, 6 << 20);
+		av_packet_unref(a->pkt);
+		if (n <= 0)
+			continue;
+		if (hwdec_feed(a->hw, a->scratch, n) > 0)
+			got = 1;
+	}
+	if (!got)
+		goto giveup;
+	a->pts = 0;
+	a->clock = 0;
+	return 0;
+giveup:
+	if (a->hw) {
+		hwdec_close(a->hw);
+		a->hw = NULL;
+	}
+	free(a->rgba);
+	a->rgba = NULL;
+	free(a->prefix);
+	a->prefix = NULL;
+	free(a->scratch);
+	a->scratch = NULL;
+	a->prefix_n = 0;
+	a->sent_prefix = 0;
+	a->nal_size = 0;
+	if (a->fmt)
+		av_seek_frame(a->fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+	a->eof = 0;
+	return -1;
+}
+
+static int
 pull_one(avdec_t *a)
 {
 	int r, spins = 0;
+	if (a->hw)
+		return hw_pull(a);
+	if (!a->codec || !a->frame)
+		return -1;
 	for (;;) {
 		if (++spins > 4096)
 			return 0;
@@ -181,6 +330,20 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	if (a->vindex < 0)
 		goto fail;
 	st = a->fmt->streams[a->vindex];
+	a->pkt = av_packet_alloc();
+	a->frame = av_frame_alloc();
+	if (!a->pkt || !a->frame)
+		goto fail;
+	if (a->fmt->duration > 0)
+		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
+	if (try_hardware(a, st) == 0) {
+		*rgba = a->rgba;
+		*w = a->w;
+		*h = a->h;
+		*duration = a->duration;
+		*out = a;
+		return 0;
+	}
 	codec = avcodec_find_decoder(st->codecpar->codec_id);
 	if (!codec)
 		goto fail;
@@ -197,17 +360,13 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	if (a->w < 16 || a->h < 16 || a->w > 1920 || a->h > 1088)
 		goto fail;
 	a->rgba = (uint8_t *)malloc((size_t)a->w * (size_t)a->h * 4);
-	a->pkt = av_packet_alloc();
-	a->frame = av_frame_alloc();
-	if (!a->rgba || !a->pkt || !a->frame)
+	if (!a->rgba)
 		goto fail;
 	memset(a->rgba, 0, (size_t)a->w * (size_t)a->h * 4);
 	a->tb = st->time_base;
 	a->pix = a->codec->pix_fmt;
-	if (a->fmt->duration > 0)
+	if (a->fmt->duration > 0 && a->duration <= 0)
 		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
-	else
-		a->duration = 0;
 	ret = pull_one(a);
 	if (ret <= 0)
 		goto fail;
@@ -230,6 +389,10 @@ avdec_close(avdec_t *a)
 {
 	if (!a)
 		return;
+	if (a->hw)
+		hwdec_close(a->hw);
+	free(a->prefix);
+	free(a->scratch);
 	if (a->frame)
 		av_frame_free(&a->frame);
 	if (a->pkt)
@@ -284,8 +447,19 @@ avdec_seek(avdec_t *a, double seconds)
 	av_seek_frame(a->fmt, -1, ts, AVSEEK_FLAG_BACKWARD);
 	if (a->codec)
 		avcodec_flush_buffers(a->codec);
+	if (a->hw)
+		hwdec_reset(a->hw);
+	a->sent_prefix = 0;
 	a->eof = 0;
 	a->clock = seconds;
 	a->pts = seconds;
 	pull_one(a);
+}
+
+const char *
+avdec_mode(const avdec_t *a)
+{
+	if (a && a->hw)
+		return "HW";
+	return "SW";
 }

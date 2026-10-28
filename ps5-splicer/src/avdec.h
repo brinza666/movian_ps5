@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-/* Software H.264 / HEVC. Not a hardware decoder and not REA. */
+/* H.264 / HEVC. Hardware (libSceVideodec2) when the running HEN can load
+ * that module, otherwise FFmpeg software. Not REA.
+ */
 typedef struct avdec avdec_t;
 
 int avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
@@ -13,5 +15,7 @@ void avdec_close(avdec_t *a);
 int avdec_tick(avdec_t *a, double dt);
 double avdec_time(const avdec_t *a);
 void avdec_seek(avdec_t *a, double seconds);
+/* "HW" or "SW". */
+const char *avdec_mode(const avdec_t *a);
 
 #endif
