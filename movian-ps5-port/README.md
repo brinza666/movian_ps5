@@ -8,6 +8,12 @@ past startup.
 Nothing in here jailbreaks a console. The binary is a payload for a
 machine that already loads homebrew ELFs.
 
+The splicer ELF beside this tree was measured with REA, not run
+(`ps5-splicer/REA.md`). Its defined decoder symbols are `plm_*` only,
+entered at `plm_create_with_filename`. There is no FFmpeg import.
+This overlay is the replacement for that call, and it still cannot boot
+until the Go runtime stops issuing FreeBSD syscalls.
+
 ## What works in the scene, late October 2026
 
 Homebrew is built as a **dynamically linked ELF**, not a fake Linux

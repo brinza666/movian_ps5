@@ -1,0 +1,45 @@
+# Layout of payload.elf
+
+Measured with REA `inspect-binary-layout` (pwntools 4.15.0, pyelftools 0.33, unicorn 2.1.2). The file was not executed.
+
+| | |
+|---|---|
+| Evidence | `ev_35073aaeb6145843452dbf30e73c4a408e80032fd1805383235dd96a2b6c16dc` |
+| SHA-256 | `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64` |
+| Size | 220464 bytes |
+| Class | ELF64, `EM_X86_64`, little-endian, `ET_DYN` |
+| Entry | `0x13260` (linked virtual address, not a proven runtime PC) |
+
+## What the loader must map
+
+`DT_NEEDED`, and nothing else:
+
+- `libSceVideoOut.sprx`
+- `libSceSystemService.sprx`
+- `libkernel_web.sprx`
+- `libSceLibcInternal.sprx`
+- `libSceNet.sprx`
+
+`libScePad`, `libSceAudioOut`, and `libSceUserService` are not in that list. The symbol table has storage for the pointers (`p_scePadInit`, `p_scePadOpen`, `p_scePadReadState`, `p_sceAudioOutInit`, `p_sceAudioOutOpen`, `p_sceAudioOutOutput`, `p_sceAudioOutSetVolume`, `p_sceAudioOutClose`) and a defined `dlopen` at `0x5a40`. Those libraries are opened after the process is already running. A missing pad sprx cannot fail the initial map.
+
+Undefined imports that do have to resolve at load are the video-out set (`sceVideoOutOpen`, `sceVideoOutRegisterBuffers2`, `sceVideoOutSubmitFlip`, `sceVideoOutSetFlipRate`, and the flip-queue calls), `sceKernelAllocateMainDirectMemory`, `sceKernelMapDirectMemory`, `sceSystemServiceHideSplashScreen`, plus libc file calls: `fopen`, `fread`, `fseek`, `opendir`, `readdir`, `stat`.
+
+## What decodes a picture
+
+The defined functions are `plm_*` from `mpeg_dec.c`. The ones the combiner actually enters through:
+
+- `plm_create_with_filename` at `0x5ae0`
+- `plm_probe` at `0x71c0`
+- `plm_decode` at `0x7e90`
+- `plm_seek` at `0x92c0`
+- `plm_frame_to_rgba` at `0xf8f0` (scanout is `A8B8G8R8`, so the frame is expanded before the flip)
+
+The GOT names `PLM_VIDEO_MACROBLOCK_TYPE_INTRA` and the other pl_mpeg tables. There is no `avcodec`, `avformat`, or FFmpeg symbol, and no `DT_NEEDED` on an FFmpeg sprx.
+
+`libSceVdecShevc.native.sprx` is a string in the file. It sits in the SDK `sysmodtab` (`rtld_sprx.c`), not in `DT_NEEDED` and not in the undefined imports. It is not a decoder this ELF calls.
+
+`scan_media` (`0x4290`) and `scan_dir` (`0x4d30`) are the USB walk. File strings in the image are `/mnt/usb0`, `/mnt/usb1`, `/data/video`, and `Put .mpg files on /mnt/usb0`.
+
+## What this changes
+
+This binary opens MPEG-1 because that is the only decoder linked into it. Replacing `plm_create_with_filename` with the FFmpeg pipeline in `movian-ps5-port` is the native step that plays the rest. The Go runtime still has to stop issuing FreeBSD syscalls before that pipeline runs. Those are separate defects. REA does not show a missing console codec, and it does not show a decompilation: no Ghidra, Hopper, IDA, or rizin was available, so function bodies were not recovered.

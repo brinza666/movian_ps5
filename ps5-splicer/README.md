@@ -31,6 +31,10 @@ SHA-256 of this tree's `payload.elf`:
 9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64
 ```
 
+The same file was measured, not executed, with REA. `REA.md` lists
+`DT_NEEDED`, the undefined imports, and the `plm_*` symbols. Pad and
+audio are not load-time dependencies.
+
 The first thing on screen is three seconds of full-frame color bars
 (red, green, blue, white, amber) with the word SPLICER counting up.
 That happens before USB is scanned and before pad or audio are opened.

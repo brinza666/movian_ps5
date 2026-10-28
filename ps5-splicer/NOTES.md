@@ -56,6 +56,21 @@ frame has an amber border.
   the FFmpeg pipeline. The syscall patch and the codec list are different
   problems.
 
+## REA layout
+
+`REA.md` is a static layout of this same `payload.elf` (same sha256),
+taken with REA and not by running the file. It confirms the notes above:
+
+- `DT_NEEDED` is video out, system service, `libkernel_web`, libc, and net.
+  Pad and audio are pointer slots (`p_scePad*`, `p_sceAudioOut*`) filled by
+  this binary's own `dlopen` at `0x5a40`. That matches "bars first, then
+  dlopen". A missing pad sprx cannot reject the map.
+- The only decode symbols are `plm_*` from `mpeg_dec.c`, entered through
+  `plm_create_with_filename`. There is no FFmpeg import. Do not treat a
+  future MP4 as a relink that already happened.
+- The string `libSceVdecShevc.native.sprx` is in the SDK `sysmodtab`, not
+  in `DT_NEEDED`. It is not a decoder this ELF calls.
+
 ## Next improvements, in order
 
 1. Confirm on a real console that the bars appear. If they do not, the
@@ -66,3 +81,5 @@ frame has an amber border.
 3. H.264 needs a software decoder linked in-process, or a sprx that
    actually exports an AvPlayer the payload is allowed to call. Do not
    claim hardware decode until a frame from an MP4 is on the scanout.
+   The replacement for `plm_create_with_filename` is the FFmpeg pipeline
+   already described in `movian-ps5-port`.
