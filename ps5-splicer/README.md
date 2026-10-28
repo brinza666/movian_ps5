@@ -45,16 +45,25 @@ loader is actually waiting on port 9021 and that the file you sent is
 this `payload.elf` (sha256 below). A black screen with no toast means
 the bytes never started, not that the combiner drew black.
 
+`main` does not call `kernel_set_proc_rootdir`. SDK startup still runs
+`__kernel_init` before `main`. In this file, firmware 4.03 is the
+version word `0x4030000`, and that word takes the same offset block as
+4.02, 4.50 and 4.51. A version the table does not know fails before the
+first frame. The entry point is `_start`. The older loader that looks
+for `payload_main` on port 9020 will not run this file. Send it to the
+ELF loader on port 9021.
+
 After the bars it scans USB and combines two buses. An amber border
 stays on the picture so the output cannot collapse to a black frame.
 
 Pad and audio are loaded with `dlopen` after the bars. If either
 library refuses to open, the picture keeps running.
 
-There is no kernel memory write in this payload. An earlier build
-called `kernel_set_proc_rootdir` before the first flip, and it linked
-pad, audio, and pthread as required libraries. A fault in any of that
-exited before a single frame. That build is not this file.
+There is no `kernel_set_proc_rootdir` call in `main`. An earlier build
+called that before the first flip, and it linked pad, audio, and pthread
+as required libraries. A fault in any of that exited before a single
+frame. That build is not this file. Startup still runs the SDK's
+`__kernel_init`, and this binary's table includes 4.03.
 
 ## What it plays
 
