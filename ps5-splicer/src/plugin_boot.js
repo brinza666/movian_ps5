@@ -71,11 +71,11 @@ Proxy = new RealProxy(RealProxy, {
 
 function mov_raw(v) {
   if (!v || typeof v !== "object") return null;
-  if (v["\xffnode"] === 1) return v;
   var i;
   for (i = 0; i < mov_proxy_pairs.length; i += 2) {
     if (mov_proxy_pairs[i] === v) return mov_proxy_pairs[i + 1];
   }
+  if (v["\xffnode"] === 1) return v;
   return null;
 }
 
@@ -110,6 +110,8 @@ function mov_child(node, name) {
     next["\xffname"] = key;
     next["\xffparent"] = node;
     kids[key] = next;
+    if (key.charCodeAt(0) !== 255)
+      node["\xfforder"].push(next);
   }
   return next;
 }
@@ -231,6 +233,20 @@ var np = {
   }
 };
 
+var mov_nav_url = "";
+var mov_nav_opened = false;
+var mov_page_root = null;
+var mov_setting_nodes = [];
+var mov_item_opt_nodes = [];
+var mov_send_event = np.sendEvent;
+np.sendEvent = function (node, type, value) {
+  if ((type === "redirect" || type === "redirect2") && value != null && value !== "") {
+    mov_nav_url = String(value);
+    mov_nav_opened = false;
+  }
+  return mov_send_event(node, type, value);
+};
+
 function mov_dirname(path) {
   var s = String(path);
   var i = s.lastIndexOf("/");
@@ -289,7 +305,8 @@ function mov_wrap_settings(mod) {
   if (typeof real !== "function" || mod.__wrapped) return;
   var current = null;
   mod.globalSettings = function () {
-    var F = function () { return real.apply(this, arguments); };
+    var args = Array.prototype.slice.call(arguments);
+    var F = function () { return real.apply(this, args); };
     F.prototype = real.prototype;
     current = new F();
     return current;
@@ -419,13 +436,18 @@ var mov_native_string = {
     return s;
   },
   entityDecode: function (s) {
-    return String(s)
-      .replace(/&nbsp;/g, " ")
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
-      .replace(/"/g, "\"")
-      .replace(/&#39;|'/g, "'");
+    var out = String(s);
+    out = out.replace(/&nbsp;/gi, " ");
+    out = out.replace(/&amp;/g, "&");
+    out = out.replace(/&lt;/g, "<");
+    out = out.replace(/&gt;/g, ">");
+    out = out.replace(/&quot;/g, "\"");
+    out = out.replace(/&apos;|&#39;/g, "'");
+    out = out.replace(/&#(\d+);/g, function (_, n) {
+      var c = parseInt(n, 10);
+      return c > 0 && c < 1114112 ? String.fromCharCode(c) : _;
+    });
+    return out;
   },
   queryStringSplit: function (s) {
     var out = {};
@@ -575,7 +597,17 @@ var mov_native_route = {
     mov_routes.push({ re: compiled, source: String(re), cb: cb });
     return ++mov_seq;
   },
-  backendOpen: function (page, url) { mov_open_into(String(url), mov_raw(page) || page); }
+  backendOpen: function (page, url) {
+    var target = String(url);
+    var raw = mov_raw(page);
+    if (!raw || raw === mov_page_root) {
+      mov_nav_url = target;
+      mov_nav_opened = true;
+      mov_open_into(target, mov_page_root);
+      return;
+    }
+    mov_open_into(target, raw);
+  }
 };
 var mov_native_hook = {
   register: function () { return ++mov_seq; }
@@ -746,27 +778,242 @@ function mov_at(node, path) {
   if (!cur || cur["\xffvalue"] == null) return "";
   return String(cur["\xffvalue"]);
 }
+function mov_kid(node, name) {
+  if (!node || !node["\xffkids"]) return null;
+  return node["\xffkids"][name] || null;
+}
+function mov_truth(v) {
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+function mov_setting_label(raw, kind) {
+  var value = mov_kid(raw, "value");
+  var held = value ? value["\xffvalue"] : "";
+  if (kind === "bool") return mov_truth(held) ? "ON" : "OFF";
+  if (kind === "integer") {
+    var unit = mov_at(raw, ["unit"]);
+    var n = held == null || held === "" ? "0" : String(held);
+    return unit ? n + " " + unit : n;
+  }
+  if (kind === "string") return held == null ? "" : String(held);
+  if (kind === "multiopt") {
+    var id = held == null ? "" : String(held);
+    var opts = mov_kid(raw, "options");
+    var node = opts ? mov_kid(opts, id) : null;
+    var title = node ? mov_at(node, ["title"]) : "";
+    return title || id;
+  }
+  if (kind === "info") return mov_plain(mov_at(raw, ["description"]));
+  return "";
+}
+function mov_describe_setting(raw, title) {
+  var kind = mov_at(raw, ["type"]);
+  if (!kind) return null;
+  return { kind: kind, title: title || kind, value: mov_setting_label(raw, kind) };
+}
+function mov_collect_box(box, prefix, into) {
+  if (!box || into.length >= 24) return;
+  var seen = [];
+  function has(raw) {
+    var i;
+    for (i = 0; i < seen.length; i++) if (seen[i] === raw) return true;
+    return false;
+  }
+  function add(raw, fallback) {
+    if (!raw || has(raw) || into.length >= 24) return;
+    var kind = mov_at(raw, ["type"]);
+    if (!kind) return;
+    var en = mov_kid(raw, "enabled");
+    var flag = en ? en["\xffvalue"] : true;
+    if (flag === false || flag === 0 || flag === "0" || flag === "false") return;
+    seen.push(raw);
+    var title = mov_plain(mov_at(raw, ["metadata", "title"]) || fallback || kind);
+    if (kind === "info" && (!title || title === "info")) title = "Note";
+    if (prefix) title = prefix + " / " + title;
+    var row = mov_describe_setting(raw, title);
+    if (!row) return;
+    mov_setting_nodes.push(raw);
+    into.push(row);
+  }
+  var order = box["\xfforder"] || [];
+  var i;
+  for (i = 0; i < order.length; i++) add(order[i], "");
+  var names = [];
+  var k;
+  var kids = box["\xffkids"] || {};
+  for (k in kids) names.push(k);
+  for (i = 0; i < names.length; i++) add(kids[names[i]], names[i]);
+}
+function mov_page_settings(root) {
+  var out = [];
+  mov_setting_nodes = [];
+  var model = mov_child(root, "model");
+  mov_collect_box(mov_kid(model, "options"), "", out);
+  var g = mov_global;
+  var apps = g && mov_kid(mov_kid(g, "settings"), "apps");
+  var nodes = apps && mov_kid(apps, "nodes");
+  var ids = [];
+  var id;
+  if (nodes && nodes["\xffkids"]) {
+    for (id in nodes["\xffkids"]) ids.push(id);
+  }
+  var a;
+  for (a = 0; a < ids.length; a++) {
+    var app = nodes["\xffkids"][ids[a]];
+    var name = mov_plain(mov_at(app, ["metadata", "title"]) || ids[a]);
+    mov_collect_box(mov_kid(app, "nodes"), name, out);
+  }
+  return out;
+}
+function mov_item_options(raw) {
+  var box = mov_kid(raw, "options");
+  var out = [];
+  var raws = [];
+  if (!box) return { list: out, raws: raws };
+  var order = box["\xfforder"] || [];
+  var i;
+  for (i = 0; i < order.length && out.length < 12; i++) {
+    var o = order[i];
+    var kind = mov_at(o, ["type"]) || "action";
+    var title = mov_plain(mov_at(o, ["metadata", "title"]) || "");
+    var url = mov_at(o, ["url"]);
+    if (!title && !url && kind !== "separator") continue;
+    out.push({ title: title || kind, url: url, kind: kind });
+    raws.push(o);
+  }
+  return { list: out, raws: raws };
+}
+function mov_visible(root) {
+  var model = mov_child(root, "model");
+  var nodes = mov_child(model, "nodes");
+  var order = nodes["\xfforder"] || [];
+  var items = [];
+  var i;
+  for (i = 0; i < order.length && items.length < 48; i++) {
+    var raw = order[i];
+    var type = mov_at(raw, ["type"]) || "item";
+    var title = mov_plain(mov_at(raw, ["metadata", "title"]) || mov_at(raw, ["url"]) || "");
+    var url = mov_at(raw, ["url"]);
+    if (type === "separator") continue;
+    if (!title && !url && type !== "action") continue;
+    items.push({ raw: raw, title: title || "Item", url: url, type: type });
+  }
+  return items;
+}
 function mov_harvest(root) {
   var model = mov_child(root, "model");
   var err = mov_at(model, ["error"]);
   var type = mov_at(model, ["type"]);
   var title = mov_plain(mov_at(model, ["metadata", "title"]) || mov_at(root, ["metadata", "title"]));
-  var nodes = mov_child(model, "nodes");
+  var vis = mov_visible(root);
   var items = [];
-  var order = nodes["\xfforder"];
+  mov_item_opt_nodes = [];
   var i;
-  for (i = 0; i < order.length && items.length < 48; i++) {
-    var raw = order[i];
-    var it = {
-      title: mov_plain(mov_at(raw, ["metadata", "title"]) || mov_at(raw, ["url"]) || "Item"),
-      url: mov_at(raw, ["url"]),
-      type: mov_at(raw, ["type"]) || "item"
-    };
-    if (it.type === "separator") continue;
-    if (!it.title && !it.url) continue;
-    items.push(it);
+  for (i = 0; i < vis.length; i++) {
+    var opts = mov_item_options(vis[i].raw);
+    mov_item_opt_nodes.push(opts.raws);
+    items.push({ title: vis[i].title, url: vis[i].url, type: vis[i].type, options: opts.list });
   }
-  return { title: title, items: items, error: type === "openerror" ? err : "" };
+  return {
+    title: title,
+    items: items,
+    error: type === "openerror" ? err : "",
+    pageOptions: mov_page_settings(root)
+  };
+}
+function mov_follow_redirect() {
+  var last = "";
+  var guard = 0;
+  while (mov_nav_url && guard < 4) {
+    var url = mov_nav_url;
+    var opened = mov_nav_opened;
+    mov_nav_url = "";
+    mov_nav_opened = false;
+    last = url;
+    guard++;
+    if (opened) continue;
+    var root = mov_make();
+    mov_page_root = root;
+    try { mov_open_into(url, root); }
+    catch (e) {
+      np.set(mov_child(root, "model"), "type", "openerror");
+      np.set(mov_child(root, "model"), "error", String(e && (e.message || e)));
+    }
+    __movianFlush();
+  }
+  return last;
+}
+function mov_multi_ids(raw) {
+  var opts = mov_kid(raw, "options");
+  var ids = [];
+  var i;
+  var k;
+  if (!opts) return ids;
+  var order = opts["\xfforder"] || [];
+  for (i = 0; i < order.length; i++) {
+    var name = order[i] && order[i]["\xffname"];
+    if (name && String(name).charCodeAt(0) !== 255) ids.push(String(name));
+  }
+  if (ids.length) return ids;
+  if (!opts["\xffkids"]) return ids;
+  for (k in opts["\xffkids"]) ids.push(k);
+  return ids;
+}
+function mov_apply_setting(raw, how) {
+  var kind = mov_at(raw, ["type"]);
+  var text = how == null ? "" : String(how);
+  if (text.charAt(0) === "\x1f") {
+    if (kind === "string") np.set(raw, "value", text.substring(1));
+    return;
+  }
+  if (kind === "bool" && text === "toggle") {
+    var held = mov_kid(raw, "value");
+    var on = held && mov_truth(held["\xffvalue"]);
+    np.set(raw, "value", on ? false : true);
+    return;
+  }
+  if (kind === "integer" && (text === "inc" || text === "dec")) {
+    var cur = parseInt(mov_at(raw, ["value"]), 10);
+    var step = parseInt(mov_at(raw, ["step"]) || "1", 10);
+    var min = parseInt(mov_at(raw, ["min"]), 10);
+    var max = parseInt(mov_at(raw, ["max"]), 10);
+    if (isNaN(cur)) cur = 0;
+    if (isNaN(step) || !step) step = 1;
+    cur += text === "dec" ? -step : step;
+    if (!isNaN(min) && cur < min) cur = min;
+    if (!isNaN(max) && cur > max) cur = max;
+    np.set(raw, "value", cur);
+    return;
+  }
+  if (kind === "multiopt" && (text === "inc" || text === "dec")) {
+    var ids = mov_multi_ids(raw);
+    if (!ids.length) return;
+    var curId = mov_at(raw, ["value"]);
+    var idx = 0;
+    var i;
+    for (i = 0; i < ids.length; i++) if (ids[i] === curId) idx = i;
+    idx = text === "dec" ? idx - 1 : idx + 1;
+    if (idx < 0) idx = ids.length - 1;
+    if (idx >= ids.length) idx = 0;
+    var opts = mov_kid(raw, "options");
+    mov_fire(opts, "selectchild", opts["\xffkids"][ids[idx]]);
+    return;
+  }
+  if (kind === "action" && text === "go") {
+    var sink = mov_kid(raw, "eventSink");
+    if (sink) mov_fire(sink, "action", "Activate");
+  }
+}
+function mov_finish_page(redirected) {
+  var page = mov_harvest(mov_page_root);
+  page.redirected = redirected || "";
+  page.mode = "page";
+  return page;
+}
+function mov_wipe_dir(node) {
+  if (!node) return;
+  node["\xffkids"] = Object.create(null);
+  node["\xfforder"] = [];
+  node["\xffsubs"] = [];
 }
 function mov_open_into(url, root) {
   var hit = null;
@@ -778,13 +1025,17 @@ function mov_open_into(url, root) {
     m = mov_routes[i].re.exec(url);
     if (m) { hit = mov_routes[i]; break; }
   }
-  var nodes = mov_child(mov_child(root, "model"), "nodes");
-  nodes["\xfforder"] = [];
+  var model = mov_child(root, "model");
+  mov_wipe_dir(mov_child(model, "nodes"));
+  mov_wipe_dir(mov_child(model, "options"));
   if (!hit) {
-    np.set(mov_child(root, "model"), "type", "openerror");
-    np.set(mov_child(root, "model"), "error", "No route for " + url);
+    np.set(model, "type", "openerror");
+    np.set(model, "error", "No route for " + url);
     return;
   }
+  np.set(model, "type", "directory");
+  np.set(model, "error", "");
+  np.set(model, "loading", false);
   var args = [];
   for (i = 1; i < m.length; i++) args.push(m[i] == null ? "" : String(m[i]));
   hit.cb(root, true, args);
@@ -852,13 +1103,59 @@ function __movianServices() { return mov_services; }
 
 function __movianOpen(url) {
   var root = mov_make();
+  mov_page_root = root;
+  mov_nav_url = "";
+  mov_nav_opened = false;
   var thrown = "";
   try { mov_open_into(String(url), root); }
   catch (e) { thrown = String(e && (e.stack || e.message) || e); }
   __movianFlush();
-  var page = mov_harvest(root);
+  mov_follow_redirect();
+  var page = mov_harvest(mov_page_root);
   if (thrown && !page.error) page.error = thrown;
+  page.redirected = "";
+  page.mode = "page";
   return page;
+}
+
+function __movianSetting(index, how) {
+  var raw = mov_setting_nodes[index];
+  if (!raw || !mov_page_root) return { mode: "error", error: "no setting", title: "", items: [], pageOptions: [], redirected: "" };
+  mov_nav_url = "";
+  mov_nav_opened = false;
+  try { mov_apply_setting(raw, how == null ? "" : String(how)); }
+  catch (e) { return { mode: "error", error: String(e && (e.message || e)), title: "", items: [], pageOptions: [], redirected: "" }; }
+  __movianFlush();
+  var url = mov_follow_redirect();
+  var page = mov_finish_page(url);
+  return page;
+}
+
+function __movianUse(itemIndex, optIndex) {
+  if (!mov_page_root) return { mode: "error", error: "no page", url: "", title: "", items: [], pageOptions: [], redirected: "" };
+  var vis = mov_visible(mov_page_root);
+  var item = vis[itemIndex];
+  if (!item) return { mode: "error", error: "no item", url: "", title: "", items: [], pageOptions: [], redirected: "" };
+  var node = item.raw;
+  if (optIndex >= 0) {
+    var raws = mov_item_opt_nodes[itemIndex] || [];
+    node = raws[optIndex];
+    if (!node) return { mode: "error", error: "no option", url: "", title: "", items: [], pageOptions: [], redirected: "" };
+    var kind = mov_at(node, ["type"]) || "action";
+    if (kind === "location") return { mode: "location", url: mov_at(node, ["url"]), title: "", items: [], pageOptions: [], redirected: "", error: "" };
+    if (kind === "separator" || kind === "info") return { mode: "none", url: "", title: "", items: [], pageOptions: [], redirected: "", error: "" };
+  }
+  mov_nav_url = "";
+  mov_nav_opened = false;
+  try {
+    var sink = mov_kid(node, "eventSink");
+    if (sink) mov_fire(sink, "action", "Activate");
+  } catch (e2) {
+    return { mode: "error", error: String(e2 && (e2.message || e2)), url: "", title: "", items: [], pageOptions: [], redirected: "" };
+  }
+  __movianFlush();
+  var gone = mov_follow_redirect();
+  return mov_finish_page(gone);
 }
 
 __movianReset();

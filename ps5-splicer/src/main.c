@@ -155,6 +155,15 @@ static int g_idx[2];
 static int g_layout;
 static int g_paused;
 static int g_audio_mode; /* 0 both, 1 A, 2 B */
+static int g_speed = 100; /* percent: 50, 100, 150, 200 */
+static int g_opt_menu; /* 1 player, 2 page settings, 3 item options, 4 keyboard */
+static int g_opt_i;
+static int g_opt_item;
+static int g_key_x;
+static int g_key_y;
+static int g_key_set;
+static int g_key_shift;
+static char g_key[160];
 static int g_focus;
 static int g_split = -1;
 static volatile int g_run = 1;
@@ -295,7 +304,8 @@ static void
 aq_pull(aq_t *q, int16_t *dst, int frames, float gain)
 {
 	int i;
-	double step = (q->rate > 0 ? (double)q->rate : 48000.0) / 48000.0;
+	double step = (q->rate > 0 ? (double)q->rate : 48000.0) / 48000.0 *
+		((double)g_speed / 100.0);
 	for (i = 0; i < frames; i++) {
 		float l = 0, r = 0;
 		if (q->n >= 2) {
@@ -1151,8 +1161,9 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	fmt_tc(ta, sizeof ta, ta_s);
 	fmt_tc(tb, sizeof tb, tb_s);
 	shade(dst, stride, vis_w, vis_h, 0, y0, vis_w, vis_h - y0);
-	snprintf(line1, sizeof line1, "SPLICER  %s  audio %s  focus %s  %s%s",
-		 LAY_NAME[g_layout], am, focus, g_status, g_paused ? "  PAUSED" : "");
+	snprintf(line1, sizeof line1, "SPLICER  %s  audio %s  focus %s  %s%s%s",
+		 LAY_NAME[g_layout], am, focus, g_status, g_paused ? "  PAUSED" : "",
+		 g_speed == 100 ? "" : (g_speed == 50 ? "  0.5x" : (g_speed == 150 ? "  1.5x" : "  2x")));
 	snprintf(line2, sizeof line2, "%c A  %-22.22s %s %s",
 		 g_focus == 0 ? '>' : ' ', g_bus[0].name,
 		 (g_bus[0].plm || g_bus[0].av) ? ta : "live",
@@ -1166,7 +1177,7 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (12 * scale), line2, COL_PAPER, scale);
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (20 * scale), line3, COL_PAPER, scale);
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (28 * scale),
-		  "L2 plugins  Cross pause  Up/Down layout  L1/R1 clip  Sqr focus  Cir audio  Tri swap  Opt rescan",
+		  "L2 plugins  Cross pause  Up/Down layout  L1/R1 clip  Sqr focus  Cir audio  Tri swap  Opt menu",
 		  COL_SAGE, scale > 1 ? scale - 1 : 1);
 	if (g_nfiles == 0) {
 		int cx = vis_w / 2 - 18 * 8 * scale;
@@ -1306,6 +1317,456 @@ proof_pattern(uint8_t *dst, int stride, int w, int h, int frame, int scale)
 	draw_text(dst, stride, w, h, w / 8, h / 2 + 36 * scale, "PAYLOAD RUNNING", (const uint8_t *)"\x10\x10\x10", scale);
 }
 
+static int stream_url(const char *url);
+
+static const int SPEEDS[] = {50, 100, 150, 200};
+static const char *PLAY_NAME[] = {
+	"Layout", "Audio", "Speed", "Focus", "Pause", "Rescan", "Plugins"
+};
+#define PLAY_N 7
+static const char KEYS[] = "abcdefghijklmnopqrstuvwxyz0123456789.-_:/?&=+#@ ";
+#define KEY_COLS 10
+#define KEY_N ((int)(sizeof(KEYS) - 1))
+
+static const char *
+speed_label(void)
+{
+	if (g_speed == 50)
+		return "0.5x";
+	if (g_speed == 150)
+		return "1.5x";
+	if (g_speed == 200)
+		return "2x";
+	return "1x";
+}
+
+static void
+cycle_speed(int dir)
+{
+	int i, cur = 0;
+	for (i = 0; i < 4; i++)
+		if (SPEEDS[i] == g_speed)
+			cur = i;
+	cur = (cur + (dir < 0 ? 3 : 1)) % 4;
+	g_speed = SPEEDS[cur];
+}
+
+static void
+open_picked(const char *url, const char *title)
+{
+	struct stat st;
+	if (is_bt_src(url)) {
+		if (bt_start(url) == 0) {
+			bus_live(&g_bus[g_focus], 2, bt_name());
+			g_bt_opened = 0;
+			g_plug = 0;
+			g_opt_menu = 0;
+			notify("SPLICER torrent");
+		} else {
+			notify("SPLICER torrent rejected");
+		}
+		return;
+	}
+	if (stream_url(url)) {
+		snprintf(g_stream, sizeof g_stream, "%s", url ? url : "");
+		snprintf(g_stream_name, sizeof g_stream_name, "%s", title ? title : "");
+		g_plug = 1;
+		g_plug_view = 2;
+		g_plug_i = 0;
+		g_opt_menu = 0;
+		return;
+	}
+	if (url && url[0] == '/' && stat(url, &st) == 0 && S_ISREG(st.st_mode)) {
+		bus_open_file(&g_bus[g_focus], url, 0);
+		g_plug = 0;
+		g_opt_menu = 0;
+		notify("SPLICER opened file");
+		return;
+	}
+	if (url && url[0] && plug_open(url) == 0) {
+		g_plug = 1;
+		g_plug_view = 1;
+		g_plug_i = 0;
+		g_opt_menu = 0;
+		return;
+	}
+	if (url && url[0])
+		notify(plug_status());
+}
+
+static void
+run_item_action(int item, int opt)
+{
+	char url[768];
+	int rc = plug_use_option(item, opt, url, sizeof url);
+	if (rc < 0) {
+		notify(plug_status());
+		return;
+	}
+	if (rc == 1) {
+		open_picked(url, opt >= 0 ? plug_item_option_title(item, opt) : plug_item_title(item));
+		return;
+	}
+	if (rc == 2) {
+		g_plug = 1;
+		g_plug_view = 1;
+		g_plug_i = 0;
+		g_opt_menu = 0;
+	}
+}
+
+static void
+apply_setting(const char *how)
+{
+	char url[768];
+	int rc;
+	if (g_opt_i < 0 || g_opt_i >= plug_setting_count())
+		return;
+	rc = plug_setting_apply(g_opt_i, how, url, sizeof url);
+	if (rc < 0) {
+		notify(plug_status());
+		return;
+	}
+	if (rc == 2) {
+		g_plug = 1;
+		g_plug_view = 1;
+		g_plug_i = 0;
+		g_opt_menu = 0;
+		return;
+	}
+	if (plug_setting_count() <= 0)
+		g_opt_menu = 0;
+	else if (g_opt_i >= plug_setting_count())
+		g_opt_i = plug_setting_count() - 1;
+}
+
+static void
+rescan_media(void)
+{
+	g_nfiles = 0;
+	scan_media();
+	load_buses();
+	notify("SPLICER rescanned");
+	g_opt_menu = 0;
+}
+
+static void
+open_plugins(void)
+{
+	g_opt_menu = 0;
+	g_plug = 1;
+	g_plug_wait = 0;
+	plug_scan();
+	g_plug_i = 0;
+	g_plug_view = 0;
+	notify(plug_count() ? "SPLICER plugins" : "SPLICER no plugins on USB");
+}
+
+static void
+player_adjust(int dir)
+{
+	if (g_opt_i == 0)
+		g_layout = (g_layout + dir + LAY_COUNT) % LAY_COUNT;
+	else if (g_opt_i == 1)
+		g_audio_mode = (g_audio_mode + dir + 3) % 3;
+	else if (g_opt_i == 2)
+		cycle_speed(dir);
+	else if (g_opt_i == 3)
+		g_focus ^= 1;
+	else if (g_opt_i == 4)
+		g_paused = !g_paused;
+}
+
+static void
+player_go(void)
+{
+	if (g_opt_i == 5)
+		rescan_media();
+	else if (g_opt_i == 6)
+		open_plugins();
+	else
+		player_adjust(1);
+}
+
+static int
+menu_len(void)
+{
+	if (g_opt_menu == 1)
+		return PLAY_N;
+	if (g_opt_menu == 2)
+		return plug_setting_count();
+	if (g_opt_menu == 3)
+		return plug_item_option_count(g_opt_item);
+	return 0;
+}
+
+static void
+commit_string(void)
+{
+	char how[164];
+	char url[768];
+	size_t n = strlen(g_key);
+	int rc;
+	if (n > sizeof how - 2)
+		n = sizeof how - 2;
+	how[0] = 0x1f;
+	memcpy(how + 1, g_key, n);
+	how[n + 1] = 0;
+	rc = plug_setting_apply(g_key_set, how, url, sizeof url);
+	if (rc < 0)
+		notify(plug_status());
+	else if (rc == 2) {
+		g_plug = 1;
+		g_plug_view = 1;
+		g_plug_i = 0;
+		g_opt_menu = 0;
+	} else {
+		g_opt_menu = 2;
+	}
+}
+
+static void
+options_tap(void)
+{
+	if (g_opt_menu == 4) {
+		commit_string();
+		return;
+	}
+	if (g_opt_menu) {
+		g_opt_menu = 0;
+		return;
+	}
+	if (g_plug && g_plug_view >= 1 && plug_setting_count() > 0) {
+		g_opt_menu = 2;
+		g_opt_i = 0;
+		return;
+	}
+	if (g_plug && g_plug_view >= 1) {
+		notify("SPLICER no options");
+		return;
+	}
+	g_opt_menu = 1;
+	g_opt_i = 0;
+}
+
+static void
+menu_keys(uint32_t down)
+{
+	int n = menu_len();
+	const char *kind;
+	if (g_opt_menu == 4) {
+		int rows = (KEY_N + KEY_COLS - 1) / KEY_COLS + 1;
+		int len = (int)strlen(g_key);
+		if (down & BTN_UP) {
+			g_key_y--;
+			if (g_key_y < 0)
+				g_key_y = rows - 1;
+		}
+		if (down & BTN_DOWN) {
+			g_key_y++;
+			if (g_key_y >= rows)
+				g_key_y = 0;
+		}
+		if (down & BTN_LEFT) {
+			g_key_x--;
+			if (g_key_x < 0)
+				g_key_x = KEY_COLS - 1;
+		}
+		if (down & BTN_RIGHT) {
+			g_key_x++;
+			if (g_key_x >= KEY_COLS)
+				g_key_x = 0;
+		}
+		if (down & BTN_CIR) {
+			g_opt_menu = 2;
+			return;
+		}
+		if (down & BTN_CROSS) {
+			int at = g_key_y * KEY_COLS + g_key_x;
+			int key_rows = (KEY_N + KEY_COLS - 1) / KEY_COLS;
+			if (g_key_y >= key_rows) {
+				if (g_key_x == 0 && len > 0)
+					g_key[len - 1] = 0;
+				else if (g_key_x == 1)
+					g_key[0] = 0;
+				else if (g_key_x == 2)
+					g_key_shift = !g_key_shift;
+				else if (g_key_x == 3)
+					options_tap();
+			} else if (at >= 0 && at < KEY_N && len + 1 < (int)sizeof g_key) {
+				int ch = (unsigned char)KEYS[at];
+				if (g_key_shift && ch >= 'a' && ch <= 'z')
+					ch = ch - 'a' + 'A';
+				g_key[len] = (char)ch;
+				g_key[len + 1] = 0;
+			}
+		}
+		return;
+	}
+	if (down & BTN_UP) {
+		g_opt_i--;
+		if (g_opt_i < 0)
+			g_opt_i = n > 0 ? n - 1 : 0;
+	}
+	if (down & BTN_DOWN) {
+		g_opt_i++;
+		if (n <= 0 || g_opt_i >= n)
+			g_opt_i = 0;
+	}
+	if (down & BTN_CIR) {
+		g_opt_menu = 0;
+		return;
+	}
+	if (g_opt_menu == 1) {
+		if (down & BTN_LEFT)
+			player_adjust(-1);
+		if (down & BTN_RIGHT)
+			player_adjust(1);
+		if (down & BTN_CROSS)
+			player_go();
+		return;
+	}
+	if (n <= 0)
+		return;
+	if (g_opt_menu == 3) {
+		kind = plug_item_option_kind(g_opt_item, g_opt_i);
+		if ((down & BTN_CROSS) && kind && strcmp(kind, "separator") != 0)
+			run_item_action(g_opt_item, g_opt_i);
+		return;
+	}
+	kind = plug_setting_kind(g_opt_i);
+	if (!kind)
+		return;
+	if ((down & BTN_LEFT) && (strcmp(kind, "bool") == 0 || strcmp(kind, "integer") == 0 ||
+				   strcmp(kind, "multiopt") == 0))
+		apply_setting(strcmp(kind, "bool") == 0 ? "toggle" : "dec");
+	if ((down & BTN_RIGHT) && (strcmp(kind, "bool") == 0 || strcmp(kind, "integer") == 0 ||
+				    strcmp(kind, "multiopt") == 0))
+		apply_setting(strcmp(kind, "bool") == 0 ? "toggle" : "inc");
+	if (!(down & BTN_CROSS))
+		return;
+	if (strcmp(kind, "bool") == 0)
+		apply_setting("toggle");
+	else if (strcmp(kind, "integer") == 0 || strcmp(kind, "multiopt") == 0)
+		apply_setting("inc");
+	else if (strcmp(kind, "action") == 0)
+		apply_setting("go");
+	else if (strcmp(kind, "string") == 0) {
+		snprintf(g_key, sizeof g_key, "%s", plug_setting_value(g_opt_i));
+		g_key_set = g_opt_i;
+		g_key_x = 0;
+		g_key_y = 0;
+		g_key_shift = 0;
+		g_opt_menu = 4;
+	}
+}
+
+static void
+draw_opt_menu(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	char line[180];
+	char ascii[160];
+	int n, i, rows, start, pitch, y0, panel_h;
+	const char *head = "OPTIONS";
+	pitch = 10 * scale;
+	if (pitch < 8)
+		pitch = 8;
+	if (g_opt_menu == 1)
+		head = "OPTIONS";
+	else if (g_opt_menu == 2)
+		head = "PAGE OPTIONS";
+	else if (g_opt_menu == 3)
+		head = "ITEM OPTIONS";
+	else
+		head = "KEYBOARD";
+	n = g_opt_menu == 4 ? 8 : menu_len();
+	rows = n > 12 ? 12 : (n > 0 ? n : 1);
+	if (g_opt_menu == 4)
+		rows = 8;
+	panel_h = (rows + 3) * pitch;
+	y0 = vis_h / 2 - panel_h / 2;
+	if (y0 < 8 * scale)
+		y0 = 8 * scale;
+	shade(dst, stride, vis_w, vis_h, 24 * scale, y0, vis_w - 48 * scale, panel_h);
+	draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + 2 * scale, head, COL_AMBER, scale);
+	if (g_opt_menu == 4) {
+		int r, c, at;
+		int key_rows = (KEY_N + KEY_COLS - 1) / KEY_COLS;
+		snprintf(line, sizeof line, "%.40s", g_key[0] ? g_key : "(empty)");
+		draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + pitch, line, COL_PAPER, scale);
+		for (r = 0; r < key_rows; r++) {
+			for (c = 0; c < KEY_COLS; c++) {
+				int on, ch;
+				at = r * KEY_COLS + c;
+				if (at >= KEY_N)
+					break;
+				on = g_key_y == r && g_key_x == c;
+				ch = (unsigned char)KEYS[at];
+				if (g_key_shift && ch >= 'a' && ch <= 'z')
+					ch = ch - 'a' + 'A';
+				line[0] = ch == ' ' ? '_' : (char)ch;
+				line[1] = 0;
+				draw_text(dst, stride, vis_w, vis_h, (32 + c * 10) * scale,
+					  y0 + (r + 2) * pitch, line, on ? COL_AMBER : COL_PAPER, scale);
+			}
+		}
+		draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + (key_rows + 2) * pitch,
+			  g_key_y >= key_rows && g_key_x == 0 ? ">BKSP" : " BKSP",
+			  g_key_y >= key_rows && g_key_x == 0 ? COL_AMBER : COL_SAGE, scale);
+		draw_text(dst, stride, vis_w, vis_h, 90 * scale, y0 + (key_rows + 2) * pitch,
+			  g_key_y >= key_rows && g_key_x == 1 ? ">CLR" : " CLR",
+			  g_key_y >= key_rows && g_key_x == 1 ? COL_AMBER : COL_SAGE, scale);
+		draw_text(dst, stride, vis_w, vis_h, 140 * scale, y0 + (key_rows + 2) * pitch,
+			  g_key_y >= key_rows && g_key_x == 2 ? (g_key_shift ? ">SHIFT" : ">shift") : (g_key_shift ? " SHIFT" : " shift"),
+			  g_key_y >= key_rows && g_key_x == 2 ? COL_AMBER : COL_SAGE, scale);
+		draw_text(dst, stride, vis_w, vis_h, 210 * scale, y0 + (key_rows + 2) * pitch,
+			  g_key_y >= key_rows && g_key_x == 3 ? ">OK" : " OK",
+			  g_key_y >= key_rows && g_key_x == 3 ? COL_AMBER : COL_SAGE, scale);
+		return;
+	}
+	if (n <= 0) {
+		draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + pitch, "Nothing to change", COL_PAPER, scale);
+		return;
+	}
+	start = g_opt_i - rows / 2;
+	if (start < 0)
+		start = 0;
+	if (start + rows > n)
+		start = n > rows ? n - rows : 0;
+	for (i = 0; i < rows && start + i < n; i++) {
+		int idx = start + i;
+		const char *title = "";
+		const char *extra = "";
+		char shown[140];
+		if (g_opt_menu == 1) {
+			title = PLAY_NAME[idx];
+			if (idx == 0)
+				extra = LAY_NAME[g_layout];
+			else if (idx == 1)
+				extra = g_audio_mode == 0 ? "A+B" : (g_audio_mode == 1 ? "A" : "B");
+			else if (idx == 2)
+				extra = speed_label();
+			else if (idx == 3)
+				extra = g_focus == 0 ? "A" : "B";
+			else if (idx == 4)
+				extra = g_paused ? "ON" : "OFF";
+		} else if (g_opt_menu == 2) {
+			title = plug_setting_title(idx);
+			extra = plug_setting_value(idx);
+		} else {
+			title = plug_item_option_title(g_opt_item, idx);
+			extra = plug_item_option_kind(g_opt_item, idx);
+		}
+		plug_ascii(title, ascii, sizeof ascii);
+		snprintf(shown, sizeof shown, "%c %-18.18s %s", idx == g_opt_i ? '>' : ' ', ascii, extra);
+		plug_ascii(shown, line, sizeof line);
+		draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + (i + 1) * pitch, line,
+			  idx == g_opt_i ? COL_AMBER : COL_PAPER, scale);
+	}
+	draw_text(dst, stride, vis_w, vis_h, 32 * scale, y0 + (rows + 1) * pitch,
+		  "Up/Down  Cross change  Circle close", COL_SAGE, scale > 1 ? scale - 1 : 1);
+}
+
 static int
 stream_url(const char *url)
 {
@@ -1325,33 +1786,11 @@ plug_job(void)
 			notify(plug_status());
 		}
 	} else if (g_plug_job == 2) {
-		const char *url = plug_item_url(g_plug_i);
-		const char *title = plug_item_title(g_plug_i);
-		struct stat st;
-		if (is_bt_src(url)) {
-			if (bt_start(url) == 0) {
-				bus_live(&g_bus[g_focus], 2, bt_name());
-				g_bt_opened = 0;
-				g_plug = 0;
-				notify("SPLICER torrent");
-			} else {
-				notify("SPLICER torrent rejected");
-			}
-		} else if (stream_url(url)) {
-			snprintf(g_stream, sizeof g_stream, "%s", url);
-			snprintf(g_stream_name, sizeof g_stream_name, "%s", title);
-			g_plug_view = 2;
-			g_plug_i = 0;
-		} else if (url && url[0] == '/' && stat(url, &st) == 0 && S_ISREG(st.st_mode)) {
-			bus_open_file(&g_bus[g_focus], url, 0);
-			g_plug = 0;
-			notify("SPLICER opened file");
-		} else if (url && url[0] && plug_open(url) == 0) {
-			g_plug_view = 1;
-			g_plug_i = 0;
-		} else if (url && url[0]) {
-			notify(plug_status());
-		}
+		const char *type = plug_item_type(g_plug_i);
+		if (type && strcmp(type, "action") == 0)
+			run_item_action(g_plug_i, -1);
+		else
+			open_picked(plug_item_url(g_plug_i), plug_item_title(g_plug_i));
 	} else if (g_plug_job == 3) {
 		if (plug_back() != 0)
 			g_plug_view = 0;
@@ -1454,7 +1893,7 @@ draw_plugins(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	}
 	y = vis_h - 16 * scale;
 	draw_text(dst, stride, vis_w, vis_h, 16 * scale, y,
-		  g_plug_view == 0 ? "Up/Down  Cross open  L2 close" : "Up/Down  Cross open  Circle back  L2 close",
+		  g_plug_view == 0 ? "Up/Down  Cross open  L2 close  Opt menu" : "Up/Down  Cross open  Circle back  Sqr options  Opt menu",
 		  COL_SAGE, scale);
 }
 
@@ -1628,12 +2067,20 @@ render_loop(void)
 			prev_btn = btn;
 			if (btn & BTN_OPTIONS)
 				opt_hold++;
-			else
+			else {
+				if (opt_hold > 0 && opt_hold <= 100)
+					options_tap();
 				opt_hold = 0;
+			}
 			if (opt_hold > 100) {
 				g_run = 0;
 				break;
 			}
+			if (opt_hold > 0) {
+				/* Hold is quit. Don't also treat it as a tap. */
+			} else if (g_opt_menu) {
+				menu_keys(down);
+			} else {
 			if (down & BTN_L2) {
 				g_plug = !g_plug;
 				g_plug_wait = 0;
@@ -1665,6 +2112,15 @@ render_loop(void)
 						g_plug_wait = 1;
 					}
 				}
+				if (!g_plug_wait && g_plug_view == 1 && (down & BTN_SQR)) {
+					if (plug_item_option_count(g_plug_i) > 0) {
+						g_opt_menu = 3;
+						g_opt_item = g_plug_i;
+						g_opt_i = 0;
+					} else {
+						notify("SPLICER no item options");
+					}
+				}
 				if (!g_plug_wait && (down & BTN_CIR)) {
 					if (g_plug_view == 2) {
 						g_plug_view = 1;
@@ -1677,11 +2133,6 @@ render_loop(void)
 					}
 				}
 			} else {
-				if (opt_hold == 1) {
-					g_nfiles = 0;
-					scan_media();
-					load_buses();
-				}
 				if (down & BTN_UP)
 					g_layout = (g_layout + LAY_COUNT - 1) % LAY_COUNT;
 				if (down & BTN_DOWN)
@@ -1706,6 +2157,7 @@ render_loop(void)
 					seek_bus(&g_bus[g_focus], -5.0);
 				if (down & BTN_RIGHT)
 					seek_bus(&g_bus[g_focus], 5.0);
+			}
 			}
 
 			if (g_bt_cool > 0)
@@ -1739,10 +2191,11 @@ render_loop(void)
 			if (!g_paused) {
 				int i;
 				for (i = 0; i < 2; i++) {
+					double play = dt * ((double)g_speed / 100.0);
 					if (g_bus[i].plm)
-						plm_decode(g_bus[i].plm, dt);
+						plm_decode(g_bus[i].plm, play);
 					else if (g_bus[i].av)
-						avdec_tick(g_bus[i].av, dt);
+						avdec_tick(g_bus[i].av, play);
 					else if (g_bus[i].live)
 						render_live(&g_bus[i], now);
 				}
@@ -1754,6 +2207,8 @@ render_loop(void)
 				composite((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, bilinear);
 				draw_hud((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
 			}
+			if (g_opt_menu)
+				draw_opt_menu((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
 			border((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, 10, 0xFF5AA1E2u);
 		}
 

@@ -42,11 +42,34 @@ int sceHttp2DeleteRequest(int);
 
 static const char PLUG_ENGINE[] = "movian-ps5-plugin-host Duktape-2.7.0";
 
+#define PLUG_OPTS 12
+#define PLUG_SET 24
+
 typedef struct {
 	char title[PLUG_NAME];
 	char url[PLUG_URL];
 	char type[32];
 } plug_row_t;
+
+typedef struct {
+	char title[96];
+	char url[PLUG_URL];
+	char kind[16];
+} plug_iopt_t;
+
+typedef struct {
+	char title[PLUG_NAME];
+	char url[PLUG_URL];
+	char type[32];
+	plug_iopt_t opt[PLUG_OPTS];
+	int opt_n;
+} plug_item_t;
+
+typedef struct {
+	char title[96];
+	char kind[16];
+	char value[160];
+} plug_set_t;
 
 typedef struct {
 	char dir[512];
@@ -60,8 +83,10 @@ static plug_pkg_t g_pkgs[PLUG_MAX];
 static int g_pkg_n;
 static plug_row_t g_services[16];
 static int g_service_n;
-static plug_row_t g_items[PLUG_ITEMS];
+static plug_item_t g_items[PLUG_ITEMS];
 static int g_item_n;
+static plug_set_t g_set[PLUG_SET];
+static int g_set_n;
 static char g_page_title[PLUG_NAME];
 static char g_page_error[480];
 static char g_status[480];
@@ -148,6 +173,75 @@ plug_item_type(int index)
 	if (index < 0 || index >= g_item_n)
 		return "";
 	return g_items[index].type;
+}
+
+static const plug_iopt_t *
+item_opt(int item, int opt)
+{
+	if (item < 0 || item >= g_item_n)
+		return NULL;
+	if (opt < 0 || opt >= g_items[item].opt_n)
+		return NULL;
+	return &g_items[item].opt[opt];
+}
+
+int
+plug_item_option_count(int item)
+{
+	if (item < 0 || item >= g_item_n)
+		return 0;
+	return g_items[item].opt_n;
+}
+
+const char *
+plug_item_option_title(int item, int opt)
+{
+	const plug_iopt_t *o = item_opt(item, opt);
+	return o ? o->title : "";
+}
+
+const char *
+plug_item_option_kind(int item, int opt)
+{
+	const plug_iopt_t *o = item_opt(item, opt);
+	return o ? o->kind : "";
+}
+
+const char *
+plug_item_option_url(int item, int opt)
+{
+	const plug_iopt_t *o = item_opt(item, opt);
+	return o ? o->url : "";
+}
+
+int
+plug_setting_count(void)
+{
+	return g_set_n;
+}
+
+const char *
+plug_setting_title(int index)
+{
+	if (index < 0 || index >= g_set_n)
+		return "";
+	return g_set[index].title;
+}
+
+const char *
+plug_setting_kind(int index)
+{
+	if (index < 0 || index >= g_set_n)
+		return "";
+	return g_set[index].kind;
+}
+
+const char *
+plug_setting_value(int index)
+{
+	if (index < 0 || index >= g_set_n)
+		return "";
+	return g_set[index].value;
 }
 
 int
@@ -1096,15 +1190,130 @@ read_page(void)
 	arr = duk_normalize_index(g_ctx, -1);
 	n = duk_get_length(g_ctx, arr);
 	for (i = 0; i < n && g_item_n < PLUG_ITEMS; i++) {
+		plug_item_t *it = &g_items[g_item_n];
+		duk_size_t on, oi;
 		duk_get_prop_index(g_ctx, arr, (duk_uarridx_t)i);
-		take_string(g_ctx, -1, "title", g_items[g_item_n].title, sizeof g_items[g_item_n].title);
-		take_string(g_ctx, -1, "url", g_items[g_item_n].url, sizeof g_items[g_item_n].url);
-		take_string(g_ctx, -1, "type", g_items[g_item_n].type, sizeof g_items[g_item_n].type);
+		take_string(g_ctx, -1, "title", it->title, sizeof it->title);
+		take_string(g_ctx, -1, "url", it->url, sizeof it->url);
+		take_string(g_ctx, -1, "type", it->type, sizeof it->type);
+		it->opt_n = 0;
+		if (duk_get_prop_string(g_ctx, -1, "options") && duk_is_array(g_ctx, -1)) {
+			on = duk_get_length(g_ctx, -1);
+			for (oi = 0; oi < on && it->opt_n < PLUG_OPTS; oi++) {
+				plug_iopt_t *o = &it->opt[it->opt_n];
+				duk_get_prop_index(g_ctx, -1, (duk_uarridx_t)oi);
+				take_string(g_ctx, -1, "title", o->title, sizeof o->title);
+				take_string(g_ctx, -1, "url", o->url, sizeof o->url);
+				take_string(g_ctx, -1, "kind", o->kind, sizeof o->kind);
+				duk_pop(g_ctx);
+				it->opt_n++;
+			}
+		}
+		duk_pop(g_ctx);
 		duk_pop(g_ctx);
 		g_item_n++;
 	}
 	duk_pop(g_ctx);
+	g_set_n = 0;
+	if (duk_get_prop_string(g_ctx, -1, "pageOptions") && duk_is_array(g_ctx, -1)) {
+		n = duk_get_length(g_ctx, -1);
+		for (i = 0; i < n && g_set_n < PLUG_SET; i++) {
+			plug_set_t *s = &g_set[g_set_n];
+			duk_get_prop_index(g_ctx, -1, (duk_uarridx_t)i);
+			take_string(g_ctx, -1, "title", s->title, sizeof s->title);
+			take_string(g_ctx, -1, "kind", s->kind, sizeof s->kind);
+			take_string(g_ctx, -1, "value", s->value, sizeof s->value);
+			duk_pop(g_ctx);
+			g_set_n++;
+		}
+	}
+	duk_pop(g_ctx);
 	return 0;
+}
+
+static int
+finish_page(char *url, size_t n)
+{
+	char mode[16];
+	char redir[PLUG_URL];
+	char loc[PLUG_URL];
+	char err[240];
+	take_string(g_ctx, -1, "mode", mode, sizeof mode);
+	take_string(g_ctx, -1, "redirected", redir, sizeof redir);
+	take_string(g_ctx, -1, "url", loc, sizeof loc);
+	take_string(g_ctx, -1, "error", err, sizeof err);
+	if (strcmp(mode, "location") == 0) {
+		if (url && n)
+			copy_str(url, n, loc);
+		duk_pop(g_ctx);
+		return 1;
+	}
+	if (strcmp(mode, "none") == 0) {
+		duk_pop(g_ctx);
+		return 0;
+	}
+	if (strcmp(mode, "error") == 0) {
+		if (err[0])
+			copy_str(g_status, sizeof g_status, err);
+		duk_pop(g_ctx);
+		return -1;
+	}
+	read_page();
+	duk_pop(g_ctx);
+	if (g_page_error[0])
+		copy_str(g_status, sizeof g_status, g_page_error);
+	if (redir[0] && g_sp < 8) {
+		copy_str(g_stack[g_sp], sizeof g_stack[g_sp], redir);
+		g_sp++;
+		if (url && n)
+			copy_str(url, n, redir);
+		return 2;
+	}
+	if (url && n)
+		url[0] = 0;
+	return 0;
+}
+
+static int
+call2(const char *fn, int a, int b, const char *how, char *url, size_t n)
+{
+	if (!g_ctx) {
+		set_status("plugin is not loaded");
+		return -1;
+	}
+	duk_get_global_string(g_ctx, fn);
+	if (!duk_is_callable(g_ctx, -1)) {
+		duk_pop(g_ctx);
+		set_status("missing options hook");
+		return -1;
+	}
+	duk_push_int(g_ctx, a);
+	if (how)
+		duk_push_string(g_ctx, how);
+	else
+		duk_push_int(g_ctx, b);
+	if (duk_pcall(g_ctx, 2) != 0) {
+		snprintf(g_status, sizeof g_status, "%.400s", duk_safe_to_string(g_ctx, -1));
+		duk_pop(g_ctx);
+		return -1;
+	}
+	return finish_page(url, n);
+}
+
+int
+plug_setting_apply(int index, const char *how, char *url, size_t n)
+{
+	if (url && n)
+		url[0] = 0;
+	return call2("__movianSetting", index, 0, how ? how : "", url, n);
+}
+
+int
+plug_use_option(int item, int opt, char *url, size_t n)
+{
+	if (url && n)
+		url[0] = 0;
+	return call2("__movianUse", item, opt, NULL, url, n);
 }
 
 int
@@ -1166,6 +1375,7 @@ plug_load_dir(const char *dir)
 	snprintf(g_status, sizeof g_status, "%s  %d routes", id[0] ? id : "plugin", g_service_n);
 	g_sp = 0;
 	g_item_n = 0;
+	g_set_n = 0;
 	g_page_title[0] = 0;
 	g_page_error[0] = 0;
 	(void)title;
@@ -1401,8 +1611,17 @@ main(int argc, char **argv)
 	if (plug_page_error()[0])
 		printf("ERR %s\n", plug_page_error());
 	printf("ITEMS %d\n", plug_item_count());
-	for (i = 0; i < plug_item_count(); i++)
+	for (i = 0; i < plug_item_count(); i++) {
+		int o;
 		printf("ITEM %s | %s | %s\n", plug_item_type(i), plug_item_title(i), plug_item_url(i));
+		for (o = 0; o < plug_item_option_count(i); o++)
+			printf("  OPT %s | %s | %s\n", plug_item_option_kind(i, o),
+			       plug_item_option_title(i, o), plug_item_option_url(i, o));
+	}
+	printf("SETTINGS %d\n", plug_setting_count());
+	for (i = 0; i < plug_setting_count(); i++)
+		printf("SET %s | %s | %s\n", plug_setting_kind(i), plug_setting_title(i),
+		       plug_setting_value(i));
 	return plug_item_count() > 0 || plug_service_count() > 0 ? 0 : 2;
 }
 #endif

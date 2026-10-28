@@ -8,7 +8,7 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Play while a torrent downloads | Built-in client. A magnet becomes `torrentfile://` plus the info hash | C client in `payload.elf` (movian-go is not this file). A magnet, a `.torrent` or a plugin magnet plays the largest video while pieces arrive. HTTP and UDP trackers. Plaintext peers, no DHT |
 | Subtitles (srt, ass, sub, vobsub) | Yes, plus OpenSubtitles | Browser subtitle tracks only, when the file has them |
 | Audio and subtitle track choice | Yes | Browser text tracks. Audio track count is shown, not switched |
-| Resume, seek, playback speed | Yes | Yes, in the preview |
+| Resume, seek, playback speed | Yes | Seek and pause. Options menu sets speed to 0.5x, 1x, 1.5x or 2x |
 | HLS, including live | Yes | A URL the browser can play |
 | MPEG-DASH and Widevine (DRM7) | Android and desktop builds | No |
 | SMB, NFS, FTP, SFTP, WebDAV | Yes | No |
@@ -20,7 +20,7 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | AC3 / DTS passthrough | PS3 | ELF mixes to stereo |
 | Plugins and another repository | Yes | Packages in `/mnt/usb0/plugins` run in the payload (Duktape, API v2). L2 opens them. Pages use sceHttp2. A popup is accepted. Stream URLs are shown, not decoded |
 | Unified search | Yes | Names on screen, plus an `http` or `magnet` line |
-| Per-file settings, on-screen keyboard | Yes | No |
+| Per-file settings, on-screen keyboard | Yes | Options opens every page and plugin setting (bool, string, integer, multi-choice, action, divider, info). Square opens an item's options. Strings use the pad keyboard, including shift |
 | Web remote | Yes | No |
 | Google Cast | Android M7 | No |
 | FTP server, NTFS, temperature | PS3 package | No |

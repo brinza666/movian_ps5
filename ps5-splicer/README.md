@@ -71,16 +71,16 @@ etaHEN and kstuff are the environment already running. The splicer loads libSceV
 | Cross | Pause |
 | Up / Down | Layout: side by side, top/bottom, picture in picture, wipe, difference, screen |
 | L1 / R1 | Previous / next clip on the focused bus |
-| Square | Focus bus A or B |
+| Square | Focus bus A or B. In a plugin list, the item's options (play, open, the actions the plugin added) |
 | Circle | Audio A+B, A only, B only |
 | Triangle | Swap the two buses |
 | Left / Right | Seek the focused bus by 5 seconds |
 | Right stick | Move the wipe |
 | L2 | Plugins. Packages in `/mnt/usb0/plugins` (also usb1 and `/data/movian/plugins`) |
-| Options | Rescan USB |
+| Options | Menu. During playback: layout, audio, speed, focus, pause, rescan, plugins. On a plugin page: that page's settings and the plugin's own settings, every type Movian has. Tap again to close. A string opens the pad keyboard (Shift for capitals) |
 | Hold Options | Quit back to the loader |
 
-L2 lists `plugin.json` packages. Cross runs that package in this payload (Duktape 2.7, Movian API v2) and opens its first service. Pages are fetched with sceHttp2. Circle goes back. A popup is accepted, so a terms gate does not stop the script. Titles are transliterated for the on-screen font. An `http` address is shown. This FFmpeg build has no HTTP protocol, so that address is not decoded. The payload was not run on a console here.
+L2 lists `plugin.json` packages. Cross runs that package in this payload (Duktape 2.7, Movian API v2) and opens its first service. Pages are fetched with sceHttp2. Circle goes back. A popup is accepted, so a terms gate does not stop the script. Titles are transliterated for the on-screen font. An `http` address is shown. This FFmpeg build has no HTTP protocol, so that address is not decoded. The payload was not run on a console here. `payload.elf` in this tree is the previous build; the options menu is in the sources and needs a rebuild.
 
 ## Rebuild
 

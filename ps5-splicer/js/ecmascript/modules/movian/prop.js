@@ -19,6 +19,9 @@ var propHandler = {
 
   get: function(obj, name) {
 
+    if(typeof name === 'string' && name.charCodeAt(0) === 255)
+      return obj[name];
+
     if(name == 'toString') return function() {
       return String(np.getValue(obj));
     }
@@ -31,6 +34,11 @@ var propHandler = {
   },
 
   set: function(obj, name, value) {
+
+    if(typeof name === 'string' && name.charCodeAt(0) === 255) {
+      obj[name] = value;
+      return true;
+    }
 
     if(typeof value == 'object' && value !== null) {
 
