@@ -32,7 +32,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256 of this tree's `payload.elf`:
 
 ```
-8c49aec5b5139e7b1238aa9891b91cb289c802d9ac67a0972c69a90c77d0db20
+1a614c6e5e98c777236a0d6e5b55f666a5428e3baed263d2aaa17990c23da6c5
 ```
 
 The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
@@ -95,7 +95,7 @@ the probe succeeds, otherwise `avcodec_send_packet`.
 - software fallback: same codecs, up to 1920×1088
 - the HUD marks the bus `HW` or `SW`
 - AAC, AAC-LATM, AC-3, E-AC-3, MP3, DTS, DTS-HD, TrueHD, Opus, FLAC, integer PCM, float PCM, and Blu-ray or DVD LPCM are mixed to the same 48 kHz stereo output as MPEG-1. 5.1 and 7.1 are folded to stereo. Object audio (Atmos, DTS:X) is not rendered past the channel bed
-- a Matroska file with zlib-compressed headers will not open
+- Matroska header compression with zlib is inflated. bzip2-compressed tracks and encrypted files still do not open
 - VP9, AV1 and AVI are not opened
 - this ELF was not booted on a console here. Scanout stays `sceVideoOut`.
   If the hardware decoder refuses the process, the toast says software
