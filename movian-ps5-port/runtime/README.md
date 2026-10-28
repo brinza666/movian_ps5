@@ -10,9 +10,7 @@
 - The payload SDK (ps5-payload-dev/sdk **0.45**, 21 Oct 2026) ships a libc
   and Sony import stubs. Programs call `mmap`, `kqueue`, `pthread_*`.
   They do not use FreeBSD's `syscalls.master` numbers.
-- [ps5-rust](https://github.com/neokuze/ps5-rust) is the proof: full `std`,
-  tokio and `std::fs` on firmware that already runs payloads, by compiling
-  the standard library against that libc and linking with `prospero-clang`.
+- [ps5-rust](https://github.com/neokuze/ps5-rust) calls that libc and links with `prospero-clang`. Go has to do the same.
 
 ## What stock Go does instead
 

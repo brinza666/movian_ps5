@@ -1,21 +1,10 @@
 # SPLICER
 
-Native PS5 video combiner. Two pictures, one scanout. No emulator.
+Two pictures, one scanout. `payload.elf` is a PIE x86-64 ELF for a loader that is already running (elfldr, websrv, or the jar loader) on TCP port 9021.
 
-`payload.elf` is a PIE x86-64 ELF for an ELF loader you already run
-(ps5-payload-elfldr / websrv / jar loader, TCP 9021). It is not an fpkg.
-An fpkg has to be signed with Sony's keys. This does not do that.
-The loader maps this ELF and jumps to it on the console CPU.
+Pre-alpha download: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).
 
-Built with ps5-payload-sdk 0.45 crt and import stubs (`x86_64-sie-ps5`).
-This particular ELF was linked with host gcc, because the SDK's
-prospero-clang wrapper had no host LLVM here. Scanout is `sceVideoOut`
-direct memory, pixel format `A8B8G8R8` (`0x8000000022000000`).
-MPEG-1 is pl_mpeg. H.264 and HEVC are demuxed with FFmpeg 7.1.
-The picture is decoded with libSceVideodec2 when that module loads,
-and with FFmpeg on the CPU when it does not. AAC, AC-3, E-AC-3, MP3, DTS,
-TrueHD, Opus, FLAC and PCM in those files are decoded with FFmpeg and
-played through sceAudioOut.
+Built with ps5-payload-sdk 0.45 (`x86_64-sie-ps5`). Scanout is `sceVideoOut`, pixel format `A8B8G8R8`. MPEG-1 is pl_mpeg. H.264 and HEVC are demuxed with FFmpeg 7.1 and decoded with libSceVideodec2 when that module loads, otherwise with FFmpeg. AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC and PCM play through sceAudioOut.
 
 ## Send it
 
@@ -23,111 +12,45 @@ played through sceAudioOut.
 nc -q 0 PS5_IP 9021 < payload.elf
 ```
 
-or, with the SDK deployer:
-
 ```sh
 prospero-deploy -h PS5_IP -p 9021 payload.elf
 ```
 
-SHA-256 of this tree's `payload.elf`:
+SHA-256:
 
 ```
 1a614c6e5e98c777236a0d6e5b55f666a5428e3baed263d2aaa17990c23da6c5
 ```
 
-The GitHub release tagged `pre-alpha` attaches this file and the older
-MPEG-1-only fallback. The fallback is not a different firmware.
+The release also has `payload-mpeg1.elf` (sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`), the older MPEG-1-only file. It is not a build for another firmware.
 
-The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
-(sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`)
-if the new file does not show the color bars.
+The first picture is color bars and the word SPLICER, before USB, pad, or audio. Toasts: `SPLICER payload started`, then `SPLICER on screen`. No bars means the file did not start. Port 9020 will not run this ELF. Entry is `_start`.
 
-The first thing on screen is three seconds of full-frame color bars
-(red, green, blue, white, amber) with the word SPLICER counting up.
-That happens before USB is scanned and before pad or audio are opened.
-A toast says `SPLICER payload started`, then `SPLICER on screen`.
+Startup reads the firmware and picks a block in this same file. There is no separate binary per firmware. An unknown version stops before the first frame.
 
-If you do not see those bars, this ELF is not running. Check that the
-loader is actually waiting on port 9021 and that the file you sent is
-this `payload.elf`. A black screen with no toast means the bytes never
-started, not that the combiner drew black.
+1.00, 1.01, 1.02, 1.05, 1.10, 1.11, 1.12, 1.13, 1.14, 2.00, 2.20, 2.25, 2.26, 2.30, 2.50, 2.70, 3.00, 3.10, 3.20, 3.21, 4.00, 4.02, 4.03, 4.50, 4.51, 5.00, 5.02, 5.10, 5.50, 6.00, 6.02, 6.50, 7.00, 7.01, 7.20, 7.40, 7.60, 7.61, 8.00, 8.20, 8.40, 8.60, 9.00, 9.05, 9.20, 9.40, 9.60, 10.00, 10.01, 10.20, 10.40, 10.60, 11.00, 11.20, 11.40, 11.60, 12.00, 12.02, 12.20, 12.40, 12.60, 12.70, 13.00, 13.20, 13.40, 13.42, 13.60, 14.00, 14.10.
 
-`main` does not call `kernel_set_proc_rootdir`. SDK startup still runs
-`__kernel_init` before `main`. That startup reads the firmware and
-picks a block already compiled into this one file. ps5-payload-sdk 0.45
-has no compile-time firmware switch, so a rebuild "for 5.50" or "for
-13.60" is the same ELF. A version the table does not know fails before
-the first frame.
+4.03 (`0x4030000`) uses the same block as 4.00, 4.02, 4.50 and 4.51.
 
-This CRT accepts:
-
-1.00, 1.01, 1.02, 1.05, 1.10, 1.11, 1.12, 1.13, 1.14,
-2.00, 2.20, 2.25, 2.26, 2.30, 2.50, 2.70,
-3.00, 3.10, 3.20, 3.21,
-4.00, 4.02, 4.03, 4.50, 4.51,
-5.00, 5.02, 5.10, 5.50,
-6.00, 6.02, 6.50,
-7.00, 7.01, 7.20, 7.40, 7.60, 7.61,
-8.00, 8.20, 8.40, 8.60,
-9.00, 9.05, 9.20, 9.40, 9.60,
-10.00, 10.01, 10.20, 10.40, 10.60,
-11.00, 11.20, 11.40, 11.60,
-12.00, 12.02, 12.20, 12.40, 12.60, 12.70,
-13.00, 13.20, 13.40, 13.42, 13.60,
-14.00, 14.10.
-
-4.03 is the version word `0x4030000`. It takes the same block as 4.00,
-4.02, 4.50 and 4.51. The entry point is `_start`. The older loader that
-looks for `payload_main` on port 9020 will not run this file. Send it
-to the ELF loader on port 9021.
-
-After the bars it loads the hardware decoder, scans USB, and combines
-two buses. A toast says `SPLICER hardware decoder` if libSceVideodec2
-opened, or `SPLICER software decoder` if it did not. An amber border
-stays on the picture so the output cannot collapse to a black frame.
-
-Pad and audio are loaded with `dlopen` after the bars. If either
-library refuses to open, the picture keeps running.
-
-There is no `kernel_set_proc_rootdir` call in `main`. An earlier build
-called that before the first flip, and it linked pad, audio, and pthread
-as required libraries. A fault in any of that exited before a single
-frame. That build is not this file. Startup still runs the SDK's
-`__kernel_init`, and this binary's table is the SDK 0.45 list above,
-including 4.03.
+After the bars the toast says `SPLICER hardware decoder` or `SPLICER software decoder`. Pad and audio open after that. If either library does not open, the picture keeps running.
 
 ## What it plays
 
-REA is not a decoder. Neither are etaHEN, kstuff, the package manager,
-or ShadowMountPlus. Those four are the environment already running on
-the console. This file uses the module-loading calls they already
-import (`sceKernelLoadStartModule`, `sceKernelDlsym`,
-`sceSysmoduleLoadModule` / `sceSysmoduleLoadModuleInternal`) to open
-sysmodule 207, libSceVideodec2. The call is resolved with `dlsym` after
-the color bars, so a missing module does not stop the first frame.
-Details of what REA measured are in [PAYLOADS.md](PAYLOADS.md).
-
-MPEG-1, via pl_mpeg (`plm_decode`):
+MPEG-1 (pl_mpeg), with Layer II audio:
 
 - `.mpg` `.mpeg` `.mpv` `.m1v` `.m2v`
-- MPEG-1 Layer II audio is played
 
-H.264 and HEVC. Demux is FFmpeg. The picture is libSceVideodec2 when
-the probe succeeds, otherwise `avcodec_send_packet`.
+H.264 and HEVC (FFmpeg demux, libSceVideodec2 or FFmpeg):
 
 - `.mp4` `.m4v` `.mov` `.mkv` `.ts` `.m2ts` `.mts`
 - hardware: 8-bit H.264, 8-bit and 10-bit HEVC, 4:2:0, up to 3840×2176
-- software fallback: same codecs, up to 1920×1088
-- the HUD marks the bus `HW` or `SW`
-- AAC, AAC-LATM, AC-3, E-AC-3, MP3, DTS, DTS-HD, TrueHD, Opus, FLAC, integer PCM, float PCM, and Blu-ray or DVD LPCM are mixed to the same 48 kHz stereo output as MPEG-1. 5.1 and 7.1 are folded to stereo. Object audio (Atmos, DTS:X) is not rendered past the channel bed
-- Matroska header compression with zlib is inflated. bzip2-compressed tracks and encrypted files still do not open
+- software: same codecs, up to 1920×1088
+- HUD shows `HW` or `SW`
+- AAC, AAC-LATM, AC-3, E-AC-3, MP3, DTS, DTS-HD, TrueHD, Opus, FLAC, integer PCM, float PCM, Blu-ray and DVD LPCM, mixed to 48 kHz stereo. 5.1 and 7.1 fold to stereo. Atmos and DTS:X objects are not rendered past the channel bed
+- zlib-compressed Matroska headers are inflated. bzip2-compressed tracks and encrypted files do not open
 - VP9, AV1 and AVI are not opened
-- this ELF was not booted on a console here. Scanout stays `sceVideoOut`.
-  If the hardware decoder refuses the process, the toast says software
-  and 1080p still plays through FFmpeg.
 
-Paths: `/mnt/usb0`, `/mnt/usb1`, `/data/video`, `/data/splicer`,
-`/user/splicer`, and files directly in `/data`.
+Paths: `/mnt/usb0`, `/mnt/usb1`, `/data/video`, `/data/splicer`, `/user/splicer`, and files in `/data`.
 
 Optional `/mnt/usb0/splicer.txt`:
 
@@ -136,9 +59,9 @@ a=/mnt/usb0/left.mpg
 b=/mnt/usb0/right.mpg
 ```
 
-Two files: left/top is the first, right/bottom is the second.
-One file: both buses play it, the second starts halfway through.
-No files: two generated reels, so the combiner is still on screen.
+Two files: left/top, then right/bottom. One file: both buses, the second starts halfway. No files: two generated reels.
+
+etaHEN and kstuff are the environment already running. The splicer loads libSceVideodec2 (sysmodule 207) through `sceKernelLoadStartModule`, `sceKernelDlsym` and `sceSysmoduleLoadModule`. See [PAYLOADS.md](PAYLOADS.md).
 
 ## Pad
 
@@ -159,19 +82,13 @@ No files: two generated reels, so the combiner is still on screen.
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-export PATH="$PS5_PAYLOAD_SDK/bin:$PATH"   # needs host clang/lld 18+
+export PATH="$PS5_PAYLOAD_SDK/bin:$PATH"
 make
 ```
 
-## Chrome / NaCl
-
-The same M7 version also ships as a Chrome packaged app. REA's read of that
-package, and what it could not open, is in [CHROME.md](CHROME.md).
-
 ## License
 
-Payload sources: GPL-3.0-or-later (derived from the hbldr scanout sample,
-Copyright (C) 2023 John Törnblom).
+Payload sources: GPL-3.0-or-later (hbldr scanout sample, Copyright (C) 2023 John Törnblom).
 pl_mpeg: MIT, Dominic Szablewski.
-FFmpeg 7.1 libraries linked into payload.elf: LGPL-2.1-or-later.
+FFmpeg 7.1: LGPL-2.1-or-later.
 font8x8: public domain, Daniel Hepper.

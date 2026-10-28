@@ -1,24 +1,33 @@
 # movian_ps5
 
-PS5 port notes and the current ELF experiment for Movian. Nothing here was on the remote until this commit. The repository was empty.
+PS5 port of Movian, and the plugin repository used with it.
 
-This is not a jailbreak and not a signed package. Payloads are for a console that already loads homebrew ELFs.
+Movian on PS3 is Dean Kasabow’s M7 (7.0.273) from [apps.movian.eu](https://apps.movian.eu/), continued from Andreas Öman’s Movian. The flat skin is the one in [andoma/movian](https://github.com/andoma/movian).
 
-## What real Movian is
+## Plugins
 
-The player people run on PS3 is Dean Kasabow’s M7, currently 7.0.273, from [apps.movian.eu](https://apps.movian.eu/). It is the continuation of Andreas Öman’s Movian (Showtime). The interface is the flat GLW skin in [andoma/movian](https://github.com/andoma/movian) (`glwskins/flat`): Roboto Condensed, accent `#4192ff`, a tiled home of sources, a file list, a right-hand menu, and a play deck. Playback goes through FFmpeg. MKV, MP4, HEVC and the rest are normal files for that player.
+How to point Movian at the alternative repository: [PLUGINS.md](PLUGINS.md).
 
-`movian-go` ([czz/movian-go](https://github.com/czz/movian-go)) is the same idea in Go, also on FFmpeg 9. A stock Go binary does not boot on PS5: the runtime issues FreeBSD syscall numbers, and Orbis userland does not service them. The process dies before `main`. That is a toolchain problem. It is not a reason to pretend the only format is MPEG-1.
+```
+https://bit.ly/mprepo
+```
 
-## What is in this tree
+The feed itself is [plugins/repo.json](plugins/repo.json).
 
-- `movian-ps5-port/` — platform overlay for movian-go (build tag `ps5`) and the notes on the libc bridge that has to exist before that ELF survives startup.
-- `ps5-splicer/` — the ELF that is actually linked. `payload.elf` (see that directory's README for the sha256) demuxes with FFmpeg 7.1. MPEG-1 still uses pl_mpeg, including its audio. H.264 and HEVC try libSceVideodec2 after the color bars and fall back to FFmpeg. AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC and PCM are mixed to 48 kHz stereo. zlib-compressed Matroska headers are inflated. The pre-alpha release is the tag `pre-alpha`: one ELF, every firmware the SDK 0.45 CRT accepts (listed in `ps5-splicer/README.md`). It was not booted on a console here.
+## Payload
 
-VLC for PS5, EVO Player, PS-Play and Kodi already link FFmpeg (and, for H.264/HEVC, the hardware decoder) on a jailbroken PS5. That is the path for a Movian that plays what the PS3 build plays.
+Pre-alpha ELF: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).
 
-## Not done
+Send `payload.elf` to an ELF loader that is already running, port 9021. Codecs and firmware list: [ps5-splicer/README.md](ps5-splicer/README.md).
 
-- No Go runtime with the FreeBSD syscalls removed, so `movian-go.elf` is not a booting payload yet.
-- The splicer ELF was not booted on a console here. bzip2-compressed Matroska tracks and encrypted files still do not open. Atmos and DTS:X objects are not rendered past the channel bed.
-- The flat-skin shell used to judge the look is the preview app, not a PS5 binary.
+## Tree
+
+- `plugins/` — alternative Movian plugin repository.
+- `ps5-splicer/` — the ELF that is linked today.
+- `movian-ps5-port/` — movian-go overlay. It does not boot yet. Stock Go issues FreeBSD syscalls, and this userland does not service them.
+
+## Limits
+
+- The splicer was not run on a console here.
+- bzip2-compressed Matroska tracks and encrypted files do not open.
+- Atmos and DTS:X objects are not rendered past the channel bed.

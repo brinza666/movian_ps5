@@ -14,8 +14,6 @@
  * the same: replace each `SYSCALL` stub with a call through the C ABI
  * to the function below, using the pattern already in
  * runtime·callCgoMmap (save SP, align to 16, CALL, restore SP).
- *
- * Do not add raw syscall numbers here.
  */
 
 #include <errno.h>
