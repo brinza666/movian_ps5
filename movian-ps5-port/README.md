@@ -10,9 +10,11 @@ machine that already loads homebrew ELFs.
 
 The splicer ELF beside this tree was measured with REA, not run
 (`ps5-splicer/REA.md`). Its defined decoder symbols are `plm_*` only,
-entered at `plm_create_with_filename`. There is no FFmpeg import.
-This overlay is the replacement for that call, and it still cannot boot
-until the Go runtime stops issuing FreeBSD syscalls.
+entered at `plm_create_with_filename`. REA 6.8.0 does not decode video,
+so it is not a stand-in for libavcodec. This overlay does not retarget
+decode onto the `rea` CLI, and it does not treat an FFmpeg link as the
+replacement for `plm_decode`. The Go runtime still has to stop issuing
+FreeBSD syscalls before any of this boots.
 
 ## What works in the scene, late October 2026
 
@@ -75,9 +77,9 @@ On this target the process:
 - Does **not** start the GLW skin. The skin is OpenGL. The PS5 SDL port is a software framebuffer. The main thread locks itself to the OS thread, opens a 1920x1080 SDL window, and draws a status page (the driver flips it with `sceVideoOut`).
 - Maps DualSense / SDL gamecontroller and a USB keyboard onto Movian actions: Cross activate, Circle back, Options menu, Triangle home, L1/R1 page, click sticks play/pause and stop.
 
-That is a native shell around the existing core (plugins, HTTP, the media pipeline's software decode once FFmpeg is linked). It is not the GL skin and it is not hardware video decode.
+That is a native shell around the existing core (plugins, HTTP, a status page on `sceVideoOut`). It is not the GL skin and it is not hardware video decode. movian-go's upstream media code calls libavcodec. REA cannot be linked in its place: it is an inspection tool, and 6.8.0 has no video decoder. The splicer payload keeps `plm_decode`.
 
-FFmpeg 9.0.1 (the version `scripts/deps.env` pins, sha256 `cf38e0e2…`) is cross-built with `--target-os=freebsd` and hardware accelerators off. There is no VAAPI, NVDEC or `/dev/dri` on a payload.
+`scripts/build_ffmpeg_ps5.sh` is still the upstream movian-go dependency build. It is not the decoder this port is using, and running it does not make REA decode anything.
 
 GLW still references `gl*` symbols. `apply.sh` adds `-lOSMesa` for `freebsd`+`ps5`. If you have not built OSMesa into the sysroot, the link fails there on purpose. Replacing that one line with a Piglet/GLES link is the performance path; the context-creation code in `internal/ui/glw` is still the Raspberry Pi / GLFW one and is not compiled into the `ps5` tag.
 
@@ -93,7 +95,6 @@ git clone https://github.com/czz/movian-go.git
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
 cd /path/to/movian-go
 make ps5-sdl
-make ps5-ffmpeg
 # GO_PS5 must be the patched toolchain from runtime/README.md
 make ps5 GO_PS5=$HOME/go-ps5/bin/go
 ```
@@ -108,4 +109,4 @@ movian-go already has `make windows` (GLFW + OpenGL + FFmpeg, amd64). prospero-w
 
 - No exploit, no kernel offset table, no "how to jailbreak".
 - No AGC/Piglet context yet. The status page is the display that exists in the public SDL port today.
-- No claim that `movian-go.elf` plays video until the Go `SYSCALL` stubs are gone and FFmpeg is in `ffmpeg/ps5`. The codec reach, once that ELF lives past `main`, is FFmpeg's — the same library VLC for PS5, EVO Player and PS-Play already ship. MPEG-1 is not the format limit of the console or of Movian.
+- No claim that `movian-go.elf` plays video. It does not boot until the Go `SYSCALL` stubs are gone. When it does, its upstream sources still call libavcodec. That is not what REA measured in `payload.elf`, and REA is not a decoder that can be dropped in instead. The ELF that does decode today is the splicer, and it decodes MPEG-1 through `plm_decode`.

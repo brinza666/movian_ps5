@@ -40,10 +40,10 @@ frame has an amber border.
 ## Still true about this ELF
 
 - This binary's decoder is pl_mpeg, so it opens MPEG-1. That was a library
-  choice, not a console limit. VLC for PS5, EVO Player, PS-Play and Kodi
-  already decode H.264, HEVC, VP9 and ordinary containers through FFmpeg.
-  movian-go's pipeline is FFmpeg 9 as well. Linking that is the next native
-  step. Do not describe MPEG-1 as the only format the machine can show.
+  choice, not a console limit. Other homebrew players decode more formats.
+  This tree does not switch decode over to FFmpeg, and it cannot switch
+  decode over to REA: REA 6.8.0 has no video decoder. The symbols REA
+  recovered are `plm_*`. That is the decoder.
 - Not an fpkg. No Sony signature.
 - Linked here, not booted on a console. The bars are the test that the
   ELF actually started.
@@ -52,9 +52,9 @@ frame has an amber border.
 - Entry is crt `_start`, same as `samples/hello_world`.
 - A Go overlay of movian-go does not boot yet. Stock Go issues FreeBSD
   syscalls; Orbis userland does not service those numbers, so a Go ELF dies
-  in the runtime before `main`. The media code past that point is already
-  the FFmpeg pipeline. The syscall patch and the codec list are different
-  problems.
+  in the runtime before `main`. movian-go's own sources call libavcodec.
+  That is not the decoder REA measured in `payload.elf`, and REA is not a
+  library those calls can be pointed at.
 
 ## REA layout
 
@@ -78,8 +78,6 @@ taken with REA and not by running the file. It confirms the notes above:
 2. If bars appear and USB files do not, the payload process cannot see
    `/mnt/usb0` without a root vnode. Do that only after the bars, and
    only on a firmware the SDK offset table names.
-3. H.264 needs a software decoder linked in-process, or a sprx that
-   actually exports an AvPlayer the payload is allowed to call. Do not
-   claim hardware decode until a frame from an MP4 is on the scanout.
-   The replacement for `plm_create_with_filename` is the FFmpeg pipeline
-   already described in `movian-ps5-port`.
+3. Do not claim a wider codec until a frame from something other than
+   MPEG-1 is on the scanout. REA cannot be that decoder. FFmpeg is not
+   linked into this ELF. The call that produces a frame is `plm_decode`.

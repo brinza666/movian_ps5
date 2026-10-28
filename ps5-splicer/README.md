@@ -65,19 +65,7 @@ program streams and elementary video:
 - `/data/video`, `/data/splicer`, `/user/splicer`, files directly in `/data`
 - extensions `.mpg` `.mpeg` `.mpv` `.m1v` `.m2v`
 
-That list is the library linked into this file. It is not what a PS5 can
-play, and it is not what Movian plays. Movian and movian-go hand the file to
-FFmpeg. Native players already running on jailbroken consoles do the same:
-[VLC for PS5](https://github.com/ZiZc3/VLC) (H.264, HEVC and VP9 in hardware,
-everything else through FFmpeg, including MKV and MP4), EVO Player, PS-Play,
-and Kodi. `libSceAvPlayer` is still absent from the public payload SDK, so
-this ELF does not call it. Those players got past MPEG-1 by cross-compiling
-FFmpeg and linking it.
-
-A stock Go build of movian-go still will not boot. Its runtime issues
-FreeBSD syscall numbers that Orbis does not service, so the process dies
-before `main`. That is a toolchain problem. It does not shrink the codec list.
-The Go media pipeline is already FFmpeg 9.
+That list is the decoder linked into this file: `pl_mpeg`, entered at `plm_create_with_filename`. REA's layout of this ELF (`REA.md`) names those `plm_*` symbols and no others. REA 6.8.0 has no video decoder, so playback is not sent through `rea`. FFmpeg is not linked here either.
 
 Optional `/mnt/usb0/splicer.txt`:
 
@@ -86,9 +74,7 @@ a=/mnt/usb0/left.mpg
 b=/mnt/usb0/right.mpg
 ```
 
-MP4, MKV, H.264 and HEVC will not open **in this ELF**, because pl_mpeg is
-the only decoder linked here. They already open in VLC, EVO and Movian.
-To feed this particular binary, convert on a computer:
+MP4, MKV, H.264 and HEVC will not open **in this ELF**. The decoder is pl_mpeg. To feed this binary, convert on a computer:
 
 ```sh
 ffmpeg -i input.mp4 -vf scale=960:540 -c:v mpeg1video -b:v 4500k -c:a mp2 -b:a 224k -f mpeg reel.mpg

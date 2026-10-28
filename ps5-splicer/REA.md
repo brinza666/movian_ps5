@@ -42,4 +42,8 @@ The GOT names `PLM_VIDEO_MACROBLOCK_TYPE_INTRA` and the other pl_mpeg tables. Th
 
 ## What this changes
 
-This binary opens MPEG-1 because that is the only decoder linked into it. Replacing `plm_create_with_filename` with the FFmpeg pipeline in `movian-ps5-port` is the native step that plays the rest. The Go runtime still has to stop issuing FreeBSD syscalls before that pipeline runs. Those are separate defects. REA does not show a missing console codec, and it does not show a decompilation: no Ghidra, Hopper, IDA, or rizin was available, so function bodies were not recovered.
+Decoding stays `plm_decode`. REA is not a codec and cannot take FFmpeg's place.
+
+REA 6.8.0 was checked for a video decoder. The commands that contain "decode" are Android resources, Interface Builder nibs, sigrok signal recordings, and one native instruction. None of them turns a media file into frames. Video reverse engineering is an open request on the REA repo, not a command in this version.
+
+So playback is not routed through the `rea` CLI. The decoder in this ELF is the one the symbol table names: `pl_mpeg`, entered at `plm_create_with_filename`. There is still no FFmpeg import, and this note does not add one. REA did not recover function bodies either: no Ghidra, Hopper, IDA, or rizin was available.
