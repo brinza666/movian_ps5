@@ -32,6 +32,7 @@
 #include "avdec.h"
 #include "hwdec.h"
 #include "plugin_host.h"
+#include "bt.h"
 #include "font8x8_basic.h"
 
 #define MAX_FILES 48
@@ -159,6 +160,9 @@ static int g_split = -1;
 static volatile int g_run = 1;
 static int g_audio = -1;
 static char g_status[96] = "booting";
+static int g_bt_opened;
+static int g_bt_cool;
+static void bt_release_if_unused(void);
 static int g_plug;
 static int g_plug_i;
 static int g_plug_view;
@@ -217,6 +221,18 @@ is_video_name(const char *name)
 	       ends_with_ci(name, ".m4v") || ends_with_ci(name, ".mov") ||
 	       ends_with_ci(name, ".mkv") || ends_with_ci(name, ".ts") ||
 	       ends_with_ci(name, ".m2ts") || ends_with_ci(name, ".mts");
+}
+
+static int
+is_bt_name(const char *name)
+{
+	return ends_with_ci(name, ".torrent") || ends_with_ci(name, ".magnet");
+}
+
+static int
+is_bt_src(const char *s)
+{
+	return s && (strncmp(s, "magnet:?", 8) == 0 || is_bt_name(s));
 }
 
 static void
@@ -416,6 +432,51 @@ bus_open_av(bus_t *b, const char *path, int half_seek)
 }
 
 static int
+bt_io_read(void *user, uint8_t *buf, int n)
+{
+	(void)user;
+	return bt_read(buf, n);
+}
+
+static int64_t
+bt_io_seek(void *user, int64_t off, int whence)
+{
+	(void)user;
+	return bt_seek(off, whence);
+}
+
+static int
+bus_open_bt(bus_t *b)
+{
+	avdec_t *av = NULL;
+	uint8_t *rgba = NULL;
+	int w = 0, h = 0;
+	double duration = 0;
+	aq_reset(&b->aq);
+	if (avdec_open_io(&av, bt_io_read, bt_io_seek, NULL, &rgba, &w, &h, &duration,
+			  on_av_pcm, b) != 0)
+		return -1;
+	if (b->plm) {
+		plm_destroy(b->plm);
+		b->plm = NULL;
+	}
+	if (b->av)
+		avdec_close(b->av);
+	free(b->rgba);
+	b->av = av;
+	b->rgba = rgba;
+	b->w = w;
+	b->h = h;
+	b->has = 1;
+	b->live = 0;
+	b->kind = 0;
+	b->duration = duration;
+	snprintf(b->path, sizeof b->path, "%s", bt_name());
+	snprintf(b->name, sizeof b->name, "%.60s", bt_name());
+	return 0;
+}
+
+static int
 bus_open_plm(bus_t *b, const char *path, int half_seek)
 {
 	plm_t *plm;
@@ -484,6 +545,13 @@ is_mpeg_name(const char *name)
 static int
 bus_open_file(bus_t *b, const char *path, int half_seek)
 {
+	if (is_bt_src(path)) {
+		if (bt_start(path) != 0)
+			return -1;
+		bus_live(b, 2, bt_name());
+		g_bt_opened = 0;
+		return 0;
+	}
 	if (is_mpeg_name(path) && bus_open_plm(b, path, half_seek) == 0)
 		return 0;
 	if (bus_open_av(b, path, half_seek) == 0)
@@ -568,7 +636,7 @@ scan_dir(const char *base, int depth)
 		}
 		if (!S_ISREG(st.st_mode))
 			continue;
-		if (!is_video_name(dp->d_name))
+		if (!is_video_name(dp->d_name) && !is_bt_name(dp->d_name))
 			continue;
 		if (g_nfiles >= MAX_FILES)
 			break;
@@ -603,10 +671,18 @@ read_playlist(const char *path, char *a, char *b, size_t n)
 		if (!eq)
 			continue;
 		*eq = 0;
-		if ((strcmp(line, "a") == 0 || strcmp(line, "A") == 0) && file_exists(eq + 1))
-			snprintf(a, n, "%s", eq + 1);
-		if ((strcmp(line, "b") == 0 || strcmp(line, "B") == 0) && file_exists(eq + 1))
-			snprintf(b, n, "%s", eq + 1);
+		if (strcmp(line, "a") == 0 || strcmp(line, "A") == 0) {
+			if (strncmp(eq + 1, "magnet:?", 8) == 0)
+				snprintf(a, n, "%s", eq + 1);
+			else if (file_exists(eq + 1))
+				snprintf(a, n, "%s", eq + 1);
+		}
+		if (strcmp(line, "b") == 0 || strcmp(line, "B") == 0) {
+			if (strncmp(eq + 1, "magnet:?", 8) == 0)
+				snprintf(b, n, "%s", eq + 1);
+			else if (file_exists(eq + 1))
+				snprintf(b, n, "%s", eq + 1);
+		}
 	}
 	fclose(f);
 }
@@ -697,6 +773,7 @@ load_buses(void)
 		bus_live(&g_bus[0], 0, "REEL A  unreadable");
 	if (bus_open_file(&g_bus[1], g_files[g_idx[1]], same) != 0)
 		bus_live(&g_bus[1], 1, "REEL B  unreadable");
+	bt_release_if_unused();
 }
 
 static void
@@ -711,6 +788,25 @@ shift_file(int bus, int dir)
 		g_idx[bus] += g_nfiles;
 	if (bus_open_file(&g_bus[bus], g_files[g_idx[bus]], 0) != 0)
 		bus_live(&g_bus[bus], bus, "unreadable");
+	bt_release_if_unused();
+}
+
+static void
+bt_release_if_unused(void)
+{
+	int i, keep = 0;
+	if (!bt_active())
+		return;
+	for (i = 0; i < 2; i++) {
+		if (g_bus[i].live && g_bus[i].kind == 2)
+			keep = 1;
+		if (g_idx[i] >= 0 && g_idx[i] < g_nfiles && bt_same(g_files[g_idx[i]]))
+			keep = 1;
+	}
+	if (!keep) {
+		bt_stop();
+		g_bt_opened = 0;
+	}
 }
 
 static void
@@ -1232,7 +1328,16 @@ plug_job(void)
 		const char *url = plug_item_url(g_plug_i);
 		const char *title = plug_item_title(g_plug_i);
 		struct stat st;
-		if (stream_url(url)) {
+		if (is_bt_src(url)) {
+			if (bt_start(url) == 0) {
+				bus_live(&g_bus[g_focus], 2, bt_name());
+				g_bt_opened = 0;
+				g_plug = 0;
+				notify("SPLICER torrent");
+			} else {
+				notify("SPLICER torrent rejected");
+			}
+		} else if (stream_url(url)) {
 			snprintf(g_stream, sizeof g_stream, "%s", url);
 			snprintf(g_stream_name, sizeof g_stream_name, "%s", title);
 			g_plug_view = 2;
@@ -1601,6 +1706,34 @@ render_loop(void)
 					seek_bus(&g_bus[g_focus], -5.0);
 				if (down & BTN_RIGHT)
 					seek_bus(&g_bus[g_focus], 5.0);
+			}
+
+			if (g_bt_cool > 0)
+				g_bt_cool--;
+			bt_pump(0);
+			if (bt_active()) {
+				int tb;
+				snprintf(g_status, sizeof g_status, "%s", bt_line());
+				for (tb = 0; tb < 2; tb++) {
+					if (g_bus[tb].live && g_bus[tb].kind == 2)
+						snprintf(g_bus[tb].name, sizeof g_bus[tb].name, "%.60s",
+							 bt_name());
+				}
+				if (!g_bt_opened && g_bt_cool <= 0 && bt_playable()) {
+					int which = -1;
+					for (tb = 0; tb < 2; tb++) {
+						if (g_bus[tb].live && g_bus[tb].kind == 2)
+							which = tb;
+					}
+					if (which >= 0) {
+						if (bus_open_bt(&g_bus[which]) == 0) {
+							g_bt_opened = 1;
+							notify("SPLICER torrent");
+						} else {
+							g_bt_cool = 45;
+						}
+					}
+				}
 			}
 
 			if (!g_paused) {

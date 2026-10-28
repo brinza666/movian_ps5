@@ -5,7 +5,7 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Capability | M7 | This tree |
 | --- | --- | --- |
 | Local video and audio | FFmpeg, most files | Preview plays what the browser can. The ELF plays MPEG-1, H.264, HEVC and the audio list in `ps5-splicer/README.md` |
-| Play while a torrent downloads | Built-in client. A magnet becomes `torrentfile://` plus the info hash | Same package, not linked into the ELF. The Go runtime still dies before `main`. The preview only shows the settings and that address |
+| Play while a torrent downloads | Built-in client. A magnet becomes `torrentfile://` plus the info hash | C client in `payload.elf` (movian-go is not this file). A magnet, a `.torrent` or a plugin magnet plays the largest video while pieces arrive. HTTP and UDP trackers. Plaintext peers, no DHT |
 | Subtitles (srt, ass, sub, vobsub) | Yes, plus OpenSubtitles | Browser subtitle tracks only, when the file has them |
 | Audio and subtitle track choice | Yes | Browser text tracks. Audio track count is shown, not switched |
 | Resume, seek, playback speed | Yes | Yes, in the preview |

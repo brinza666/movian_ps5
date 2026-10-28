@@ -18,7 +18,7 @@ The feed itself is [plugins/repo.json](plugins/repo.json).
 
 Pre-alpha ELF: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).
 
-Send `payload.elf` to an ELF loader that is already running, port 9021. Codecs and firmware list: [ps5-splicer/README.md](ps5-splicer/README.md).
+Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet or a `.torrent` plays in that file while the pieces arrive. Codecs and firmware list: [ps5-splicer/README.md](ps5-splicer/README.md).
 
 ## Tree
 
@@ -29,5 +29,6 @@ Send `payload.elf` to an ELF loader that is already running, port 9021. Codecs a
 ## Limits
 
 - The splicer was not run on a console here.
+- Torrent peers are plaintext. There is no DHT. HTTPS trackers are not announced. A swarm that only answers encrypted peers will not connect.
 - bzip2-compressed Matroska tracks and encrypted files do not open.
 - Atmos and DTS:X objects are not rendered past the channel bed.

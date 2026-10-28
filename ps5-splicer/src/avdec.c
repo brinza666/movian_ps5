@@ -5,6 +5,8 @@
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 
+#include <libavformat/avio.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,6 +37,11 @@ struct avdec {
 	int pcm_cap;
 	avdec_pcm_fn on_pcm;
 	void *pcm_user;
+	AVIOContext *avio;
+	uint8_t *iobuf;
+	avdec_read_fn io_read;
+	avdec_seek_fn io_seek;
+	void *io_user;
 };
 
 static int
@@ -349,6 +356,8 @@ hw_pull(avdec_t *a)
 			return 0;
 		}
 		r = av_read_frame(a->fmt, a->pkt);
+		if (r == AVERROR(EAGAIN))
+			return 2;
 		if (r < 0) {
 			a->eof = 1;
 			continue;
@@ -504,6 +513,8 @@ pull_one(avdec_t *a)
 		if (a->eof)
 			return 0;
 		r = av_read_frame(a->fmt, a->pkt);
+		if (r == AVERROR(EAGAIN))
+			return 2;
 		if (r < 0) {
 			a->eof = 1;
 			avcodec_send_packet(a->codec, NULL);
@@ -517,14 +528,79 @@ pull_one(avdec_t *a)
 	}
 }
 
+static int
+open_streams(avdec_t *a, uint8_t **rgba, int *w, int *h, double *duration)
+{
+	const AVCodec *codec;
+	AVStream *st;
+	int i, ret;
+	if (avformat_find_stream_info(a->fmt, NULL) < 0)
+		return -1;
+	for (i = 0; i < (int)a->fmt->nb_streams; i++) {
+		enum AVCodecID id = a->fmt->streams[i]->codecpar->codec_id;
+		if (a->fmt->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
+			continue;
+		if (id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC) {
+			a->vindex = i;
+			break;
+		}
+	}
+	if (a->vindex < 0)
+		return -1;
+	st = a->fmt->streams[a->vindex];
+	a->pkt = av_packet_alloc();
+	a->frame = av_frame_alloc();
+	if (!a->pkt || !a->frame)
+		return -1;
+	open_audio(a);
+	if (a->fmt->duration > 0)
+		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
+	if (try_hardware(a, st) == 0) {
+		*rgba = a->rgba;
+		*w = a->w;
+		*h = a->h;
+		*duration = a->duration;
+		return 0;
+	}
+	codec = avcodec_find_decoder(st->codecpar->codec_id);
+	if (!codec)
+		return -1;
+	a->codec = avcodec_alloc_context3(codec);
+	if (!a->codec)
+		return -1;
+	if (avcodec_parameters_to_context(a->codec, st->codecpar) < 0)
+		return -1;
+	a->codec->thread_count = 1;
+	if (avcodec_open2(a->codec, codec, NULL) < 0)
+		return -1;
+	a->w = a->codec->width;
+	a->h = a->codec->height;
+	if (a->w < 16 || a->h < 16 || a->w > 1920 || a->h > 1088)
+		return -1;
+	a->rgba = (uint8_t *)malloc((size_t)a->w * (size_t)a->h * 4);
+	if (!a->rgba)
+		return -1;
+	memset(a->rgba, 0, (size_t)a->w * (size_t)a->h * 4);
+	a->tb = st->time_base;
+	a->pix = a->codec->pix_fmt;
+	if (a->fmt->duration > 0 && a->duration <= 0)
+		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
+	ret = pull_one(a);
+	if (ret != 1)
+		return -1;
+	a->clock = a->pts;
+	*rgba = a->rgba;
+	*w = a->w;
+	*h = a->h;
+	*duration = a->duration;
+	return 0;
+}
+
 int
 avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	   double *duration, avdec_pcm_fn pcm, void *pcm_user)
 {
 	avdec_t *a;
-	const AVCodec *codec;
-	AVStream *st;
-	int i, ret;
 	*out = NULL;
 	*rgba = NULL;
 	a = (avdec_t *)calloc(1, sizeof *a);
@@ -536,71 +612,77 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	a->pcm_user = pcm_user;
 	if (avformat_open_input(&a->fmt, path, NULL, NULL) < 0)
 		goto fail;
-	if (avformat_find_stream_info(a->fmt, NULL) < 0)
+	if (open_streams(a, rgba, w, h, duration) != 0)
 		goto fail;
-	for (i = 0; i < (int)a->fmt->nb_streams; i++) {
-		enum AVCodecID id = a->fmt->streams[i]->codecpar->codec_id;
-		if (a->fmt->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
-			continue;
-		if (id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC) {
-			a->vindex = i;
-			break;
-		}
-	}
-	if (a->vindex < 0)
-		goto fail;
-	st = a->fmt->streams[a->vindex];
-	a->pkt = av_packet_alloc();
-	a->frame = av_frame_alloc();
-	if (!a->pkt || !a->frame)
-		goto fail;
-	open_audio(a);
-	if (a->fmt->duration > 0)
-		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
-	if (try_hardware(a, st) == 0) {
-		*rgba = a->rgba;
-		*w = a->w;
-		*h = a->h;
-		*duration = a->duration;
-		*out = a;
-		return 0;
-	}
-	codec = avcodec_find_decoder(st->codecpar->codec_id);
-	if (!codec)
-		goto fail;
-	a->codec = avcodec_alloc_context3(codec);
-	if (!a->codec)
-		goto fail;
-	if (avcodec_parameters_to_context(a->codec, st->codecpar) < 0)
-		goto fail;
-	a->codec->thread_count = 1;
-	if (avcodec_open2(a->codec, codec, NULL) < 0)
-		goto fail;
-	a->w = a->codec->width;
-	a->h = a->codec->height;
-	if (a->w < 16 || a->h < 16 || a->w > 1920 || a->h > 1088)
-		goto fail;
-	a->rgba = (uint8_t *)malloc((size_t)a->w * (size_t)a->h * 4);
-	if (!a->rgba)
-		goto fail;
-	memset(a->rgba, 0, (size_t)a->w * (size_t)a->h * 4);
-	a->tb = st->time_base;
-	a->pix = a->codec->pix_fmt;
-	if (a->fmt->duration > 0 && a->duration <= 0)
-		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
-	ret = pull_one(a);
-	if (ret <= 0)
-		goto fail;
-	a->clock = a->pts;
-	*rgba = a->rgba;
-	*w = a->w;
-	*h = a->h;
-	*duration = a->duration;
 	*out = a;
 	return 0;
 fail:
-	free(a->rgba);
-	a->rgba = NULL;
+	avdec_close(a);
+	return -1;
+}
+
+static int
+io_read_cb(void *opaque, uint8_t *buf, int buf_size)
+{
+	avdec_t *a = opaque;
+	int r;
+	if (!a->io_read)
+		return AVERROR_EOF;
+	r = a->io_read(a->io_user, buf, buf_size);
+	if (r == 0)
+		return AVERROR_EOF;
+	if (r < 0)
+		return AVERROR(EAGAIN);
+	return r;
+}
+
+static int64_t
+io_seek_cb(void *opaque, int64_t off, int whence)
+{
+	avdec_t *a = opaque;
+	if (!a->io_seek)
+		return -1;
+	if (whence & AVSEEK_FORCE)
+		whence &= ~AVSEEK_FORCE;
+	return a->io_seek(a->io_user, off, whence);
+}
+
+int
+avdec_open_io(avdec_t **out, avdec_read_fn read, avdec_seek_fn seek, void *io,
+	      uint8_t **rgba, int *w, int *h, double *duration,
+	      avdec_pcm_fn pcm, void *pcm_user)
+{
+	avdec_t *a;
+	*out = NULL;
+	*rgba = NULL;
+	if (!read || !seek)
+		return -1;
+	a = (avdec_t *)calloc(1, sizeof *a);
+	if (!a)
+		return -1;
+	a->vindex = -1;
+	a->aindex = -1;
+	a->on_pcm = pcm;
+	a->pcm_user = pcm_user;
+	a->io_read = read;
+	a->io_seek = seek;
+	a->io_user = io;
+	a->iobuf = (uint8_t *)av_malloc(32 * 1024);
+	a->fmt = avformat_alloc_context();
+	if (!a->iobuf || !a->fmt)
+		goto fail;
+	a->avio = avio_alloc_context(a->iobuf, 32 * 1024, 0, a, io_read_cb, NULL, io_seek_cb);
+	if (!a->avio)
+		goto fail;
+	a->fmt->pb = a->avio;
+	a->fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
+	if (avformat_open_input(&a->fmt, NULL, NULL, NULL) < 0)
+		goto fail;
+	if (open_streams(a, rgba, w, h, duration) != 0)
+		goto fail;
+	*out = a;
+	return 0;
+fail:
 	avdec_close(a);
 	return -1;
 }
@@ -627,6 +709,13 @@ avdec_close(avdec_t *a)
 		avcodec_free_context(&a->codec);
 	if (a->fmt)
 		avformat_close_input(&a->fmt);
+	if (a->avio) {
+		uint8_t *buf = a->avio->buffer;
+		avio_context_free(&a->avio);
+		av_free(buf);
+	} else {
+		av_free(a->iobuf);
+	}
 	free(a);
 }
 
@@ -643,6 +732,10 @@ avdec_tick(avdec_t *a, double dt)
 		int r = pull_one(a);
 		if (r < 0)
 			return n;
+		if (r == 2) {
+			a->clock -= dt;
+			break;
+		}
 		if (r == 0) {
 			avdec_seek(a, 0);
 			a->clock = 0;
@@ -670,7 +763,8 @@ avdec_seek(avdec_t *a, double seconds)
 	if (seconds < 0)
 		seconds = 0;
 	ts = (int64_t)(seconds * (double)AV_TIME_BASE);
-	av_seek_frame(a->fmt, -1, ts, AVSEEK_FLAG_BACKWARD);
+	if (av_seek_frame(a->fmt, -1, ts, AVSEEK_FLAG_BACKWARD) < 0)
+		return;
 	if (a->codec)
 		avcodec_flush_buffers(a->codec);
 	if (a->acodec)

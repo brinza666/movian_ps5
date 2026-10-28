@@ -10,7 +10,7 @@ ELF := payload.elf
 CFLAGS := -O2 -fPIC -fno-stack-protector -fno-plt -Wall -Wno-unused-function -Wno-unused-variable \
 	-nostdinc -isystem $(PS5_PAYLOAD_SDK)/target/include \
 	-Ithird_party -I$(FFMPEG_SRC)
-OBJS := main.o mpeg_dec.o avdec.o hwdec.o duktape.o plugin_host.o
+OBJS := main.o mpeg_dec.o avdec.o hwdec.o duktape.o plugin_host.o bt.o
 DUK_SRC := /tmp/duktape/duktape-2.7.0/src/duktape.c
 
 all: $(ELF)
@@ -27,6 +27,8 @@ src/plugin_embed.h: src/plugin_boot.js tools/embed_js.py $(wildcard js/ecmascrip
 	python3 tools/embed_js.py
 plugin_host.o: src/plugin_host.c src/plugin_host.h src/plugin_embed.h
 	gcc $(CFLAGS) -I$(dir $(DUK_SRC)) -c -o $@ src/plugin_host.c
+bt.o: src/bt.c src/bt.h
+	gcc $(CFLAGS) -c -o $@ src/bt.c
 duktape.o: $(DUK_SRC) third_party/endian.h
 	gcc $(CFLAGS) -c -o $@ $(DUK_SRC)
 
@@ -42,7 +44,7 @@ $(ELF): $(OBJS)
 		/tmp/zlib-1.3.1/libz.a \
 		--end-group \
 		-lSceVideoOut -lSceSystemService -lkernel_web -lSceLibcInternal -lSceNet \
-		-lSceSsl -lSceHttp2
+		-lSceSsl -lSceHttp2 -lScePosixForWebKit
 
 clean:
 	rm -f $(ELF) $(OBJS)

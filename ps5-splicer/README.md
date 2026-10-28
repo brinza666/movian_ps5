@@ -19,7 +19,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256:
 
 ```
-c8e5476150be6add66ace66af7d6ed2a934d0f1e78fccb4b85510012cab559db
+abfbdbeee968f696c8d6ecfd4b2618659b5fd992719a133b0ac86ba64d5e227a
 ```
 
 The release also has `payload-mpeg1.elf` (sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`), the older MPEG-1-only file. It is not a build for another firmware.
@@ -48,6 +48,7 @@ H.264 and HEVC (FFmpeg demux, libSceVideodec2 or FFmpeg):
 - HUD shows `HW` or `SW`
 - AAC, AAC-LATM, AC-3, E-AC-3, MP3, DTS, DTS-HD, TrueHD, Opus, FLAC, integer PCM, float PCM, Blu-ray and DVD LPCM, mixed to 48 kHz stereo. 5.1 and 7.1 fold to stereo. Atmos and DTS:X objects are not rendered past the channel bed
 - zlib-compressed Matroska headers are inflated. bzip2-compressed tracks and encrypted files do not open
+- a `.torrent`, a `.magnet` file, or `magnet:?xt=urn:btih:...` in `splicer.txt` or on a plugin line starts the built-in client. The largest video plays while the rest is still arriving. HTTP and UDP trackers, plaintext peers. No DHT. Piece cache is `/data/splicer/bt` (or USB `splicer-bt` when `/data` is not writable)
 - VP9, AV1 and AVI are not opened
 
 Paths: `/mnt/usb0`, `/mnt/usb1`, `/data/video`, `/data/splicer`, `/user/splicer`, and files in `/data`.
