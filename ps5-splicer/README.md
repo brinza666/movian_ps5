@@ -107,6 +107,11 @@ export PATH="$PS5_PAYLOAD_SDK/bin:$PATH"   # needs host clang/lld 18+
 make
 ```
 
+## Chrome / NaCl
+
+The same M7 version also ships as a Chrome packaged app. REA's read of that
+package, and what it could not open, is in [CHROME.md](CHROME.md).
+
 ## License
 
 Payload sources: GPL-3.0-or-later (derived from the hbldr scanout sample,
