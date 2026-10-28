@@ -35,6 +35,9 @@ SHA-256 of this tree's `payload.elf`:
 1a614c6e5e98c777236a0d6e5b55f666a5428e3baed263d2aaa17990c23da6c5
 ```
 
+The GitHub release tagged `pre-alpha` attaches this file and the older
+MPEG-1-only fallback. The fallback is not a different firmware.
+
 The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
 (sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`)
 if the new file does not show the color bars.
@@ -50,12 +53,33 @@ this `payload.elf`. A black screen with no toast means the bytes never
 started, not that the combiner drew black.
 
 `main` does not call `kernel_set_proc_rootdir`. SDK startup still runs
-`__kernel_init` before `main`. In this file, firmware 4.03 is the
-version word `0x4030000`, and that word takes the same offset block as
-4.02, 4.50 and 4.51. A version the table does not know fails before the
-first frame. The entry point is `_start`. The older loader that looks
-for `payload_main` on port 9020 will not run this file. Send it to the
-ELF loader on port 9021.
+`__kernel_init` before `main`. That startup reads the firmware and
+picks a block already compiled into this one file. ps5-payload-sdk 0.45
+has no compile-time firmware switch, so a rebuild "for 5.50" or "for
+13.60" is the same ELF. A version the table does not know fails before
+the first frame.
+
+This CRT accepts:
+
+1.00, 1.01, 1.02, 1.05, 1.10, 1.11, 1.12, 1.13, 1.14,
+2.00, 2.20, 2.25, 2.26, 2.30, 2.50, 2.70,
+3.00, 3.10, 3.20, 3.21,
+4.00, 4.02, 4.03, 4.50, 4.51,
+5.00, 5.02, 5.10, 5.50,
+6.00, 6.02, 6.50,
+7.00, 7.01, 7.20, 7.40, 7.60, 7.61,
+8.00, 8.20, 8.40, 8.60,
+9.00, 9.05, 9.20, 9.40, 9.60,
+10.00, 10.01, 10.20, 10.40, 10.60,
+11.00, 11.20, 11.40, 11.60,
+12.00, 12.02, 12.20, 12.40, 12.60, 12.70,
+13.00, 13.20, 13.40, 13.42, 13.60,
+14.00, 14.10.
+
+4.03 is the version word `0x4030000`. It takes the same block as 4.00,
+4.02, 4.50 and 4.51. The entry point is `_start`. The older loader that
+looks for `payload_main` on port 9020 will not run this file. Send it
+to the ELF loader on port 9021.
 
 After the bars it loads the hardware decoder, scans USB, and combines
 two buses. A toast says `SPLICER hardware decoder` if libSceVideodec2
@@ -69,7 +93,8 @@ There is no `kernel_set_proc_rootdir` call in `main`. An earlier build
 called that before the first flip, and it linked pad, audio, and pthread
 as required libraries. A fault in any of that exited before a single
 frame. That build is not this file. Startup still runs the SDK's
-`__kernel_init`, and this binary's table includes 4.03.
+`__kernel_init`, and this binary's table is the SDK 0.45 list above,
+including 4.03.
 
 ## What it plays
 

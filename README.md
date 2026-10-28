@@ -13,7 +13,7 @@ The player people run on PS3 is Dean Kasabow’s M7, currently 7.0.273, from [ap
 ## What is in this tree
 
 - `movian-ps5-port/` — platform overlay for movian-go (build tag `ps5`) and the notes on the libc bridge that has to exist before that ELF survives startup.
-- `ps5-splicer/` — the ELF that is actually linked. `payload.elf` (see that directory's README for the sha256) demuxes with FFmpeg 7.1. MPEG-1 still uses pl_mpeg, including its audio. H.264 and HEVC try libSceVideodec2 after the color bars and fall back to FFmpeg. AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC and PCM are mixed to 48 kHz stereo. zlib-compressed Matroska headers are inflated. It was not booted on a console here.
+- `ps5-splicer/` — the ELF that is actually linked. `payload.elf` (see that directory's README for the sha256) demuxes with FFmpeg 7.1. MPEG-1 still uses pl_mpeg, including its audio. H.264 and HEVC try libSceVideodec2 after the color bars and fall back to FFmpeg. AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC and PCM are mixed to 48 kHz stereo. zlib-compressed Matroska headers are inflated. The pre-alpha release is the tag `pre-alpha`: one ELF, every firmware the SDK 0.45 CRT accepts (listed in `ps5-splicer/README.md`). It was not booted on a console here.
 
 VLC for PS5, EVO Player, PS-Play and Kodi already link FFmpeg (and, for H.264/HEVC, the hardware decoder) on a jailbroken PS5. That is the path for a Movian that plays what the PS3 build plays.
 

@@ -109,4 +109,4 @@ movian-go already has `make windows` (GLFW + OpenGL + FFmpeg, amd64). prospero-w
 
 - No exploit, no kernel offset table, no "how to jailbreak".
 - No AGC/Piglet context yet. The status page is the display that exists in the public SDL port today.
-- No claim that `movian-go.elf` plays video. It does not boot until the Go `SYSCALL` stubs are gone. When it does, its upstream sources still call libavcodec. That is not what REA measured in `payload.elf`, and REA is not a decoder that can be dropped in instead. The ELF that does decode today is the splicer, and it decodes MPEG-1 through `plm_decode`.
+- No claim that `movian-go.elf` plays video. It does not boot until the Go `SYSCALL` stubs are gone. When it does, its upstream sources still call libavcodec. That is not what REA measured in `payload.elf`, and REA is not a decoder that can be dropped in instead. The ELF that does decode today is the splicer: MPEG-1 through `plm_decode`, H.264 and HEVC through libSceVideodec2 when that module loads, otherwise FFmpeg.
