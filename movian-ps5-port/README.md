@@ -17,6 +17,7 @@ The ELF that plays video today is [../ps5-splicer](../ps5-splicer). This overlay
 - Dummy audio. ALSA is not built.
 - No GLW skin. A 1920×1080 SDL window on `sceVideoOut` shows a status page.
 - DualSense and a USB keyboard: Cross activate, Circle back, Options menu, Triangle home, L1/R1 page, sticks play/pause and stop.
+- BitTorrent stays `internal/backend/bittorrent`, already constructed in `wire_core.go`. A magnet opens as `torrentfile://` plus the 40-hex info hash. This overlay does not replace that package.
 
 `scripts/build_ffmpeg_ps5.sh` is the upstream movian-go dependency script. It is not how `payload.elf` was linked.
 
