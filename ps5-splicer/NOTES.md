@@ -39,45 +39,19 @@ frame has an amber border.
 
 ## Still true about this ELF
 
-- This binary's decoder is pl_mpeg, so it opens MPEG-1. That was a library
-  choice, not a console limit. Other homebrew players decode more formats.
-  This tree does not switch decode over to FFmpeg, and it cannot switch
-  decode over to REA: REA 6.8.0 has no video decoder. The symbols REA
-  recovered are `plm_*`. That is the decoder.
-- Not an fpkg. No Sony signature.
-- Linked here, not booted on a console. The bars are the test that the
-  ELF actually started.
-- Toolchain: ps5-payload-sdk 0.45, host clang/lld 18.1.8, target
-  `x86_64-sie-ps5`. The SDK is not vendored in this repo.
-- Entry is crt `_start`, same as `samples/hello_world`.
-- A Go overlay of movian-go does not boot yet. Stock Go issues FreeBSD
-  syscalls; Orbis userland does not service those numbers, so a Go ELF dies
-  in the runtime before `main`. movian-go's own sources call libavcodec.
-  That is not the decoder REA measured in `payload.elf`, and REA is not a
-  library those calls can be pointed at.
+- Current `payload.elf` is the file described in `README.md`, not the first MPEG-1 build. MPEG-1 is still pl_mpeg. H.264 and HEVC are FFmpeg demux plus libSceVideodec2 when that module loads, otherwise FFmpeg on the CPU. Audio for those containers is FFmpeg (AAC through PCM, including DTS, TrueHD, Opus and FLAC), mixed to the same 48 kHz output. zlib header compression in Matroska is inflated.
+- The MPEG-1-only ELF is kept as `payload-mpeg1.elf`. `REA.md` is the layout of that older file, sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`. It is not a layout of the current payload.
+- REA 6.8.0 has no video decoder. Playback is not sent through `rea`.
+- Not an fpkg. No Sony signature. No new kernel patch.
+- Linked here with host gcc and the ps5-payload-sdk 0.45 crt, not booted on a console. The bars are the test that the ELF actually started.
+- A Go overlay of movian-go does not boot yet. Stock Go issues FreeBSD syscalls; Orbis userland does not service those numbers, so a Go ELF dies in the runtime before `main`.
 
 ## REA layout
 
-`REA.md` is a static layout of this same `payload.elf` (same sha256),
-taken with REA and not by running the file. It confirms the notes above:
+`REA.md` is a static layout of `payload-mpeg1.elf`, not of the current `payload.elf`. Do not read its "no FFmpeg import" line as a description of the file in this directory now.
 
-- `DT_NEEDED` is video out, system service, `libkernel_web`, libc, and net.
-  Pad and audio are pointer slots (`p_scePad*`, `p_sceAudioOut*`) filled by
-  this binary's own `dlopen` at `0x5a40`. That matches "bars first, then
-  dlopen". A missing pad sprx cannot reject the map.
-- The only decode symbols are `plm_*` from `mpeg_dec.c`, entered through
-  `plm_create_with_filename`. There is no FFmpeg import. Do not treat a
-  future MP4 as a relink that already happened.
-- The string `libSceVdecShevc.native.sprx` is in the SDK `sysmodtab`, not
-  in `DT_NEEDED`. It is not a decoder this ELF calls.
+## Next check
 
-## Next improvements, in order
-
-1. Confirm on a real console that the bars appear. If they do not, the
-   problem is the loader path, not the combiner.
-2. If bars appear and USB files do not, the payload process cannot see
-   `/mnt/usb0` without a root vnode. Do that only after the bars, and
-   only on a firmware the SDK offset table names.
-3. Do not claim a wider codec until a frame from something other than
-   MPEG-1 is on the scanout. REA cannot be that decoder. FFmpeg is not
-   linked into this ELF. The call that produces a frame is `plm_decode`.
+1. Confirm on a real console that the bars appear, then that the toast says hardware or software.
+2. If bars appear and USB files do not, the payload process cannot see `/mnt/usb0` without the mounts kstuff and ShadowMount already provide. Do not add a kernel patch for that.
+3. A picture from an MP4 or MKV on that console is still the missing test. This tree links the decoders. It has not shown a frame from them on hardware.

@@ -1,4 +1,6 @@
-# Layout of payload.elf
+# Layout of the old MPEG-1 payload
+
+This note is `payload-mpeg1.elf`, not the current `payload.elf`. The current file is described in [README.md](README.md). Its sha256 is not the one in the table below.
 
 Measured with REA `inspect-binary-layout` (pwntools 4.15.0, pyelftools 0.33, unicorn 2.1.2). The file was not executed.
 
@@ -40,9 +42,9 @@ The GOT names `PLM_VIDEO_MACROBLOCK_TYPE_INTRA` and the other pl_mpeg tables. Th
 
 `scan_media` (`0x4290`) and `scan_dir` (`0x4d30`) are the USB walk. File strings in the image are `/mnt/usb0`, `/mnt/usb1`, `/data/video`, and `Put .mpg files on /mnt/usb0`.
 
-## What this changes
+## What this measured
 
-Decoding stays `plm_decode`. REA is not a codec and cannot take FFmpeg's place.
+This layout is the MPEG-1 ELF only. Decoding in that file stays `plm_decode`. REA is not a codec and cannot take FFmpeg's place. The current `payload.elf` does link FFmpeg. Do not use the paragraphs below to describe it.
 
 REA 6.8.0 was checked for a video decoder. The commands that contain "decode" are Android resources, Interface Builder nibs, sigrok signal recordings, and one native instruction. None of them turns a media file into frames. Video reverse engineering is an open request on the REA repo, not a command in this version.
 
