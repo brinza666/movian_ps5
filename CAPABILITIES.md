@@ -18,7 +18,7 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Photos | Yes | No |
 | DVD and disc images | Yes | No |
 | AC3 / DTS passthrough | PS3 | ELF mixes to stereo |
-| Plugins and another repository | Yes | Address `https://bit.ly/mprepo`, list only. No plugin runtime |
+| Plugins and another repository | Yes | Packages in `/mnt/usb0/plugins` run in the payload (Duktape, API v2). L2 opens them. Pages use sceHttp2. A popup is accepted. Stream URLs are shown, not decoded |
 | Unified search | Yes | Names on screen, plus an `http` or `magnet` line |
 | Per-file settings, on-screen keyboard | Yes | No |
 | Web remote | Yes | No |

@@ -31,6 +31,7 @@
 #include "pl_mpeg.h"
 #include "avdec.h"
 #include "hwdec.h"
+#include "plugin_host.h"
 #include "font8x8_basic.h"
 
 #define MAX_FILES 48
@@ -158,6 +159,13 @@ static int g_split = -1;
 static volatile int g_run = 1;
 static int g_audio = -1;
 static char g_status[96] = "booting";
+static int g_plug;
+static int g_plug_i;
+static int g_plug_view;
+static int g_plug_wait;
+static int g_plug_job;
+static char g_stream[768];
+static char g_stream_name[180];
 
 static const uint8_t COL_AMBER[3] = {0xe2, 0xa1, 0x5a};
 static const uint8_t COL_PAPER[3] = {0xeb, 0xe6, 0xdb};
@@ -1062,7 +1070,7 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (12 * scale), line2, COL_PAPER, scale);
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (20 * scale), line3, COL_PAPER, scale);
 	draw_text(dst, stride, vis_w, vis_h, 12 * scale, y0 + (28 * scale),
-		  "Cross pause  Up/Down layout  L1/R1 clip  Left/Right seek  Sqr focus  Cir audio  Tri swap  R-stick wipe  Opt rescan",
+		  "L2 plugins  Cross pause  Up/Down layout  L1/R1 clip  Sqr focus  Cir audio  Tri swap  Opt rescan",
 		  COL_SAGE, scale > 1 ? scale - 1 : 1);
 	if (g_nfiles == 0) {
 		int cx = vis_w / 2 - 18 * 8 * scale;
@@ -1200,6 +1208,149 @@ proof_pattern(uint8_t *dst, int stride, int w, int h, int frame, int scale)
 	draw_text(dst, stride, w, h, w / 8, h / 2 - 16 * scale, "SPLICER", (const uint8_t *)"\x10\x10\x10", scale * 3);
 	draw_text(dst, stride, w, h, w / 8, h / 2 + 20 * scale, line, (const uint8_t *)"\x10\x10\x10", scale);
 	draw_text(dst, stride, w, h, w / 8, h / 2 + 36 * scale, "PAYLOAD RUNNING", (const uint8_t *)"\x10\x10\x10", scale);
+}
+
+static int
+stream_url(const char *url)
+{
+	return url && (strncmp(url, "http://", 7) == 0 || strncmp(url, "https://", 8) == 0 ||
+		       strncmp(url, "hls:", 4) == 0);
+}
+
+static void
+plug_job(void)
+{
+	if (g_plug_job == 1) {
+		if (plug_activate(g_plug_i) == 0) {
+			g_plug_view = 1;
+			g_plug_i = 0;
+			notify("SPLICER plugin page");
+		} else {
+			notify(plug_status());
+		}
+	} else if (g_plug_job == 2) {
+		const char *url = plug_item_url(g_plug_i);
+		const char *title = plug_item_title(g_plug_i);
+		struct stat st;
+		if (stream_url(url)) {
+			snprintf(g_stream, sizeof g_stream, "%s", url);
+			snprintf(g_stream_name, sizeof g_stream_name, "%s", title);
+			g_plug_view = 2;
+			g_plug_i = 0;
+		} else if (url && url[0] == '/' && stat(url, &st) == 0 && S_ISREG(st.st_mode)) {
+			bus_open_file(&g_bus[g_focus], url, 0);
+			g_plug = 0;
+			notify("SPLICER opened file");
+		} else if (url && url[0] && plug_open(url) == 0) {
+			g_plug_view = 1;
+			g_plug_i = 0;
+		} else if (url && url[0]) {
+			notify(plug_status());
+		}
+	} else if (g_plug_job == 3) {
+		if (plug_back() != 0)
+			g_plug_view = 0;
+		g_plug_i = 0;
+	}
+	g_plug_wait = 0;
+}
+
+static void clear_frame(uint8_t *dst, int stride, int vis_w, int vis_h);
+
+static void
+draw_plugins(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	char ascii[200];
+	char line[220];
+	int n = 0;
+	int rows;
+	int start;
+	int i;
+	int pitch = 10 * scale;
+	int y;
+	int chars;
+	if (pitch < 8)
+		pitch = 8;
+	rows = (vis_h - 36 * scale) / pitch;
+	if (rows < 3)
+		rows = 3;
+	if (rows > 22)
+		rows = 22;
+	chars = vis_w / (8 * scale) - 4;
+	if (chars < 16)
+		chars = 16;
+	if (chars > 180)
+		chars = 180;
+	clear_frame(dst, stride, vis_w, vis_h);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, 12 * scale, "PLUGINS", COL_AMBER, scale);
+	if (g_plug_wait) {
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 28 * scale, "LOADING", COL_PAPER, scale);
+		return;
+	}
+	if (g_plug_view == 2) {
+		plug_ascii(g_stream_name, ascii, sizeof ascii);
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 28 * scale, ascii, COL_PAPER, scale);
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 40 * scale,
+			  "Stream address. This build does not decode HTTP yet.", COL_SAGE, scale);
+		{
+			const char *p = g_stream;
+			int row = 0;
+			while (*p && row < rows) {
+				int k = 0;
+				while (p[k] && k < chars)
+					k++;
+				snprintf(line, sizeof line, "%.*s", k, p);
+				draw_text(dst, stride, vis_w, vis_h, 16 * scale, (52 + row * 10) * scale, line, COL_PAPER, scale);
+				p += k;
+				row++;
+			}
+		}
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, vis_h - 16 * scale, "Circle back   L2 close", COL_SAGE, scale);
+		return;
+	}
+	if (g_plug_view == 0) {
+		n = plug_count();
+		snprintf(line, sizeof line, "%s", plug_status());
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 28 * scale, line, COL_SAGE, scale);
+		if (n <= 0) {
+			draw_text(dst, stride, vis_w, vis_h, 16 * scale, 48 * scale, "No plugins on USB", COL_PAPER, scale);
+			draw_text(dst, stride, vis_w, vis_h, 16 * scale, 60 * scale, "Put packages in /mnt/usb0/plugins", COL_PAPER, scale);
+		}
+	} else {
+		n = plug_item_count();
+		plug_ascii(plug_page_title(), ascii, sizeof ascii);
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 28 * scale, ascii[0] ? ascii : "Page", COL_PAPER, scale);
+		if (plug_page_error()[0]) {
+			plug_ascii(plug_page_error(), ascii, sizeof ascii);
+			draw_text(dst, stride, vis_w, vis_h, 16 * scale, 40 * scale, ascii, COL_AMBER, scale);
+		}
+	}
+	if (n > 0) {
+		if (g_plug_i >= n)
+			g_plug_i = n - 1;
+		if (g_plug_i < 0)
+			g_plug_i = 0;
+		start = g_plug_i - rows / 2;
+		if (start < 0)
+			start = 0;
+		if (start + rows > n)
+			start = n > rows ? n - rows : 0;
+		for (i = 0; i < rows && start + i < n; i++) {
+			int idx = start + i;
+			int yy = (g_plug_view == 0 ? 44 : 52) * scale + i * pitch;
+			const char *label = g_plug_view == 0 ? plug_title(idx) : plug_item_title(idx);
+			plug_ascii(label, ascii, sizeof ascii);
+			if (idx == g_plug_i)
+				fill_rect_px(dst, stride, vis_w, vis_h, 8 * scale, yy - scale, vis_w - 16 * scale, 8 * scale, 0xFF18405Au);
+			snprintf(line, sizeof line, "%c %s", idx == g_plug_i ? '>' : ' ', ascii);
+			draw_text(dst, stride, vis_w, vis_h, 12 * scale, yy, line,
+				  idx == g_plug_i ? COL_AMBER : COL_PAPER, scale);
+		}
+	}
+	y = vis_h - 16 * scale;
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, y,
+		  g_plug_view == 0 ? "Up/Down  Cross open  L2 close" : "Up/Down  Cross open  Circle back  L2 close",
+		  COL_SAGE, scale);
 }
 
 static void
@@ -1374,39 +1525,83 @@ render_loop(void)
 				opt_hold++;
 			else
 				opt_hold = 0;
-			if (opt_hold == 1) {
-				g_nfiles = 0;
-				scan_media();
-				load_buses();
-			}
 			if (opt_hold > 100) {
 				g_run = 0;
 				break;
 			}
-			if (down & BTN_UP)
-				g_layout = (g_layout + LAY_COUNT - 1) % LAY_COUNT;
-			if (down & BTN_DOWN)
-				g_layout = (g_layout + 1) % LAY_COUNT;
-			if (down & BTN_CROSS)
-				g_paused = !g_paused;
-			if (down & BTN_SQR)
-				g_focus ^= 1;
-			if (down & BTN_CIR)
-				g_audio_mode = (g_audio_mode + 1) % 3;
-			if (down & BTN_TRI) {
-				int tmp = g_idx[0];
-				g_idx[0] = g_idx[1];
-				g_idx[1] = tmp;
-				load_buses();
+			if (down & BTN_L2) {
+				g_plug = !g_plug;
+				g_plug_wait = 0;
+				if (g_plug) {
+					plug_scan();
+					g_plug_i = 0;
+					g_plug_view = 0;
+					notify(plug_count() ? "SPLICER plugins" : "SPLICER no plugins on USB");
+				}
 			}
-			if (down & BTN_L1)
-				shift_file(g_focus, -1);
-			if (down & BTN_R1)
-				shift_file(g_focus, +1);
-			if (down & BTN_LEFT)
-				seek_bus(&g_bus[g_focus], -5.0);
-			if (down & BTN_RIGHT)
-				seek_bus(&g_bus[g_focus], 5.0);
+			if (g_plug) {
+				int n = g_plug_view == 0 ? plug_count() :
+					(g_plug_view == 1 ? plug_item_count() : 0);
+				if (g_plug_wait == 1)
+					plug_job();
+				else if (g_plug_view != 2) {
+					if ((down & BTN_UP) && n > 0) {
+						g_plug_i--;
+						if (g_plug_i < 0)
+							g_plug_i = n - 1;
+					}
+					if ((down & BTN_DOWN) && n > 0) {
+						g_plug_i++;
+						if (g_plug_i >= n)
+							g_plug_i = 0;
+					}
+					if ((down & BTN_CROSS) && n > 0) {
+						g_plug_job = g_plug_view == 0 ? 1 : 2;
+						g_plug_wait = 1;
+					}
+				}
+				if (!g_plug_wait && (down & BTN_CIR)) {
+					if (g_plug_view == 2) {
+						g_plug_view = 1;
+						g_plug_i = 0;
+					} else if (g_plug_view == 1) {
+						g_plug_job = 3;
+						g_plug_wait = 1;
+					} else {
+						g_plug = 0;
+					}
+				}
+			} else {
+				if (opt_hold == 1) {
+					g_nfiles = 0;
+					scan_media();
+					load_buses();
+				}
+				if (down & BTN_UP)
+					g_layout = (g_layout + LAY_COUNT - 1) % LAY_COUNT;
+				if (down & BTN_DOWN)
+					g_layout = (g_layout + 1) % LAY_COUNT;
+				if (down & BTN_CROSS)
+					g_paused = !g_paused;
+				if (down & BTN_SQR)
+					g_focus ^= 1;
+				if (down & BTN_CIR)
+					g_audio_mode = (g_audio_mode + 1) % 3;
+				if (down & BTN_TRI) {
+					int tmp = g_idx[0];
+					g_idx[0] = g_idx[1];
+					g_idx[1] = tmp;
+					load_buses();
+				}
+				if (down & BTN_L1)
+					shift_file(g_focus, -1);
+				if (down & BTN_R1)
+					shift_file(g_focus, +1);
+				if (down & BTN_LEFT)
+					seek_bus(&g_bus[g_focus], -5.0);
+				if (down & BTN_RIGHT)
+					seek_bus(&g_bus[g_focus], 5.0);
+			}
 
 			if (!g_paused) {
 				int i;
@@ -1420,8 +1615,12 @@ render_loop(void)
 				}
 			}
 			clear_frame((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h);
-			composite((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, bilinear);
-			draw_hud((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+			if (g_plug) {
+				draw_plugins((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+			} else {
+				composite((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, bilinear);
+				draw_hud((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+			}
 			border((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, 10, 0xFF5AA1E2u);
 		}
 

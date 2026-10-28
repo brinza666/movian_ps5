@@ -10,7 +10,8 @@ ELF := payload.elf
 CFLAGS := -O2 -fPIC -fno-stack-protector -fno-plt -Wall -Wno-unused-function -Wno-unused-variable \
 	-nostdinc -isystem $(PS5_PAYLOAD_SDK)/target/include \
 	-Ithird_party -I$(FFMPEG_SRC)
-OBJS := main.o mpeg_dec.o avdec.o hwdec.o
+OBJS := main.o mpeg_dec.o avdec.o hwdec.o duktape.o plugin_host.o
+DUK_SRC := /tmp/duktape/duktape-2.7.0/src/duktape.c
 
 all: $(ELF)
 
@@ -22,6 +23,12 @@ avdec.o: src/avdec.c src/avdec.h src/hwdec.h
 	gcc $(CFLAGS) -c -o $@ src/avdec.c
 hwdec.o: src/hwdec.c src/hwdec.h
 	gcc $(CFLAGS) -c -o $@ src/hwdec.c
+src/plugin_embed.h: src/plugin_boot.js tools/embed_js.py $(wildcard js/ecmascript/*/*.js) $(wildcard js/ecmascript/*/*/*.js)
+	python3 tools/embed_js.py
+plugin_host.o: src/plugin_host.c src/plugin_host.h src/plugin_embed.h
+	gcc $(CFLAGS) -I$(dir $(DUK_SRC)) -c -o $@ src/plugin_host.c
+duktape.o: $(DUK_SRC) third_party/endian.h
+	gcc $(CFLAGS) -c -o $@ $(DUK_SRC)
 
 $(ELF): $(OBJS)
 	ld -pie -T $(PS5_PAYLOAD_SDK)/target/lib/main.script --eh-frame-hdr --build-id=none \
@@ -34,7 +41,8 @@ $(ELF): $(OBJS)
 		$(FFMPEG_SRC)/libavutil/libavutil.a \
 		/tmp/zlib-1.3.1/libz.a \
 		--end-group \
-		-lSceVideoOut -lSceSystemService -lkernel_web -lSceLibcInternal -lSceNet
+		-lSceVideoOut -lSceSystemService -lkernel_web -lSceLibcInternal -lSceNet \
+		-lSceSsl -lSceHttp2
 
 clean:
 	rm -f $(ELF) $(OBJS)

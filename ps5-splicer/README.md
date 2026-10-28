@@ -19,7 +19,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256:
 
 ```
-1a614c6e5e98c777236a0d6e5b55f666a5428e3baed263d2aaa17990c23da6c5
+c8e5476150be6add66ace66af7d6ed2a934d0f1e78fccb4b85510012cab559db
 ```
 
 The release also has `payload-mpeg1.elf` (sha256 `9b62550330fdf1162f0a6b031f67ddcb1eadfc3e0f21f322fdd48d0db8d23d64`), the older MPEG-1-only file. It is not a build for another firmware.
@@ -75,8 +75,11 @@ etaHEN and kstuff are the environment already running. The splicer loads libSceV
 | Triangle | Swap the two buses |
 | Left / Right | Seek the focused bus by 5 seconds |
 | Right stick | Move the wipe |
+| L2 | Plugins. Packages in `/mnt/usb0/plugins` (also usb1 and `/data/movian/plugins`) |
 | Options | Rescan USB |
 | Hold Options | Quit back to the loader |
+
+L2 lists `plugin.json` packages. Cross runs that package in this payload (Duktape 2.7, Movian API v2) and opens its first service. Pages are fetched with sceHttp2. Circle goes back. A popup is accepted, so a terms gate does not stop the script. Titles are transliterated for the on-screen font. An `http` address is shown. This FFmpeg build has no HTTP protocol, so that address is not decoded. The payload was not run on a console here.
 
 ## Rebuild
 
