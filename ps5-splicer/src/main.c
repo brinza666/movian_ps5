@@ -5,9 +5,10 @@
  * demuxed with FFmpeg. Decode tries libSceVideodec2 (sysmodule 207),
  * loaded with sceKernelLoadStartModule / sceSysmoduleLoadModule, the
  * same module calls the running HEN already makes. If that module does
- * not open, FFmpeg decodes in software. AAC, AC-3, E-AC-3 and MP3 in
- * those files are decoded with FFmpeg and mixed into sceAudioOut, the
- * same output MPEG-1 already uses. REA is not a decoder.
+ * not open, FFmpeg decodes in software. AAC, AC-3, E-AC-3, MP3, DTS,
+ * TrueHD, Opus, FLAC and PCM in those files are decoded with FFmpeg
+ * and mixed to stereo on sceAudioOut, the same output MPEG-1 uses.
+ * REA is not a decoder.
  *
  * The scanout sequence follows the public hbldr sample (GPL-3.0):
  *   Copyright (C) 2023 John Törnblom

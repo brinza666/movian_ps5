@@ -133,9 +133,32 @@ frame_pts(avdec_t *a)
 static int
 is_audio_id(enum AVCodecID id)
 {
-	return id == AV_CODEC_ID_AAC || id == AV_CODEC_ID_AAC_LATM ||
-	       id == AV_CODEC_ID_AC3 || id == AV_CODEC_ID_EAC3 ||
-	       id == AV_CODEC_ID_MP3;
+	switch (id) {
+	case AV_CODEC_ID_AAC:
+	case AV_CODEC_ID_AAC_LATM:
+	case AV_CODEC_ID_AC3:
+	case AV_CODEC_ID_EAC3:
+	case AV_CODEC_ID_MP3:
+	case AV_CODEC_ID_DTS:
+	case AV_CODEC_ID_TRUEHD:
+	case AV_CODEC_ID_MLP:
+	case AV_CODEC_ID_OPUS:
+	case AV_CODEC_ID_FLAC:
+	case AV_CODEC_ID_PCM_S16LE:
+	case AV_CODEC_ID_PCM_S16BE:
+	case AV_CODEC_ID_PCM_S24LE:
+	case AV_CODEC_ID_PCM_S24BE:
+	case AV_CODEC_ID_PCM_S32LE:
+	case AV_CODEC_ID_PCM_S32BE:
+	case AV_CODEC_ID_PCM_F32LE:
+	case AV_CODEC_ID_PCM_F32BE:
+	case AV_CODEC_ID_PCM_U8:
+	case AV_CODEC_ID_PCM_BLURAY:
+	case AV_CODEC_ID_PCM_DVD:
+		return 1;
+	default:
+		return 0;
+	}
 }
 
 static float
@@ -159,6 +182,22 @@ sample_at(const AVFrame *f, int ch, int i)
 	if (f->format == AV_SAMPLE_FMT_S16) {
 		const int16_t *p = (const int16_t *)f->extended_data[0];
 		return p ? (float)p[i * nch + ch] / 32768.0f : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_S32P) {
+		const int32_t *p = (const int32_t *)f->extended_data[ch];
+		return p ? (float)p[i] / 2147483648.0f : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_S32) {
+		const int32_t *p = (const int32_t *)f->extended_data[0];
+		return p ? (float)p[i * nch + ch] / 2147483648.0f : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_U8P) {
+		const uint8_t *p = (const uint8_t *)f->extended_data[ch];
+		return p ? ((float)p[i] - 128.0f) / 128.0f : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_U8) {
+		const uint8_t *p = (const uint8_t *)f->extended_data[0];
+		return p ? ((float)p[i * nch + ch] - 128.0f) / 128.0f : 0;
 	}
 	return 0;
 }
@@ -206,6 +245,10 @@ emit_audio(avdec_t *a)
 					float lfe = sample_at(f, 3, i);
 					L = sample_at(f, 0, i) + 0.707f * c + 0.707f * sample_at(f, 4, i) + 0.25f * lfe;
 					R = sample_at(f, 1, i) + 0.707f * c + 0.707f * sample_at(f, 5, i) + 0.25f * lfe;
+					if (ch >= 8) {
+						L += 0.5f * sample_at(f, 6, i);
+						R += 0.5f * sample_at(f, 7, i);
+					}
 				} else {
 					L = sample_at(f, 0, i);
 					R = sample_at(f, 1, i);

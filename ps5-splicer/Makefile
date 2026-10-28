@@ -30,6 +30,7 @@ $(ELF): $(OBJS)
 		--start-group \
 		$(FFMPEG_SRC)/libavformat/libavformat.a \
 		$(FFMPEG_SRC)/libavcodec/libavcodec.a \
+		$(FFMPEG_SRC)/libswresample/libswresample.a \
 		$(FFMPEG_SRC)/libavutil/libavutil.a \
 		--end-group \
 		-lSceVideoOut -lSceSystemService -lkernel_web -lSceLibcInternal -lSceNet

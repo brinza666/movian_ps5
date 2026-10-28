@@ -13,8 +13,9 @@ prospero-clang wrapper had no host LLVM here. Scanout is `sceVideoOut`
 direct memory, pixel format `A8B8G8R8` (`0x8000000022000000`).
 MPEG-1 is pl_mpeg. H.264 and HEVC are demuxed with FFmpeg 7.1.
 The picture is decoded with libSceVideodec2 when that module loads,
-and with FFmpeg on the CPU when it does not. AAC, AC-3, E-AC-3 and MP3
-in those files are decoded with FFmpeg and played through sceAudioOut.
+and with FFmpeg on the CPU when it does not. AAC, AC-3, E-AC-3, MP3, DTS,
+TrueHD, Opus, FLAC and PCM in those files are decoded with FFmpeg and
+played through sceAudioOut.
 
 ## Send it
 
@@ -31,7 +32,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256 of this tree's `payload.elf`:
 
 ```
-1035516c00e861407cc55bed6d70061d5de95cb222a2f55044d85318ad8d91b7
+8c49aec5b5139e7b1238aa9891b91cb289c802d9ac67a0972c69a90c77d0db20
 ```
 
 The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
@@ -93,7 +94,7 @@ the probe succeeds, otherwise `avcodec_send_packet`.
 - hardware: 8-bit H.264, 8-bit and 10-bit HEVC, 4:2:0, up to 3840×2176
 - software fallback: same codecs, up to 1920×1088
 - the HUD marks the bus `HW` or `SW`
-- AAC, AAC-LATM, AC-3, E-AC-3 and MP3 in those files are decoded and mixed to the same 48 kHz stereo output as MPEG-1. 5.1 is folded to stereo. DTS, TrueHD, Opus, FLAC and PCM stay silent
+- AAC, AAC-LATM, AC-3, E-AC-3, MP3, DTS, DTS-HD, TrueHD, Opus, FLAC, integer PCM, float PCM, and Blu-ray or DVD LPCM are mixed to the same 48 kHz stereo output as MPEG-1. 5.1 and 7.1 are folded to stereo. Object audio (Atmos, DTS:X) is not rendered past the channel bed
 - a Matroska file with zlib-compressed headers will not open
 - VP9, AV1 and AVI are not opened
 - this ELF was not booted on a console here. Scanout stays `sceVideoOut`.
