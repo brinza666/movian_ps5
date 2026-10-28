@@ -1,11 +1,14 @@
 /* SPLICER — two-bus video combiner for a PS5 ELF loader.
  *
  * Native x86-64 payload. Scanout is sceVideoOut (direct memory, A8B8G8R8).
- * Decode is in-process MPEG-1 (pl_mpeg). No emulator, no Wine, no second runtime.
+ * MPEG-1 is pl_mpeg. MP4, MKV and MPEG-TS that carry H.264 or HEVC are
+ * software-decoded with FFmpeg (no sceVideodec2 — an elfldr payload does
+ * not get that). REA is not a decoder.
  *
  * The scanout sequence follows the public hbldr sample (GPL-3.0):
  *   Copyright (C) 2023 John Törnblom
  * This file is licensed under GPL-3.0-or-later. pl_mpeg is MIT.
+ * FFmpeg libraries linked here are LGPL-2.1-or-later.
  * font8x8 is public domain.
  */
 
@@ -22,6 +25,7 @@
 #include <sys/event.h>
 
 #include "pl_mpeg.h"
+#include "avdec.h"
 #include "font8x8_basic.h"
 
 #define MAX_FILES 48
@@ -98,6 +102,7 @@ typedef struct bus {
 	char name[192];
 	char path[768];
 	plm_t *plm;
+	avdec_t *av;
 	uint8_t *rgba;
 	int w, h;
 	int has;
@@ -195,7 +200,10 @@ is_video_name(const char *name)
 {
 	return ends_with_ci(name, ".mpg") || ends_with_ci(name, ".mpeg") ||
 	       ends_with_ci(name, ".mpv") || ends_with_ci(name, ".m1v") ||
-	       ends_with_ci(name, ".m2v");
+	       ends_with_ci(name, ".m2v") || ends_with_ci(name, ".mp4") ||
+	       ends_with_ci(name, ".m4v") || ends_with_ci(name, ".mov") ||
+	       ends_with_ci(name, ".mkv") || ends_with_ci(name, ".ts") ||
+	       ends_with_ci(name, ".m2ts") || ends_with_ci(name, ".mts");
 }
 
 static void
@@ -335,6 +343,10 @@ bus_live(bus_t *b, int kind, const char *name)
 		plm_destroy(b->plm);
 		b->plm = NULL;
 	}
+	if (b->av) {
+		avdec_close(b->av);
+		b->av = NULL;
+	}
 	free(b->rgba);
 	b->rgba = (uint8_t *)malloc((size_t)LIVE_W * LIVE_H * 4);
 	b->w = LIVE_W;
@@ -351,7 +363,38 @@ bus_live(bus_t *b, int kind, const char *name)
 }
 
 static int
-bus_open_file(bus_t *b, const char *path, int half_seek)
+bus_open_av(bus_t *b, const char *path, int half_seek)
+{
+	avdec_t *av = NULL;
+	uint8_t *rgba = NULL;
+	int w = 0, h = 0;
+	double duration = 0;
+	if (avdec_open(&av, path, &rgba, &w, &h, &duration) != 0)
+		return -1;
+	if (b->plm) {
+		plm_destroy(b->plm);
+		b->plm = NULL;
+	}
+	if (b->av)
+		avdec_close(b->av);
+	free(b->rgba);
+	b->av = av;
+	b->rgba = rgba;
+	b->w = w;
+	b->h = h;
+	b->has = 1;
+	b->live = 0;
+	b->duration = duration;
+	snprintf(b->path, sizeof b->path, "%s", path);
+	basename_copy(b->name, sizeof b->name, path);
+	aq_reset(&b->aq);
+	if (half_seek && b->duration > 1.0)
+		avdec_seek(av, b->duration * 0.5);
+	return 0;
+}
+
+static int
+bus_open_plm(bus_t *b, const char *path, int half_seek)
 {
 	plm_t *plm;
 	int w, h;
@@ -383,6 +426,10 @@ bus_open_file(bus_t *b, const char *path, int half_seek)
 
 	if (b->plm)
 		plm_destroy(b->plm);
+	if (b->av) {
+		avdec_close(b->av);
+		b->av = NULL;
+	}
 	free(b->rgba);
 	b->plm = plm;
 	b->rgba = rgba;
@@ -402,6 +449,26 @@ bus_open_file(bus_t *b, const char *path, int half_seek)
 	if (half_seek && b->duration > 1.0)
 		plm_seek(plm, b->duration * 0.5, 0);
 	return 0;
+}
+
+static int
+is_mpeg_name(const char *name)
+{
+	return ends_with_ci(name, ".mpg") || ends_with_ci(name, ".mpeg") ||
+	       ends_with_ci(name, ".mpv") || ends_with_ci(name, ".m1v") ||
+	       ends_with_ci(name, ".m2v");
+}
+
+static int
+bus_open_file(bus_t *b, const char *path, int half_seek)
+{
+	if (is_mpeg_name(path) && bus_open_plm(b, path, half_seek) == 0)
+		return 0;
+	if (bus_open_av(b, path, half_seek) == 0)
+		return 0;
+	if (!is_mpeg_name(path) && bus_open_plm(b, path, half_seek) == 0)
+		return 0;
+	return -1;
 }
 
 static void
@@ -628,12 +695,19 @@ static void
 seek_bus(bus_t *b, double delta)
 {
 	double t;
-	if (!b->plm)
+	if (b->plm) {
+		t = plm_get_time(b->plm) + delta;
+		if (t < 0)
+			t = 0;
+		plm_seek(b->plm, t, 0);
 		return;
-	t = plm_get_time(b->plm) + delta;
-	if (t < 0)
-		t = 0;
-	plm_seek(b->plm, t, 0);
+	}
+	if (b->av) {
+		t = avdec_time(b->av) + delta;
+		if (t < 0)
+			t = 0;
+		avdec_seek(b->av, t);
+	}
 }
 
 static void
@@ -949,8 +1023,12 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 		y0 = 0;
 	if (g_bus[0].plm)
 		ta_s = plm_get_time(g_bus[0].plm);
+	else if (g_bus[0].av)
+		ta_s = avdec_time(g_bus[0].av);
 	if (g_bus[1].plm)
 		tb_s = plm_get_time(g_bus[1].plm);
+	else if (g_bus[1].av)
+		tb_s = avdec_time(g_bus[1].av);
 	fmt_tc(ta, sizeof ta, ta_s);
 	fmt_tc(tb, sizeof tb, tb_s);
 	shade(dst, stride, vis_w, vis_h, 0, y0, vis_w, vis_h - y0);
@@ -1312,6 +1390,8 @@ render_loop(void)
 				for (i = 0; i < 2; i++) {
 					if (g_bus[i].plm)
 						plm_decode(g_bus[i].plm, dt);
+					else if (g_bus[i].av)
+						avdec_tick(g_bus[i].av, dt);
 					else if (g_bus[i].live)
 						render_live(&g_bus[i], now);
 				}
