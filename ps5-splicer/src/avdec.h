@@ -8,8 +8,11 @@
  */
 typedef struct avdec avdec_t;
 
+/* Interleaved stereo float, -1..1. count is frames. rate is the source rate. */
+typedef void (*avdec_pcm_fn)(void *user, const float *interleaved, int count, int rate);
+
 int avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
-	       double *duration);
+	       double *duration, avdec_pcm_fn pcm, void *pcm_user);
 void avdec_close(avdec_t *a);
 /* Decode forward by dt seconds. Returns 1 if a picture was written. */
 int avdec_tick(avdec_t *a, double dt);

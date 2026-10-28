@@ -13,7 +13,8 @@ prospero-clang wrapper had no host LLVM here. Scanout is `sceVideoOut`
 direct memory, pixel format `A8B8G8R8` (`0x8000000022000000`).
 MPEG-1 is pl_mpeg. H.264 and HEVC are demuxed with FFmpeg 7.1.
 The picture is decoded with libSceVideodec2 when that module loads,
-and with FFmpeg on the CPU when it does not.
+and with FFmpeg on the CPU when it does not. AAC, AC-3, E-AC-3 and MP3
+in those files are decoded with FFmpeg and played through sceAudioOut.
 
 ## Send it
 
@@ -30,7 +31,7 @@ prospero-deploy -h PS5_IP -p 9021 payload.elf
 SHA-256 of this tree's `payload.elf`:
 
 ```
-f0b436bb69864c2e04328f146cb8e0e77b3877b0ca2d0de376eae4a1711e5e2a
+1035516c00e861407cc55bed6d70061d5de95cb222a2f55044d85318ad8d91b7
 ```
 
 The previous MPEG-1-only ELF is kept as `payload-mpeg1.elf`
@@ -92,7 +93,7 @@ the probe succeeds, otherwise `avcodec_send_packet`.
 - hardware: 8-bit H.264, 8-bit and 10-bit HEVC, 4:2:0, up to 3840×2176
 - software fallback: same codecs, up to 1920×1088
 - the HUD marks the bus `HW` or `SW`
-- picture only on those containers. Their audio is not decoded
+- AAC, AAC-LATM, AC-3, E-AC-3 and MP3 in those files are decoded and mixed to the same 48 kHz stereo output as MPEG-1. 5.1 is folded to stereo. DTS, TrueHD, Opus, FLAC and PCM stay silent
 - a Matroska file with zlib-compressed headers will not open
 - VP9, AV1 and AVI are not opened
 - this ELF was not booted on a console here. Scanout stays `sceVideoOut`.

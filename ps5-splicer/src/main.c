@@ -5,7 +5,9 @@
  * demuxed with FFmpeg. Decode tries libSceVideodec2 (sysmodule 207),
  * loaded with sceKernelLoadStartModule / sceSysmoduleLoadModule, the
  * same module calls the running HEN already makes. If that module does
- * not open, FFmpeg decodes in software. REA is not a decoder.
+ * not open, FFmpeg decodes in software. AAC, AC-3, E-AC-3 and MP3 in
+ * those files are decoded with FFmpeg and mixed into sceAudioOut, the
+ * same output MPEG-1 already uses. REA is not a decoder.
  *
  * The scanout sequence follows the public hbldr sample (GPL-3.0):
  *   Copyright (C) 2023 John Törnblom
@@ -365,6 +367,13 @@ bus_live(bus_t *b, int kind, const char *name)
 	aq_reset(&b->aq);
 }
 
+static void
+on_av_pcm(void *user, const float *interleaved, int count, int rate)
+{
+	bus_t *b = user;
+	aq_push(&b->aq, interleaved, count, rate);
+}
+
 static int
 bus_open_av(bus_t *b, const char *path, int half_seek)
 {
@@ -372,7 +381,8 @@ bus_open_av(bus_t *b, const char *path, int half_seek)
 	uint8_t *rgba = NULL;
 	int w = 0, h = 0;
 	double duration = 0;
-	if (avdec_open(&av, path, &rgba, &w, &h, &duration) != 0)
+	aq_reset(&b->aq);
+	if (avdec_open(&av, path, &rgba, &w, &h, &duration, on_av_pcm, b) != 0)
 		return -1;
 	if (b->plm) {
 		plm_destroy(b->plm);
@@ -390,9 +400,10 @@ bus_open_av(bus_t *b, const char *path, int half_seek)
 	b->duration = duration;
 	snprintf(b->path, sizeof b->path, "%s", path);
 	basename_copy(b->name, sizeof b->name, path);
-	aq_reset(&b->aq);
-	if (half_seek && b->duration > 1.0)
+	if (half_seek && b->duration > 1.0) {
+		aq_reset(&b->aq);
 		avdec_seek(av, b->duration * 0.5);
+	}
 	return 0;
 }
 
@@ -709,6 +720,7 @@ seek_bus(bus_t *b, double delta)
 		t = avdec_time(b->av) + delta;
 		if (t < 0)
 			t = 0;
+		aq_reset(&b->aq);
 		avdec_seek(b->av, t);
 	}
 }

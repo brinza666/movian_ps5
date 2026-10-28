@@ -28,6 +28,13 @@ struct avdec {
 	uint8_t *prefix;
 	int prefix_n;
 	uint8_t *scratch;
+	AVCodecContext *acodec;
+	AVFrame *aframe;
+	int aindex;
+	float *pcm;
+	int pcm_cap;
+	avdec_pcm_fn on_pcm;
+	void *pcm_user;
 };
 
 static int
@@ -124,6 +131,160 @@ frame_pts(avdec_t *a)
 }
 
 static int
+is_audio_id(enum AVCodecID id)
+{
+	return id == AV_CODEC_ID_AAC || id == AV_CODEC_ID_AAC_LATM ||
+	       id == AV_CODEC_ID_AC3 || id == AV_CODEC_ID_EAC3 ||
+	       id == AV_CODEC_ID_MP3;
+}
+
+static float
+sample_at(const AVFrame *f, int ch, int i)
+{
+	int nch = f->ch_layout.nb_channels > 0 ? f->ch_layout.nb_channels : 1;
+	if (ch < 0 || ch >= nch)
+		return 0;
+	if (f->format == AV_SAMPLE_FMT_FLTP) {
+		const float *p = (const float *)f->extended_data[ch];
+		return p ? p[i] : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_FLT) {
+		const float *p = (const float *)f->extended_data[0];
+		return p ? p[i * nch + ch] : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_S16P) {
+		const int16_t *p = (const int16_t *)f->extended_data[ch];
+		return p ? (float)p[i] / 32768.0f : 0;
+	}
+	if (f->format == AV_SAMPLE_FMT_S16) {
+		const int16_t *p = (const int16_t *)f->extended_data[0];
+		return p ? (float)p[i * nch + ch] / 32768.0f : 0;
+	}
+	return 0;
+}
+
+static float
+clamp1(float s)
+{
+	if (s > 1.0f)
+		return 1.0f;
+	if (s < -1.0f)
+		return -1.0f;
+	return s;
+}
+
+static void
+emit_audio(avdec_t *a)
+{
+	AVFrame *f;
+	int n, ch, i;
+	if (!a->acodec || !a->aframe || !a->on_pcm)
+		return;
+	f = a->aframe;
+	for (;;) {
+		int r = avcodec_receive_frame(a->acodec, f);
+		if (r)
+			return;
+		n = f->nb_samples;
+		ch = f->ch_layout.nb_channels > 0 ? f->ch_layout.nb_channels : 1;
+		if (n > 0) {
+			if (n > a->pcm_cap) {
+				float *p = (float *)realloc(a->pcm, (size_t)n * 2 * sizeof(float));
+				if (!p) {
+					av_frame_unref(f);
+					return;
+				}
+				a->pcm = p;
+				a->pcm_cap = n;
+			}
+			for (i = 0; i < n; i++) {
+				float L, R;
+				if (ch == 1) {
+					L = R = sample_at(f, 0, i);
+				} else if (ch >= 6) {
+					float c = sample_at(f, 2, i);
+					float lfe = sample_at(f, 3, i);
+					L = sample_at(f, 0, i) + 0.707f * c + 0.707f * sample_at(f, 4, i) + 0.25f * lfe;
+					R = sample_at(f, 1, i) + 0.707f * c + 0.707f * sample_at(f, 5, i) + 0.25f * lfe;
+				} else {
+					L = sample_at(f, 0, i);
+					R = sample_at(f, 1, i);
+					if (ch > 2) {
+						float c = sample_at(f, 2, i);
+						L += 0.707f * c;
+						R += 0.707f * c;
+					}
+				}
+				a->pcm[i * 2] = clamp1(L);
+				a->pcm[i * 2 + 1] = clamp1(R);
+			}
+			a->on_pcm(a->pcm_user, a->pcm, n,
+				  f->sample_rate > 0 ? f->sample_rate : 48000);
+		}
+		av_frame_unref(f);
+	}
+}
+
+static void
+feed_audio_packet(avdec_t *a)
+{
+	int r;
+	if (!a->acodec || !a->pkt || a->aindex < 0 || a->pkt->stream_index != a->aindex)
+		return;
+	r = avcodec_send_packet(a->acodec, a->pkt);
+	if (r == AVERROR(EAGAIN)) {
+		emit_audio(a);
+		r = avcodec_send_packet(a->acodec, a->pkt);
+	}
+	if (r == 0)
+		emit_audio(a);
+}
+
+static int
+open_audio(avdec_t *a)
+{
+	const AVCodec *codec;
+	AVStream *st;
+	enum AVCodecID id;
+	int i;
+	a->aindex = -1;
+	if (!a->fmt)
+		return -1;
+	for (i = 0; i < (int)a->fmt->nb_streams; i++) {
+		if (a->fmt->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO)
+			continue;
+		id = a->fmt->streams[i]->codecpar->codec_id;
+		if (!is_audio_id(id))
+			continue;
+		a->aindex = i;
+		break;
+	}
+	if (a->aindex < 0)
+		return -1;
+	st = a->fmt->streams[a->aindex];
+	codec = avcodec_find_decoder(st->codecpar->codec_id);
+	if (!codec)
+		goto fail;
+	a->acodec = avcodec_alloc_context3(codec);
+	a->aframe = av_frame_alloc();
+	if (!a->acodec || !a->aframe)
+		goto fail;
+	if (avcodec_parameters_to_context(a->acodec, st->codecpar) < 0)
+		goto fail;
+	a->acodec->thread_count = 1;
+	if (avcodec_open2(a->acodec, codec, NULL) < 0)
+		goto fail;
+	return 0;
+fail:
+	if (a->aframe)
+		av_frame_free(&a->aframe);
+	if (a->acodec)
+		avcodec_free_context(&a->acodec);
+	a->aindex = -1;
+	return -1;
+}
+
+static int
 hw_pull(avdec_t *a)
 {
 	int spins = 0;
@@ -147,6 +308,11 @@ hw_pull(avdec_t *a)
 		r = av_read_frame(a->fmt, a->pkt);
 		if (r < 0) {
 			a->eof = 1;
+			continue;
+		}
+		if (a->pkt->stream_index == a->aindex) {
+			feed_audio_packet(a);
+			av_packet_unref(a->pkt);
 			continue;
 		}
 		if (a->pkt->stream_index != a->vindex) {
@@ -238,6 +404,12 @@ try_hardware(avdec_t *a, AVStream *st)
 	}
 	if (!got)
 		goto giveup;
+	av_seek_frame(a->fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+	hwdec_reset(a->hw);
+	if (a->acodec)
+		avcodec_flush_buffers(a->acodec);
+	a->sent_prefix = 0;
+	a->eof = 0;
 	a->pts = 0;
 	a->clock = 0;
 	return 0;
@@ -294,7 +466,9 @@ pull_one(avdec_t *a)
 			avcodec_send_packet(a->codec, NULL);
 			continue;
 		}
-		if (a->pkt->stream_index == a->vindex)
+		if (a->pkt->stream_index == a->aindex)
+			feed_audio_packet(a);
+		else if (a->pkt->stream_index == a->vindex)
 			avcodec_send_packet(a->codec, a->pkt);
 		av_packet_unref(a->pkt);
 	}
@@ -302,7 +476,7 @@ pull_one(avdec_t *a)
 
 int
 avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
-	   double *duration)
+	   double *duration, avdec_pcm_fn pcm, void *pcm_user)
 {
 	avdec_t *a;
 	const AVCodec *codec;
@@ -314,6 +488,9 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	if (!a)
 		return -1;
 	a->vindex = -1;
+	a->aindex = -1;
+	a->on_pcm = pcm;
+	a->pcm_user = pcm_user;
 	if (avformat_open_input(&a->fmt, path, NULL, NULL) < 0)
 		goto fail;
 	if (avformat_find_stream_info(a->fmt, NULL) < 0)
@@ -334,6 +511,7 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	a->frame = av_frame_alloc();
 	if (!a->pkt || !a->frame)
 		goto fail;
+	open_audio(a);
 	if (a->fmt->duration > 0)
 		a->duration = (double)a->fmt->duration / (double)AV_TIME_BASE;
 	if (try_hardware(a, st) == 0) {
@@ -393,6 +571,11 @@ avdec_close(avdec_t *a)
 		hwdec_close(a->hw);
 	free(a->prefix);
 	free(a->scratch);
+	free(a->pcm);
+	if (a->aframe)
+		av_frame_free(&a->aframe);
+	if (a->acodec)
+		avcodec_free_context(&a->acodec);
 	if (a->frame)
 		av_frame_free(&a->frame);
 	if (a->pkt)
@@ -447,6 +630,8 @@ avdec_seek(avdec_t *a, double seconds)
 	av_seek_frame(a->fmt, -1, ts, AVSEEK_FLAG_BACKWARD);
 	if (a->codec)
 		avcodec_flush_buffers(a->codec);
+	if (a->acodec)
+		avcodec_flush_buffers(a->acodec);
 	if (a->hw)
 		hwdec_reset(a->hw);
 	a->sent_prefix = 0;
