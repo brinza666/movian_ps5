@@ -12,6 +12,8 @@
 int hwdec_probe(void);
 int hwdec_ready(void);
 const char *hwdec_status(void);
+/* 1 keeps the software decoder even when the module loaded. */
+void hwdec_force_software(int on);
 
 typedef struct hwdec hwdec_t;
 

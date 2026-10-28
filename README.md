@@ -18,7 +18,7 @@ The feed itself is [plugins/repo.json](plugins/repo.json).
 
 Pre-alpha ELF: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).
 
-Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet or a `.torrent` plays in that file while the pieces arrive. Codecs and firmware list: [ps5-splicer/README.md](ps5-splicer/README.md).
+Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet or a `.torrent` plays in that file while the pieces arrive. Options opens the player menu; Repository on that menu is the alternate plugin feed. Codecs and the pad: [ps5-splicer/README.md](ps5-splicer/README.md). The pre-alpha ELF does not include these menus until the tree is rebuilt.
 
 ## Tree
 

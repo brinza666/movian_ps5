@@ -149,6 +149,7 @@ static k_unflex_fn p_unflex;
 
 static int g_probed;
 static int g_ready;
+static int g_force_sw;
 static char g_status[24] = "SW";
 
 struct hwdec {
@@ -329,9 +330,21 @@ hwdec_probe(void)
 int
 hwdec_ready(void)
 {
+	if (g_force_sw)
+		return 0;
 	if (!g_probed)
 		hwdec_probe();
 	return g_ready;
+}
+
+void
+hwdec_force_software(int on)
+{
+	g_force_sw = on ? 1 : 0;
+	if (g_force_sw)
+		memcpy(g_status, "SW", 3);
+	else if (g_ready)
+		memcpy(g_status, "HW", 3);
 }
 
 const char *

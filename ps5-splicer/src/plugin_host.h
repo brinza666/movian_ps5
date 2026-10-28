@@ -55,4 +55,10 @@ void plug_ascii(const char *utf8, char *out, size_t n);
 
 const char *plug_engine_line(void);
 
+/* GET. *body is malloc'd and NUL-terminated. cap is the byte limit. */
+int plug_http_get(const char *url, char **body, size_t *len, size_t cap, char *err, size_t errn);
+
+/* Called with each page URL before the script opens it. Optional. */
+void plug_set_uri_hook(int (*fn)(const char *uri));
+
 #endif

@@ -32,6 +32,7 @@
 #include "avdec.h"
 #include "hwdec.h"
 #include "plugin_host.h"
+#include "options.h"
 #include "bt.h"
 #include "font8x8_basic.h"
 
@@ -173,6 +174,7 @@ static int g_bt_opened;
 static int g_bt_cool;
 static void bt_release_if_unused(void);
 static int g_plug;
+static int g_opt;
 static int g_plug_i;
 static int g_plug_view;
 static int g_plug_wait;
@@ -301,11 +303,13 @@ ftoi(float s, float gain)
 }
 
 static void
-aq_pull(aq_t *q, int16_t *dst, int frames, float gain)
+aq_pull(aq_t *q, int16_t *dst, int frames, float gain, double speed)
 {
 	int i;
-	double step = (q->rate > 0 ? (double)q->rate : 48000.0) / 48000.0 *
-		((double)g_speed / 100.0);
+	double step = (q->rate > 0 ? (double)q->rate : 48000.0) / 48000.0;
+	if (speed < 0.25 || speed > 4.0)
+		speed = 1.0;
+	step *= speed;
 	for (i = 0; i < frames; i++) {
 		float l = 0, r = 0;
 		if (q->n >= 2) {
@@ -853,8 +857,8 @@ pump_audio(void)
 		ga = (g_audio_mode == 0) ? 0.55f : 1.0f;
 	if (g_audio_mode != 1)
 		gb = (g_audio_mode == 0) ? 0.55f : 1.0f;
-	aq_pull(&g_bus[0].aq, a, 256, ga);
-	aq_pull(&g_bus[1].aq, b, 256, gb);
+	aq_pull(&g_bus[0].aq, a, 256, ga, opt_speed());
+	aq_pull(&g_bus[1].aq, b, 256, gb, opt_speed());
 	for (i = 0; i < 256 * 2; i++) {
 		int s = (int)a[i] + (int)b[i];
 		if (s > 32767)
@@ -1161,9 +1165,8 @@ draw_hud(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 	fmt_tc(ta, sizeof ta, ta_s);
 	fmt_tc(tb, sizeof tb, tb_s);
 	shade(dst, stride, vis_w, vis_h, 0, y0, vis_w, vis_h - y0);
-	snprintf(line1, sizeof line1, "SPLICER  %s  audio %s  focus %s  %s%s%s",
-		 LAY_NAME[g_layout], am, focus, g_status, g_paused ? "  PAUSED" : "",
-		 g_speed == 100 ? "" : (g_speed == 50 ? "  0.5x" : (g_speed == 150 ? "  1.5x" : "  2x")));
+	snprintf(line1, sizeof line1, "SPLICER  %s  audio %s  focus %s  %.2gx  %s%s",
+		 LAY_NAME[g_layout], am, focus, opt_speed(), g_status, g_paused ? "  PAUSED" : "");
 	snprintf(line2, sizeof line2, "%c A  %-22.22s %s %s",
 		 g_focus == 0 ? '>' : ' ', g_bus[0].name,
 		 (g_bus[0].plm || g_bus[0].av) ? ta : "live",
@@ -1321,9 +1324,9 @@ static int stream_url(const char *url);
 
 static const int SPEEDS[] = {50, 100, 150, 200};
 static const char *PLAY_NAME[] = {
-	"Layout", "Audio", "Speed", "Focus", "Pause", "Rescan", "Plugins"
+	"Layout", "Audio", "Speed", "Focus", "Pause", "Rescan", "Plugins", "Repository"
 };
-#define PLAY_N 7
+#define PLAY_N 8
 static const char KEYS[] = "abcdefghijklmnopqrstuvwxyz0123456789.-_:/?&=+#@ ";
 #define KEY_COLS 10
 #define KEY_N ((int)(sizeof(KEYS) - 1))
@@ -1331,13 +1334,9 @@ static const char KEYS[] = "abcdefghijklmnopqrstuvwxyz0123456789.-_:/?&=+#@ ";
 static const char *
 speed_label(void)
 {
-	if (g_speed == 50)
-		return "0.5x";
-	if (g_speed == 150)
-		return "1.5x";
-	if (g_speed == 200)
-		return "2x";
-	return "1x";
+	static char buf[16];
+	snprintf(buf, sizeof buf, "%.2gx", opt_speed());
+	return buf;
 }
 
 static void
@@ -1349,6 +1348,7 @@ cycle_speed(int dir)
 			cur = i;
 	cur = (cur + (dir < 0 ? 3 : 1)) % 4;
 	g_speed = SPEEDS[cur];
+	opt_set_speed((double)g_speed / 100.0);
 }
 
 static void
@@ -1465,11 +1465,13 @@ open_plugins(void)
 static void
 player_adjust(int dir)
 {
-	if (g_opt_i == 0)
+	if (g_opt_i == 0) {
 		g_layout = (g_layout + dir + LAY_COUNT) % LAY_COUNT;
-	else if (g_opt_i == 1)
+		opt_set_layout(g_layout);
+	} else if (g_opt_i == 1) {
 		g_audio_mode = (g_audio_mode + dir + 3) % 3;
-	else if (g_opt_i == 2)
+		opt_set_audio(g_audio_mode);
+	} else if (g_opt_i == 2)
 		cycle_speed(dir);
 	else if (g_opt_i == 3)
 		g_focus ^= 1;
@@ -1484,7 +1486,11 @@ player_go(void)
 		rescan_media();
 	else if (g_opt_i == 6)
 		open_plugins();
-	else
+	else if (g_opt_i == 7) {
+		g_opt_menu = 0;
+		g_opt = 1;
+		opt_open();
+	} else
 		player_adjust(1);
 }
 
@@ -1528,6 +1534,10 @@ commit_string(void)
 static void
 options_tap(void)
 {
+	if (g_opt) {
+		g_opt = 0;
+		return;
+	}
 	if (g_opt_menu == 4) {
 		commit_string();
 		return;
@@ -1898,6 +1908,59 @@ draw_plugins(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 }
 
 static void
+draw_options(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	char raw[480];
+	char ascii[480];
+	int n = opt_row_count();
+	int rows;
+	int start = 0;
+	int focus = 0;
+	int i;
+	int pitch = 10 * scale;
+	int header = 0;
+	int selected = 0;
+	if (pitch < 8)
+		pitch = 8;
+	rows = (vis_h - 52 * scale) / pitch;
+	if (rows < 3)
+		rows = 3;
+	if (rows > 22)
+		rows = 22;
+	clear_frame(dst, stride, vis_w, vis_h);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, 12 * scale, opt_title(), COL_AMBER, scale);
+	plug_ascii(opt_status(), ascii, sizeof ascii);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, 24 * scale, ascii, COL_SAGE, scale);
+	if (opt_armed()) {
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, 44 * scale, "LOADING", COL_PAPER, scale);
+		return;
+	}
+	for (i = 0; i < n; i++) {
+		opt_row(i, raw, sizeof raw, &header, &selected);
+		if (selected)
+			focus = i;
+	}
+	start = focus - rows / 2;
+	if (start < 0)
+		start = 0;
+	if (start + rows > n)
+		start = n > rows ? n - rows : 0;
+	for (i = 0; i < rows && start + i < n; i++) {
+		int idx = start + i;
+		int yy = 40 * scale + i * pitch;
+		opt_row(idx, raw, sizeof raw, &header, &selected);
+		plug_ascii(raw, ascii, sizeof ascii);
+		if (selected)
+			fill_rect_px(dst, stride, vis_w, vis_h, 8 * scale, yy - scale, vis_w - 16 * scale,
+				     8 * scale, 0xFF18405Au);
+		draw_text(dst, stride, vis_w, vis_h, 12 * scale, yy, ascii,
+			  header ? COL_SAGE : (selected ? COL_AMBER : COL_PAPER), scale);
+	}
+	plug_ascii(opt_hint(), ascii, sizeof ascii);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, vis_h - 16 * scale, ascii, COL_SAGE, scale);
+}
+
+static void
 border(uint8_t *dst, int stride, int w, int h, int t, uint32_t pix)
 {
 	fill_rect_px(dst, stride, w, h, 0, 0, w, t, pix);
@@ -2057,10 +2120,12 @@ render_loop(void)
 				btn = (uint32_t)padbuf[0] | ((uint32_t)padbuf[1] << 8) |
 				      ((uint32_t)padbuf[2] << 16) | ((uint32_t)padbuf[3] << 24);
 				rx = padbuf[6];
-				if (rx < 108 || rx > 148) {
+				if (!g_opt && !g_plug && (rx < 108 || rx > 148)) {
 					g_split = ((int)rx * vis_w) / 255;
-					if (g_layout != LAY_WIPE && (rx < 70 || rx > 186))
+					if (g_layout != LAY_WIPE && (rx < 70 || rx > 186)) {
 						g_layout = LAY_WIPE;
+						opt_set_layout(g_layout);
+					}
 				}
 			}
 			down = btn & ~prev_btn;
@@ -2082,6 +2147,7 @@ render_loop(void)
 				menu_keys(down);
 			} else {
 			if (down & BTN_L2) {
+				g_opt = 0;
 				g_plug = !g_plug;
 				g_plug_wait = 0;
 				if (g_plug) {
@@ -2091,7 +2157,52 @@ render_loop(void)
 					notify(plug_count() ? "SPLICER plugins" : "SPLICER no plugins on USB");
 				}
 			}
-			if (g_plug) {
+			if (g_opt) {
+				unsigned bits = 0;
+				if (opt_armed())
+					opt_work();
+				else {
+					if (down & BTN_UP)
+						bits |= OPT_UP;
+					if (down & BTN_DOWN)
+						bits |= OPT_DOWN;
+					if (down & BTN_LEFT)
+						bits |= OPT_LEFT;
+					if (down & BTN_RIGHT)
+						bits |= OPT_RIGHT;
+					if (down & BTN_CROSS)
+						bits |= OPT_CROSS;
+					if (down & BTN_CIR)
+						bits |= OPT_CIRCLE;
+					if (down & BTN_SQR)
+						bits |= OPT_SQUARE;
+					if (down & BTN_TRI)
+						bits |= OPT_TRI;
+					if (down & BTN_L1)
+						bits |= OPT_L1;
+					if (down & BTN_R1)
+						bits |= OPT_R1;
+					if (bits && !opt_pad(bits))
+						g_opt = 0;
+				}
+				g_layout = opt_layout();
+				g_audio_mode = opt_audio();
+				{
+					double s = opt_speed();
+					int pct = (int)(s * 100.0 + 0.5);
+					if (pct == 50 || pct == 100 || pct == 150 || pct == 200)
+						g_speed = pct;
+				}
+				if (opt_take_rescan()) {
+					g_nfiles = 0;
+					scan_media();
+					load_buses();
+				}
+				if (opt_take_reopen()) {
+					hwdec_force_software(opt_force_software());
+					load_buses();
+				}
+			} else if (g_plug) {
 				int n = g_plug_view == 0 ? plug_count() :
 					(g_plug_view == 1 ? plug_item_count() : 0);
 				if (g_plug_wait == 1)
@@ -2133,16 +2244,22 @@ render_loop(void)
 					}
 				}
 			} else {
-				if (down & BTN_UP)
+				if (down & BTN_UP) {
 					g_layout = (g_layout + LAY_COUNT - 1) % LAY_COUNT;
-				if (down & BTN_DOWN)
+					opt_set_layout(g_layout);
+				}
+				if (down & BTN_DOWN) {
 					g_layout = (g_layout + 1) % LAY_COUNT;
+					opt_set_layout(g_layout);
+				}
 				if (down & BTN_CROSS)
 					g_paused = !g_paused;
 				if (down & BTN_SQR)
 					g_focus ^= 1;
-				if (down & BTN_CIR)
+				if (down & BTN_CIR) {
 					g_audio_mode = (g_audio_mode + 1) % 3;
+					opt_set_audio(g_audio_mode);
+				}
 				if (down & BTN_TRI) {
 					int tmp = g_idx[0];
 					g_idx[0] = g_idx[1];
@@ -2154,9 +2271,9 @@ render_loop(void)
 				if (down & BTN_R1)
 					shift_file(g_focus, +1);
 				if (down & BTN_LEFT)
-					seek_bus(&g_bus[g_focus], -5.0);
+					seek_bus(&g_bus[g_focus], -opt_seek());
 				if (down & BTN_RIGHT)
-					seek_bus(&g_bus[g_focus], 5.0);
+					seek_bus(&g_bus[g_focus], opt_seek());
 			}
 			}
 
@@ -2190,18 +2307,20 @@ render_loop(void)
 
 			if (!g_paused) {
 				int i;
+				double play_dt = dt * opt_speed();
 				for (i = 0; i < 2; i++) {
-					double play = dt * ((double)g_speed / 100.0);
 					if (g_bus[i].plm)
-						plm_decode(g_bus[i].plm, play);
+						plm_decode(g_bus[i].plm, play_dt);
 					else if (g_bus[i].av)
-						avdec_tick(g_bus[i].av, play);
+						avdec_tick(g_bus[i].av, play_dt);
 					else if (g_bus[i].live)
 						render_live(&g_bus[i], now);
 				}
 			}
 			clear_frame((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h);
-			if (g_plug) {
+			if (g_opt) {
+				draw_options((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+			} else if (g_plug) {
 				draw_plugins((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
 			} else {
 				composite((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, bilinear);
@@ -2227,11 +2346,32 @@ render_loop(void)
 	return 0;
 }
 
+static int
+opt_uri_hook(const char *uri)
+{
+	char err[180];
+	int rc = opt_install_for_uri(uri, err, sizeof err);
+	if (rc > 0)
+		notify(err);
+	return rc;
+}
+
 int
 main(void)
 {
 	sceSystemServiceHideSplashScreen();
 	notify("SPLICER payload started");
+	opt_boot();
+	plug_set_uri_hook(opt_uri_hook);
+	g_layout = opt_layout();
+	g_audio_mode = opt_audio();
+	{
+		double s = opt_speed();
+		int pct = (int)(s * 100.0 + 0.5);
+		if (pct == 50 || pct == 100 || pct == 150 || pct == 200)
+			g_speed = pct;
+	}
+	hwdec_force_software(opt_force_software());
 	bus_init(&g_bus[0]);
 	bus_init(&g_bus[1]);
 	g_idx[0] = 0;

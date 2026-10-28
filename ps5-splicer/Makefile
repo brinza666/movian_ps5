@@ -10,7 +10,7 @@ ELF := payload.elf
 CFLAGS := -O2 -fPIC -fno-stack-protector -fno-plt -Wall -Wno-unused-function -Wno-unused-variable \
 	-nostdinc -isystem $(PS5_PAYLOAD_SDK)/target/include \
 	-Ithird_party -I$(FFMPEG_SRC)
-OBJS := main.o mpeg_dec.o avdec.o hwdec.o duktape.o plugin_host.o bt.o
+OBJS := main.o mpeg_dec.o avdec.o hwdec.o duktape.o plugin_host.o bt.o options.o
 DUK_SRC := /tmp/duktape/duktape-2.7.0/src/duktape.c
 
 all: $(ELF)
@@ -29,6 +29,8 @@ plugin_host.o: src/plugin_host.c src/plugin_host.h src/plugin_embed.h
 	gcc $(CFLAGS) -I$(dir $(DUK_SRC)) -c -o $@ src/plugin_host.c
 bt.o: src/bt.c src/bt.h
 	gcc $(CFLAGS) -c -o $@ src/bt.c
+options.o: src/options.c src/options.h
+	gcc $(CFLAGS) -c -o $@ src/options.c
 duktape.o: $(DUK_SRC) third_party/endian.h
 	gcc $(CFLAGS) -c -o $@ $(DUK_SRC)
 

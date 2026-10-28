@@ -831,7 +831,7 @@ push_http(duk_context *ctx, int status, const char *body, size_t n, const char *
 #ifdef PLUGIN_HOST_TEST
 static int
 http_curl(const char *url, const char *method, const char *headerblob, const char *post,
-	  char **body, size_t *blen, char **hdrs, int *status, char *err, size_t errn)
+	  char **body, size_t *blen, char **hdrs, int *status, size_t cap, char *err, size_t errn)
 {
 	char bodypath[64], hdrpath[64];
 	int pipes[2];
@@ -840,16 +840,20 @@ http_curl(const char *url, const char *method, const char *headerblob, const cha
 	char *argv[64];
 	int argc = 0;
 	char statusbuf[16];
+	char capbuf[24];
 	size_t got = 0;
+	if (cap < 1)
+		cap = 1;
 	snprintf(bodypath, sizeof bodypath, "/tmp/mvhttp-%d.body", (int)getpid());
 	snprintf(hdrpath, sizeof hdrpath, "/tmp/mvhttp-%d.hdr", (int)getpid());
+	snprintf(capbuf, sizeof capbuf, "%u", (unsigned)cap);
 	argv[argc++] = "curl";
 	argv[argc++] = "-sS";
 	argv[argc++] = "-L";
 	argv[argc++] = "--max-time";
-	argv[argc++] = "12";
+	argv[argc++] = "20";
 	argv[argc++] = "--max-filesize";
-	argv[argc++] = "2000000";
+	argv[argc++] = capbuf;
 	argv[argc++] = "-D";
 	argv[argc++] = hdrpath;
 	argv[argc++] = "-o";
@@ -915,7 +919,7 @@ http_curl(const char *url, const char *method, const char *headerblob, const cha
 	close(pipes[0]);
 	waitpid(pid, &code, 0);
 	*status = atoi(statusbuf);
-	*body = read_file(bodypath, blen, HTTP_CAP);
+	*body = read_file(bodypath, blen, cap);
 	*hdrs = read_file(hdrpath, NULL, 65536);
 	remove(bodypath);
 	remove(hdrpath);
@@ -965,13 +969,15 @@ http_ps5_init(char *err, size_t errn)
 
 static int
 http_ps5(const char *url, const char *method, const char *headerblob, const char *post,
-	 char **body, size_t *blen, int *status, char *err, size_t errn)
+	 char **body, size_t *blen, int *status, size_t cap, char *err, size_t errn)
 {
 	int req;
 	int st = 0;
 	char *buf;
 	size_t used = 0;
 	const char *m = (method && method[0]) ? method : "GET";
+	if (cap < 1)
+		cap = 1;
 	if (http_ps5_init(err, errn) != 0)
 		return -1;
 	req = sceHttp2CreateRequestWithURL(g_tmpl, m, url, 0);
@@ -1015,7 +1021,7 @@ http_ps5(const char *url, const char *method, const char *headerblob, const char
 		snprintf(err, errn, "sceHttp2GetStatusCode");
 		return -1;
 	}
-	buf = (char *)malloc(HTTP_CAP);
+	buf = (char *)malloc(cap + 1);
 	if (!buf) {
 		sceHttp2DeleteRequest(req);
 		snprintf(err, errn, "http buffer");
@@ -1032,15 +1038,16 @@ http_ps5(const char *url, const char *method, const char *headerblob, const char
 		}
 		if (n == 0)
 			break;
-		if (used + (size_t)n > HTTP_CAP)
-			n = (int)(HTTP_CAP - used);
+		if (used + (size_t)n > cap)
+			n = (int)(cap - used);
 		if (n > 0) {
 			memcpy(buf + used, tmp, (size_t)n);
 			used += (size_t)n;
 		}
-		if (used >= HTTP_CAP)
+		if (used >= cap)
 			break;
 	}
+	buf[used] = 0;
 	sceHttp2DeleteRequest(req);
 	*body = buf;
 	*blen = used;
@@ -1068,10 +1075,10 @@ js_http(duk_context *ctx)
 		return 1;
 	}
 #ifdef PLUGIN_HOST_TEST
-	rc = http_curl(url, method, headers, post, &body, &blen, &hdrs, &status, err, sizeof err);
+	rc = http_curl(url, method, headers, post, &body, &blen, &hdrs, &status, HTTP_CAP, err, sizeof err);
 	(void)0;
 #else
-	rc = http_ps5(url, method, headers, post, &body, &blen, &status, err, sizeof err);
+	rc = http_ps5(url, method, headers, post, &body, &blen, &status, HTTP_CAP, err, sizeof err);
 #endif
 	if (rc != 0 && !err[0])
 		snprintf(err, sizeof err, "http failed");
@@ -1079,6 +1086,43 @@ js_http(duk_context *ctx)
 	free(body);
 	free(hdrs);
 	return 1;
+}
+
+int
+plug_http_get(const char *url, char **body, size_t *len, size_t cap, char *err, size_t errn)
+{
+	int status = 0;
+	int rc;
+	char *hdrs = NULL;
+	if (!body || !len || !err || errn == 0)
+		return -1;
+	*body = NULL;
+	*len = 0;
+	err[0] = 0;
+	if (!url || (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0)) {
+		snprintf(err, errn, "Only http and https");
+		return -1;
+	}
+	if (cap < 1)
+		cap = 1;
+	if (cap > 8u * 1024u * 1024u)
+		cap = 8u * 1024u * 1024u;
+#ifdef PLUGIN_HOST_TEST
+	rc = http_curl(url, "GET", NULL, NULL, body, len, &hdrs, &status, cap, err, errn);
+#else
+	rc = http_ps5(url, "GET", NULL, NULL, body, len, &status, cap, err, errn);
+#endif
+	free(hdrs);
+	if (rc != 0)
+		return -1;
+	if (status < 200 || status >= 300) {
+		snprintf(err, errn, "http %d", status);
+		free(*body);
+		*body = NULL;
+		*len = 0;
+		return -1;
+	}
+	return 0;
 }
 
 static void
@@ -1382,9 +1426,19 @@ plug_load_dir(const char *dir)
 	return 0;
 }
 
+static int (*g_uri_hook)(const char *uri);
+
+void
+plug_set_uri_hook(int (*fn)(const char *uri))
+{
+	g_uri_hook = fn;
+}
+
 static int
 open_url(const char *url, int push)
 {
+	if (g_uri_hook && url && url[0])
+		g_uri_hook(url);
 	if (!g_ctx || !url || !url[0]) {
 		set_status("no page");
 		return -1;

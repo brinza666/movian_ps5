@@ -8,7 +8,7 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Play while a torrent downloads | Built-in client. A magnet becomes `torrentfile://` plus the info hash | C client in `payload.elf` (movian-go is not this file). A magnet, a `.torrent` or a plugin magnet plays the largest video while pieces arrive. HTTP and UDP trackers. Plaintext peers, no DHT |
 | Subtitles (srt, ass, sub, vobsub) | Yes, plus OpenSubtitles | Browser subtitle tracks only, when the file has them |
 | Audio and subtitle track choice | Yes | Browser text tracks. Audio track count is shown, not switched |
-| Resume, seek, playback speed | Yes | Seek and pause. Options menu sets speed to 0.5x, 1x, 1.5x or 2x |
+| Resume, seek, playback speed | Yes | Seek and pause. The Options menu sets 0.5x, 1x, 1.5x, or 2x. Repository → Playback also stores 0.75x and 1.25x, and the seek step |
 | HLS, including live | Yes | A URL the browser can play |
 | MPEG-DASH and Widevine (DRM7) | Android and desktop builds | No |
 | SMB, NFS, FTP, SFTP, WebDAV | Yes | No |
@@ -18,9 +18,9 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Photos | Yes | No |
 | DVD and disc images | Yes | No |
 | AC3 / DTS passthrough | PS3 | ELF mixes to stereo |
-| Plugins and another repository | Yes | Packages in `/mnt/usb0/plugins` run in the payload (Duktape, API v2). L2 opens them. Pages use sceHttp2. A popup is accepted. Stream URLs are shown, not decoded |
+| Plugins and another repository | Yes | Installed packages run in the payload (Duktape, API v2). Options → Repository is Settings → General: alternate repository URL, beta passwords, automatic upgrade, install on demand, Browse, and Upgrade. An empty URL uses `https://repo.movian.eu/plugins-v1.json`. L2 opens what is already installed. A popup is accepted. Stream URLs are shown, not decoded |
 | Unified search | Yes | Names on screen, plus an `http` or `magnet` line |
-| Per-file settings, on-screen keyboard | Yes | Options opens every page and plugin setting (bool, string, integer, multi-choice, action, divider, info). Square opens an item's options. Strings use the pad keyboard, including shift |
+| Per-file settings, on-screen keyboard | Yes | On a plugin page, Options lists every Movian setting type (bool, string, integer, multi-choice, action, divider, info). Square opens an item's options. Strings use the pad keyboard, including shift. The repository URL and beta passwords use a keyboard too |
 | Web remote | Yes | No |
 | Google Cast | Android M7 | No |
 | FTP server, NTFS, temperature | PS3 package | No |
