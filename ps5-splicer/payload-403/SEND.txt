@@ -1,0 +1,27 @@
+Firmware 4.03. Do not install a package. Send one ELF to the etaHEN loader on port 9021.
+
+These match the payload that already starts on this console:
+ET_DYN, entry 0, 4 program headers, libkernel_web.sprx.
+Built with ps5-payload-sdk 0.45 and host gcc, the same link as payload-hostld.
+
+1) splicer-linear.elf
+   Linear color bars. Toasts start with LIN.
+   "LIN start linear payload" then "LIN Open rc=" a positive number.
+   Log: /data/splicer/linear.log or /mnt/usb0/splicer-linear.log
+
+2) splicer-mpeg1.elf
+   Same display path. Plays the first .mpg .mpeg .mpv .m1v or .m2v in
+   /mnt/usb0, /mnt/usb1, /data/video, /data/splicer, or /user/splicer.
+   Up to 1920x1088. No audio in this file. Toasts start with M1.
+   No file: it flips red and amber instead.
+
+From a PC, with etaHEN already loaded:
+
+  nc -q 0 PS5_IP 9021 < splicer-linear.elf
+
+The Bad gateway page is the browser preview (grok-sandbox.com), not the PS5.
+
+A background payload can open VideoOut and still leave the home UI on the TV.
+Ports that fill the screen are home-screen titles (ItemzFlow, or a folder
+ShadowMountPlus mounts from /data/homebrew). The packages already tried
+are not that path: they exit before main.

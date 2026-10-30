@@ -16,6 +16,9 @@ The feed itself is [plugins/repo.json](plugins/repo.json).
 
 ## Payload
 
+Tonight's 4.03 test files are in [ps5-splicer/payload-403/](ps5-splicer/payload-403/) and on the release `fw403-20261030`. Send one ELF to the loader that is already running, port 9021. Do not install a package. `splicer-linear.elf` draws linear bars and toasts `LIN`. `splicer-mpeg1.elf` plays one MPEG-1 file from USB or `/data` and toasts `M1`. The browser preview is not the console.
+
+
 Pre-alpha ELF: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).
 
 Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet or a `.torrent` plays in that file while the pieces arrive. Options opens the player menu; Repository on that menu is the alternate plugin feed. Codecs and the pad: [ps5-splicer/README.md](ps5-splicer/README.md). The pre-alpha ELF does not include these menus until the tree is rebuilt.
