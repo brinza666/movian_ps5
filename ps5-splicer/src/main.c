@@ -36,11 +36,19 @@
 #include "options.h"
 #include "bt.h"
 #include "font8x8_basic.h"
+#ifdef MOVIAN_TITLE
+#include "dirwalk.h"
+#endif
 
 #define MAX_FILES 48
 #define QMAX 8192
 #define LIVE_W 480
 #define LIVE_H 272
+#ifdef MOVIAN_TITLE
+#define BOOT_FRAMES 40
+#else
+#define BOOT_FRAMES 180
+#endif
 
 enum {
 	LAY_SBS = 0,
@@ -195,18 +203,61 @@ static int g_plug_view;
 static int g_plug_wait;
 static int g_late_scan;
 static int g_plug_job;
+#ifdef MOVIAN_TITLE
+static int g_nav;
+static int g_src;
+static int g_list_i;
+static int g_list_n;
+static int g_list[MAX_FILES];
+static int g_scan_tries;
+static int g_scan_wait;
+static int g_scan_announced;
+static char g_scan_line[180];
+static char g_scan_sample[48];
+
+typedef struct {
+	const char *tag;
+	int err;
+	int dents;
+	int kept;
+} root_t;
+#define ROOT_CAP 8
+static root_t g_rootst[ROOT_CAP];
+static int g_nrootst;
+#endif
+
+static void
+write_pid_file(const char *path, int quoted)
+{
+	char tmp[160];
+	FILE *f;
+	int pid = (int)getpid();
+	int used_tmp = 0;
+	snprintf(tmp, sizeof tmp, "%s.tmp", path);
+	f = fopen(tmp, "w");
+	if (f)
+		used_tmp = 1;
+	else
+		f = fopen(path, "w");
+	if (!f)
+		return;
+	if (quoted)
+		fprintf(f, "{\"PID\":\"%d\"}\n", pid);
+	else
+		fprintf(f, "{\"PID\":%d}\n", pid);
+	if (fclose(f) != 0)
+		return;
+	if (used_tmp)
+		rename(tmp, path);
+}
 
 static void
 request_sandbox(void)
 {
-	FILE *f;
-	/* Same request PS5MC writes: a resident etaHEN or Lapy daemon
-	 * opens the title sandbox so /mnt/usb0 and /data show up. */
-	f = fopen("/download0/etahen_jailbreak", "w");
-	if (!f)
-		return;
-	fprintf(f, "{\"PID\":\"%d\"}\n", (int)getpid());
-	fclose(f);
+	/* etaHEN reads a quoted pid. Lapy reads an unquoted pid from
+	 * elevate_proc. Either daemon has to be loaded before launch. */
+	write_pid_file("/download0/etahen_jailbreak", 1);
+	write_pid_file("/download0/elevate_proc", 0);
 }
 static char g_stream[768];
 static char g_stream_name[180];
@@ -215,6 +266,7 @@ static const uint8_t COL_AMBER[3] = {0xe2, 0xa1, 0x5a};
 static const uint8_t COL_PAPER[3] = {0xeb, 0xe6, 0xdb};
 static const uint8_t COL_SAGE[3] = {0xb7, 0xc4, 0xa4};
 static const uint8_t COL_DIM[3] = {0x8a, 0x84, 0x78};
+static const uint8_t COL_ACCENT[3] = {0x41, 0x92, 0xff};
 
 static void
 notify(const char *msg)
@@ -260,7 +312,10 @@ is_video_name(const char *name)
 	       ends_with_ci(name, ".m2v") || ends_with_ci(name, ".mp4") ||
 	       ends_with_ci(name, ".m4v") || ends_with_ci(name, ".mov") ||
 	       ends_with_ci(name, ".mkv") || ends_with_ci(name, ".ts") ||
-	       ends_with_ci(name, ".m2ts") || ends_with_ci(name, ".mts");
+	       ends_with_ci(name, ".m2ts") || ends_with_ci(name, ".mts") ||
+	       ends_with_ci(name, ".avi") || ends_with_ci(name, ".webm") ||
+	       ends_with_ci(name, ".wmv") || ends_with_ci(name, ".flv") ||
+	       ends_with_ci(name, ".vob");
 }
 
 static int
@@ -647,6 +702,110 @@ render_live(bus_t *b, double t)
 	}
 }
 
+#ifdef MOVIAN_TITLE
+typedef struct {
+	int depth;
+	int *dents;
+	int *kept;
+} scan_ctx_t;
+
+static int
+have_file(const char *path)
+{
+	int i;
+	for (i = 0; i < g_nfiles; i++) {
+		if (strcmp(g_files[i], path) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+static int scan_visit(const char *full, const char *name, int is_dir, void *ud);
+
+static int
+scan_visit(const char *full, const char *name, int is_dir, void *ud)
+{
+	scan_ctx_t *c = ud;
+	if (!name || name[0] == '.')
+		return 0;
+	(*c->dents)++;
+	if (!g_scan_sample[0])
+		snprintf(g_scan_sample, sizeof g_scan_sample, "%.46s", name);
+	if (is_dir) {
+		if (c->depth > 0) {
+			scan_ctx_t sub;
+			sub.depth = c->depth - 1;
+			sub.dents = c->dents;
+			sub.kept = c->kept;
+			dir_walk(full, scan_visit, &sub, NULL);
+		}
+		return g_nfiles >= MAX_FILES;
+	}
+	if (!is_video_name(name) && !is_bt_name(name))
+		return 0;
+	if (have_file(full) || g_nfiles >= MAX_FILES)
+		return g_nfiles >= MAX_FILES;
+	snprintf(g_files[g_nfiles], sizeof g_files[0], "%s", full);
+	g_nfiles++;
+	(*c->kept)++;
+	return g_nfiles >= MAX_FILES;
+}
+
+static void
+scan_root(const char *path, int depth, int *dents, int *kept, int *err)
+{
+	scan_ctx_t c;
+	*dents = 0;
+	*kept = 0;
+	*err = 0;
+	c.depth = depth;
+	c.dents = dents;
+	c.kept = kept;
+	if (dir_walk(path, scan_visit, &c, err) != 0 && *err == 0)
+		*err = EIO;
+}
+
+static void
+format_scan_line(void)
+{
+	char *p = g_scan_line;
+	size_t left = sizeof g_scan_line;
+	int i;
+	int nshow = g_nrootst < 4 ? g_nrootst : 4;
+	p[0] = 0;
+	if (g_nrootst > 0 && g_rootst[0].err != 0)
+		nshow = g_nrootst;
+	if (nshow > 6)
+		nshow = 6;
+	for (i = 0; i < nshow; i++) {
+		int n;
+		int err = g_rootst[i].err;
+		const char *tag = g_rootst[i].tag;
+		const char *sep = p == g_scan_line ? "" : "  ";
+		if (left < 12)
+			break;
+		if (err == 0 && g_rootst[i].kept == 0 && g_rootst[i].dents > 0)
+			n = snprintf(p, left, "%s%s listed %d", sep, tag, g_rootst[i].dents);
+		else if (err == 0)
+			n = snprintf(p, left, "%s%s %d", sep, tag, g_rootst[i].kept);
+		else if (err == ENOENT)
+			n = snprintf(p, left, "%s%s gone", sep, tag);
+		else if (err == EPERM || err == EACCES)
+			n = snprintf(p, left, "%s%s denied", sep, tag);
+		else if (err == EINVAL)
+			n = snprintf(p, left, "%s%s small", sep, tag);
+		else
+			n = snprintf(p, left, "%s%s e%d", sep, tag, err);
+		if (n < 0 || (size_t)n >= left)
+			break;
+		p += n;
+		left -= (size_t)n;
+	}
+	if (g_scan_sample[0] && left > 10)
+		snprintf(p, left, "  saw %.24s", g_scan_sample);
+}
+#endif
+
 static void
 scan_dir(const char *base, int depth)
 {
@@ -761,12 +920,47 @@ scan_media(void)
 	g_nfiles = 0;
 	for (i = 0; plays[i]; i++)
 		read_playlist(plays[i], force_a, force_b, sizeof force_a);
+#ifdef MOVIAN_TITLE
+	{
+		static const struct {
+			const char *path;
+			const char *tag;
+			int depth;
+		} roots[] = {
+			{"/mnt/usb0", "usb0", 4},
+			{"/mnt/usb1", "usb1", 4},
+			{"/data", "data", 3},
+			{"/mnt", "mnt", 2},
+			{"/usb0", "usbA", 3},
+			{"/mnt/usb", "usbb", 3},
+		};
+		int r;
+		g_nrootst = 0;
+		g_scan_sample[0] = 0;
+		for (r = 0; r < (int)(sizeof roots / sizeof roots[0]); r++) {
+			int dents = 0;
+			int kept = 0;
+			int err = 0;
+			scan_root(roots[r].path, roots[r].depth, &dents, &kept, &err);
+			if (g_nrootst < ROOT_CAP) {
+				g_rootst[g_nrootst].tag = roots[r].tag;
+				g_rootst[g_nrootst].err = err;
+				g_rootst[g_nrootst].dents = dents;
+				g_rootst[g_nrootst].kept = kept;
+				g_nrootst++;
+			}
+		}
+		format_scan_line();
+		plug_scan();
+	}
+#else
 	scan_dir("/mnt/usb0", 2);
 	scan_dir("/mnt/usb1", 2);
 	scan_dir("/data/video", 2);
 	scan_dir("/data/splicer", 2);
 	scan_dir("/user/splicer", 2);
 	scan_dir("/data", 0);
+#endif
 	remember(force_a);
 	remember(force_b);
 	/* Playlist paths win the first two slots when both exist. */
@@ -1494,13 +1688,25 @@ apply_setting(const char *how)
 		g_opt_i = plug_setting_count() - 1;
 }
 
+#ifdef MOVIAN_TITLE
+static void rebuild_list(void);
+#endif
+
 static void
 rescan_media(void)
 {
 	g_nfiles = 0;
 	scan_media();
+#ifdef MOVIAN_TITLE
+	if (g_nav == 1)
+		rebuild_list();
+	if (g_nav >= 2)
+		load_buses();
+	notify("MOVIAN rescanned");
+#else
 	load_buses();
 	notify("SPLICER rescanned");
+#endif
 	g_opt_menu = 0;
 }
 
@@ -2134,6 +2340,316 @@ alloc_scanout(void **vaddr, int *memsize_out)
 }
 #endif
 
+#ifdef MOVIAN_TITLE
+static const char *SRC_NAME[] = {
+	"USB 0", "USB 1", "Data", "Videos", "BitTorrent", "Plugins"
+};
+#define SRC_N 6
+
+static void
+ascii_copy(char *dst, size_t n, const char *s)
+{
+	size_t i = 0;
+	if (!s)
+		s = "";
+	if (n == 0)
+		return;
+	for (; s[i] && i + 1 < n; i++) {
+		unsigned char c = (unsigned char)s[i];
+		dst[i] = (c >= 32 && c < 127) ? (char)c : '?';
+	}
+	dst[i] = 0;
+}
+
+static int
+file_matches_src(int src, const char *path)
+{
+	if (!path || !path[0])
+		return 0;
+	if (src == 4)
+		return is_bt_src(path);
+	if (src == 0)
+		return strncmp(path, "/mnt/usb1", 9) != 0 &&
+		       (strncmp(path, "/mnt/", 5) == 0 || strncmp(path, "/usb0", 5) == 0);
+	if (src == 1)
+		return strncmp(path, "/mnt/usb1", 9) == 0;
+	if (src == 2)
+		return strncmp(path, "/data/", 6) == 0;
+	if (src == 3)
+		return strstr(path, "/video/") != NULL || strncmp(path, "/data/video", 11) == 0;
+	return 0;
+}
+
+static int
+src_count(int src)
+{
+	int i, n = 0;
+	if (src == 5)
+		return plug_count();
+	for (i = 0; i < g_nfiles; i++) {
+		if (file_matches_src(src, g_files[i]))
+			n++;
+	}
+	return n;
+}
+
+static void
+rebuild_list(void)
+{
+	int i;
+	g_list_n = 0;
+	for (i = 0; i < g_nfiles; i++) {
+		if (!file_matches_src(g_src, g_files[i]))
+			continue;
+		g_list[g_list_n++] = i;
+	}
+	if (g_list_i >= g_list_n)
+		g_list_i = g_list_n ? g_list_n - 1 : 0;
+	if (g_list_i < 0)
+		g_list_i = 0;
+}
+
+static void
+play_current(void)
+{
+	int fi;
+	char base[80];
+	if (g_list_n <= 0)
+		return;
+	if (g_list_i < 0 || g_list_i >= g_list_n)
+		g_list_i = 0;
+	fi = g_list[g_list_i];
+	g_idx[0] = fi;
+	g_focus = 0;
+	g_paused = 0;
+	basename_copy(base, sizeof base, g_files[fi]);
+	if (bus_open_file(&g_bus[0], g_files[fi], 0) != 0) {
+		bus_live(&g_bus[0], 0, "unreadable");
+		notify("MOVIAN unreadable");
+	}
+	snprintf(g_status, sizeof g_status, "%s", base);
+	g_nav = 2;
+}
+
+static void
+play_rel(int dir)
+{
+	if (g_list_n <= 0)
+		return;
+	g_list_i = (g_list_i + dir) % g_list_n;
+	if (g_list_i < 0)
+		g_list_i += g_list_n;
+	play_current();
+}
+
+static int
+roots_closed(void)
+{
+	int i;
+	int opened = 0;
+	if (g_nrootst <= 0)
+		return 1;
+	for (i = 0; i < g_nrootst && i < 4; i++) {
+		if (g_rootst[i].err == 0)
+			opened = 1;
+	}
+	return !opened;
+}
+
+static void
+movian_keys(uint32_t down)
+{
+	if (g_nav == 0) {
+		if ((down & BTN_LEFT) && (g_src % 2) == 1)
+			g_src--;
+		if ((down & BTN_RIGHT) && (g_src % 2) == 0 && g_src + 1 < SRC_N)
+			g_src++;
+		if ((down & BTN_UP) && g_src >= 2)
+			g_src -= 2;
+		if ((down & BTN_DOWN) && g_src + 2 < SRC_N)
+			g_src += 2;
+		if (down & (BTN_L1 | BTN_R1)) {
+			request_sandbox();
+			scan_media();
+			notify(g_nfiles > 0 ? "MOVIAN found files" : "MOVIAN rescanned");
+		}
+		if (down & BTN_CROSS) {
+			if (g_src == 5) {
+				g_opt = 1;
+				opt_open_repo();
+			} else {
+				g_nav = 1;
+				g_list_i = 0;
+				rebuild_list();
+			}
+		}
+	} else if (g_nav == 1) {
+		if ((down & BTN_UP) && g_list_n > 0) {
+			g_list_i--;
+			if (g_list_i < 0)
+				g_list_i = g_list_n - 1;
+		}
+		if ((down & BTN_DOWN) && g_list_n > 0) {
+			g_list_i++;
+			if (g_list_i >= g_list_n)
+				g_list_i = 0;
+		}
+		if ((down & BTN_CROSS) && g_list_n > 0)
+			play_current();
+		if (down & BTN_CIR)
+			g_nav = 0;
+		if (down & (BTN_L1 | BTN_R1)) {
+			request_sandbox();
+			scan_media();
+			rebuild_list();
+		}
+	} else {
+		if (down & BTN_CROSS)
+			g_paused = !g_paused;
+		if (down & BTN_CIR) {
+			g_paused = 1;
+			g_nav = 1;
+			rebuild_list();
+		}
+		if (down & BTN_LEFT)
+			seek_bus(&g_bus[0], -opt_seek());
+		if (down & BTN_RIGHT)
+			seek_bus(&g_bus[0], opt_seek());
+		if (down & (BTN_UP | BTN_L1))
+			play_rel(-1);
+		if (down & (BTN_DOWN | BTN_R1))
+			play_rel(1);
+	}
+}
+
+static void
+draw_movian_home(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	int margin = 48 * scale;
+	int gap = 16 * scale;
+	int top = 72 * scale;
+	int usable_w = vis_w - margin * 2;
+	int usable_h = vis_h - top - 56 * scale;
+	int tw = (usable_w - gap) / 2;
+	int th = (usable_h - gap * 2) / 3;
+	int s;
+	char line[64];
+	fill_rect_px(dst, stride, vis_w, vis_h, 0, 0, vis_w, vis_h, 0xFF0A0A0Au);
+	draw_text(dst, stride, vis_w, vis_h, margin, 16 * scale, "Movian", COL_ACCENT, scale + 1);
+	draw_text(dst, stride, vis_w, vis_h, margin, 40 * scale, "Home", COL_PAPER, scale);
+	if (tw < 8 || th < 8)
+		return;
+	for (s = 0; s < SRC_N; s++) {
+		int col = s % 2;
+		int row = s / 2;
+		int x = margin + col * (tw + gap);
+		int y = top + row * (th + gap);
+		int n = src_count(s);
+		fill_rect_px(dst, stride, vis_w, vis_h, x, y, tw, th,
+			     s == g_src ? 0xFF242424u : 0xFF161616u);
+		if (s == g_src)
+			fill_rect_px(dst, stride, vis_w, vis_h, x, y, 6 * scale, th, 0xFFFF9241u);
+		draw_text(dst, stride, vis_w, vis_h, x + 18 * scale, y + th / 2 - 14 * scale,
+			  SRC_NAME[s], s == g_src ? COL_ACCENT : COL_PAPER, scale);
+		if (s == 5)
+			snprintf(line, sizeof line, n > 0 ? "%d on USB" : "repository", n);
+		else
+			snprintf(line, sizeof line, "%d", n);
+		draw_text(dst, stride, vis_w, vis_h, x + 18 * scale, y + th / 2 + 4 * scale,
+			  line, COL_SAGE, scale);
+	}
+	if (g_scan_line[0])
+		draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 34 * scale, g_scan_line,
+			  COL_SAGE, scale > 1 ? scale - 1 : 1);
+	draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 18 * scale,
+		  "Cross open   Options settings   L1 rescan   videos stay on the USB stick",
+		  COL_PAPER, scale > 1 ? scale - 1 : 1);
+}
+
+static void
+draw_movian_list(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	int margin = 32 * scale;
+	int pitch = 14 * scale;
+	int rows;
+	int start;
+	int i;
+	char line[140];
+	char name[96];
+	char shown[96];
+	fill_rect_px(dst, stride, vis_w, vis_h, 0, 0, vis_w, vis_h, 0xFF0A0A0Au);
+	draw_text(dst, stride, vis_w, vis_h, margin, 16 * scale,
+		  g_src >= 0 && g_src < SRC_N ? SRC_NAME[g_src] : "Movian", COL_ACCENT, scale);
+	if (g_list_n <= 0) {
+		draw_text(dst, stride, vis_w, vis_h, margin, 48 * scale, "Nothing in this folder",
+			  COL_PAPER, scale);
+		draw_text(dst, stride, vis_w, vis_h, margin, 68 * scale,
+			  "Put videos on the USB root, video/, usb/video/ or data/video/",
+			  COL_SAGE, scale);
+		draw_text(dst, stride, vis_w, vis_h, margin, 84 * scale,
+			  "Do not put them in the PPSA99455 folder. That folder is the app.",
+			  COL_SAGE, scale);
+		if (g_scan_line[0])
+			draw_text(dst, stride, vis_w, vis_h, margin, 108 * scale, g_scan_line,
+				  COL_PAPER, scale);
+		draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 18 * scale,
+			  "Circle back   L1 rescan", COL_PAPER, scale > 1 ? scale - 1 : 1);
+		return;
+	}
+	rows = (vis_h - 80 * scale) / pitch;
+	if (rows < 1)
+		rows = 1;
+	start = g_list_i - rows / 2;
+	if (start < 0)
+		start = 0;
+	if (start + rows > g_list_n)
+		start = g_list_n - rows;
+	if (start < 0)
+		start = 0;
+	for (i = 0; i < rows && start + i < g_list_n; i++) {
+		int fi = g_list[start + i];
+		int on = (start + i) == g_list_i;
+		int y = 48 * scale + i * pitch;
+		basename_copy(name, sizeof name, g_files[fi]);
+		ascii_copy(shown, sizeof shown, name);
+		if (on)
+			fill_rect_px(dst, stride, vis_w, vis_h, margin - 8, y - 2, vis_w - margin * 2,
+				     pitch, 0xFF1E1E1Eu);
+		snprintf(line, sizeof line, "%c %s", on ? '>' : ' ', shown);
+		draw_text(dst, stride, vis_w, vis_h, margin, y, line, on ? COL_ACCENT : COL_PAPER, scale);
+	}
+	draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 18 * scale,
+		  "Cross play   Circle back   Up/Down move", COL_PAPER, scale > 1 ? scale - 1 : 1);
+}
+
+static void
+draw_movian_play(uint8_t *dst, int stride, int vis_w, int vis_h, int scale, int bilinear)
+{
+	bus_t *A = &g_bus[0];
+	const uint8_t *sa = A->has ? A->rgba : NULL;
+	char line[180];
+	char name[80];
+	char tc[16];
+	double t = 0;
+	int y0 = vis_h - 28 * scale;
+	if (y0 < 0)
+		y0 = 0;
+	blit_pane(dst, stride, vis_w, vis_h, 0, 0, vis_w, vis_h, sa, A->w, A->h, bilinear);
+	if (A->plm)
+		t = plm_get_time(A->plm);
+	else if (A->av)
+		t = avdec_time(A->av);
+	fmt_tc(tc, sizeof tc, t);
+	ascii_copy(name, sizeof name, A->name[0] ? A->name : g_status);
+	fill_rect_px(dst, stride, vis_w, vis_h, 0, y0, vis_w, vis_h - y0, 0xF0101010u);
+	snprintf(line, sizeof line, "Movian  %.40s  %s%s", name, tc, g_paused ? "  PAUSED" : "");
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, y0 + 4 * scale, line, COL_PAPER, scale);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, y0 + 16 * scale,
+		  "Circle back   Cross pause   Left/Right seek   Up/Down next",
+		  COL_SAGE, scale > 1 ? scale - 1 : 1);
+}
+#endif
+
 static int
 render_loop(void)
 {
@@ -2250,12 +2766,13 @@ render_loop(void)
 #endif
 
 		/* Nothing else runs until color bars have actually flipped. */
-		if (frame_id < 180) {
+		if (frame_id < BOOT_FRAMES) {
 			proof_pattern(framepx, stride, vis_w, vis_h,
 				      (int)frame_id, scale);
 		} else {
-			if (frame_id == 180) {
+			if (frame_id == BOOT_FRAMES) {
 #ifdef MOVIAN_TITLE
+				request_sandbox();
 				notify("MOVIAN");
 #else
 				notify("SPLICER scanning USB");
@@ -2263,23 +2780,39 @@ render_loop(void)
 				hwdec_probe();
 				g_nfiles = 0;
 				scan_media();
+#ifdef MOVIAN_TITLE
+				snprintf(g_status, sizeof g_status, "%d", g_nfiles);
+				if (!g_scan_announced) {
+					g_scan_announced = 1;
+					notify(g_nfiles > 0 ? "MOVIAN found files" :
+							      (g_scan_line[0] ? g_scan_line :
+									       "MOVIAN no files yet"));
+				}
+				g_scan_wait = 90;
+#else
 				load_buses();
 				snprintf(g_status, sizeof g_status, "%d reels %s", g_nfiles,
 					 hwdec_status());
-#ifdef MOVIAN_TITLE
-				notify(hwdec_ready() ? "MOVIAN hardware decoder" :
-						       "MOVIAN software decoder");
-#else
 				notify(hwdec_ready() ? "SPLICER hardware decoder" :
 						       "SPLICER software decoder");
 #endif
 			}
 #ifdef MOVIAN_TITLE
-			if (frame_id == 480 && !g_late_scan && g_nfiles <= 0) {
-				g_late_scan = 1;
-				scan_media();
-				load_buses();
-				notify(g_nfiles > 0 ? "MOVIAN found files" : "MOVIAN no files yet");
+			if (frame_id > BOOT_FRAMES && g_nav < 2 && roots_closed() &&
+			    g_scan_tries < 8) {
+				if (g_scan_wait > 0)
+					g_scan_wait--;
+				else {
+					int before = g_nfiles;
+					g_scan_tries++;
+					g_scan_wait = 90;
+					request_sandbox();
+					scan_media();
+					if (g_nav == 1)
+						rebuild_list();
+					if (g_nfiles > 0 && before <= 0)
+						notify("MOVIAN found files");
+				}
 			}
 #endif
 			if (!extras) {
@@ -2287,13 +2820,18 @@ render_loop(void)
 				pad = open_pad(&user);
 				g_audio = open_audio(user);
 				extras = 1;
+#ifdef MOVIAN_TITLE
+				notify(pad >= 0 ? "MOVIAN pad" : "MOVIAN pad off");
+#else
 				notify(pad >= 0 ? "SPLICER pad ok" : "SPLICER pad off, picture stays");
+#endif
 			}
 			if (pad >= 0 && p_scePadReadState && p_scePadReadState(pad, padbuf) == 0) {
 				uint8_t rx;
 				btn = (uint32_t)padbuf[0] | ((uint32_t)padbuf[1] << 8) |
 				      ((uint32_t)padbuf[2] << 16) | ((uint32_t)padbuf[3] << 24);
 				rx = padbuf[6];
+#ifndef MOVIAN_TITLE
 				if (!g_opt && !g_plug && (rx < 108 || rx > 148)) {
 					g_split = ((int)rx * vis_w) / 255;
 					if (g_layout != LAY_WIPE && (rx < 70 || rx > 186)) {
@@ -2301,6 +2839,9 @@ render_loop(void)
 						opt_set_layout(g_layout);
 					}
 				}
+#else
+				(void)rx;
+#endif
 			}
 			down = btn & ~prev_btn;
 			prev_btn = btn;
@@ -2370,11 +2911,23 @@ render_loop(void)
 				if (opt_take_rescan()) {
 					g_nfiles = 0;
 					scan_media();
+#ifdef MOVIAN_TITLE
+					if (g_nav == 1)
+						rebuild_list();
+					if (g_nav >= 2)
+						load_buses();
+#else
 					load_buses();
+#endif
 				}
 				if (opt_take_reopen()) {
 					hwdec_force_software(opt_force_software());
+#ifdef MOVIAN_TITLE
+					if (g_nav >= 2)
+						load_buses();
+#else
 					load_buses();
+#endif
 				}
 			} else if (g_plug) {
 				int n = g_plug_view == 0 ? plug_count() :
@@ -2418,6 +2971,9 @@ render_loop(void)
 					}
 				}
 			} else {
+#ifdef MOVIAN_TITLE
+				movian_keys(down);
+#else
 				if (down & BTN_UP) {
 					g_layout = (g_layout + LAY_COUNT - 1) % LAY_COUNT;
 					opt_set_layout(g_layout);
@@ -2448,6 +3004,7 @@ render_loop(void)
 					seek_bus(&g_bus[g_focus], -opt_seek());
 				if (down & BTN_RIGHT)
 					seek_bus(&g_bus[g_focus], opt_seek());
+#endif
 			}
 			}
 
@@ -2487,8 +3044,12 @@ render_loop(void)
 						plm_decode(g_bus[i].plm, play_dt);
 					else if (g_bus[i].av)
 						avdec_tick(g_bus[i].av, play_dt);
-					else if (g_bus[i].live)
-						render_live(&g_bus[i], now);
+					else if (g_bus[i].live) {
+#ifdef MOVIAN_TITLE
+						if (g_nav >= 2)
+#endif
+							render_live(&g_bus[i], now);
+					}
 				}
 			}
 			clear_frame(framepx, stride, vis_w, vis_h);
@@ -2497,12 +3058,25 @@ render_loop(void)
 			} else if (g_plug) {
 				draw_plugins(framepx, stride, vis_w, vis_h, scale);
 			} else {
+#ifdef MOVIAN_TITLE
+				if (g_nav == 0)
+					draw_movian_home(framepx, stride, vis_w, vis_h, scale);
+				else if (g_nav == 1)
+					draw_movian_list(framepx, stride, vis_w, vis_h, scale);
+				else
+					draw_movian_play(framepx, stride, vis_w, vis_h, scale, bilinear);
+#else
 				composite(framepx, stride, vis_w, vis_h, bilinear);
 				draw_hud(framepx, stride, vis_w, vis_h, scale);
+#endif
 			}
 			if (g_opt_menu)
 				draw_opt_menu(framepx, stride, vis_w, vis_h, scale);
+#ifdef MOVIAN_TITLE
+			border(framepx, stride, vis_w, vis_h, 4, 0xFFFF9241u);
+#else
 			border(framepx, stride, vis_w, vis_h, 10, 0xFF5AA1E2u);
+#endif
 		}
 #ifdef MOVIAN_TITLE
 		swizzle_frame((uint8_t *)vbuf[idx].data, g_linear, vis_w, vis_h);
@@ -2513,7 +3087,7 @@ render_loop(void)
 			fail_loop("flip failed");
 		if (sceKernelWaitEqueue(evt_queue, &evt, 1, &junk, 0))
 			fail_loop("wait flip failed");
-		if (frame_id >= 180)
+		if (frame_id >= BOOT_FRAMES)
 			pump_audio();
 		frame_id++;
 	}

@@ -25,7 +25,7 @@ Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet
 
 ## Home screen
 
-ShadowMountPlus title `PPSA99455`: [SHADOWMOUNT.md](SHADOWMOUNT.md). Release [`shadowmount`](https://github.com/brinza666/movian_ps5/releases/tag/shadowmount). Copy the folder to `/data/homebrew/PPSA99455` and launch Movian from the home screen. That file is not the 9021 ELF.
+ShadowMountPlus title `PPSA99455`: [SHADOWMOUNT.md](SHADOWMOUNT.md). Release [`shadowmount`](https://github.com/brinza666/movian_ps5/releases/tag/shadowmount). The first screen is the Movian home: USB 0, USB 1, Data, Videos, BitTorrent, Plugins. Do not edit the mounted `PPSA99455` folder and do not put videos in it. No ShadowMount setting has to change for that. Copy the folder to `/data/homebrew/PPSA99455` and launch Movian from the console home screen. That file is not the 9021 ELF.
 
 ## Tree
 

@@ -18,11 +18,11 @@ M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player. Its Bit
 | Photos | Yes | No |
 | DVD and disc images | Yes | No |
 | AC3 / DTS passthrough | PS3 | ELF mixes to stereo |
-| Plugins and another repository | Yes | Installed packages run in the payload (Duktape, API v2). Options → Repository is Settings → General: alternate repository URL, beta passwords, automatic upgrade, install on demand, Browse, and Upgrade. An empty URL uses `https://repo.movian.eu/plugins-v1.json`. L2 opens what is already installed. A popup is accepted. Stream URLs are shown, not decoded |
+| Plugins and another repository | Yes | Installed packages run in the payload (Duktape, API v2). Options → Repository is Settings → General: alternate repository URL, beta passwords, automatic upgrade, install on demand, Browse, and Upgrade. A saved empty URL uses `https://repo.movian.eu/plugins-v1.json`. With no settings file yet the home-screen title starts at `https://bit.ly/mprepo`. L2 opens packages already on disk. A popup is accepted. Stream URLs are shown, not decoded |
 | Unified search | Yes | Names on screen, plus an `http` or `magnet` line |
 | Per-file settings, on-screen keyboard | Yes | On a plugin page, Options lists every Movian setting type (bool, string, integer, multi-choice, action, divider, info). Square opens an item's options. Strings use the pad keyboard, including shift. The repository URL and beta passwords use a keyboard too |
 | Web remote | Yes | No |
 | Google Cast | Android M7 | No |
 | FTP server, NTFS, temperature | PS3 package | No |
 
-The ELF and the home-screen title were not run on a console here. The home-screen folder is `PPSA99455`, described in [SHADOWMOUNT.md](SHADOWMOUNT.md).
+The ELF and this home-screen build were not launched from here. A console has shown the previous home-screen picture. This build's folder is `PPSA99455`, described in [SHADOWMOUNT.md](SHADOWMOUNT.md). It lists directories with a 64 KiB `getdents` buffer and opens on the Movian home.

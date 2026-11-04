@@ -25,6 +25,8 @@ void opt_boot(void);
 void opt_set_paths(const char *settings_file, const char *install_root);
 
 void opt_open(void);
+/* Open straight onto the plugin catalog. */
+void opt_open_repo(void);
 int opt_is_open(void);
 /* 1 while the screen should stay up. */
 int opt_pad(unsigned bits);

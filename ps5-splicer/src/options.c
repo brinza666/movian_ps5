@@ -227,6 +227,7 @@ static const char *
 settings_path(void)
 {
 	static const char *cands[] = {
+		"/download0/movian-settings.txt",
 		"/data/splicer/settings.txt",
 		"/mnt/usb0/splicer-settings.txt",
 		"/mnt/usb1/splicer-settings.txt",
@@ -306,6 +307,8 @@ apply_kv(const char *key, const char *val)
 		g_dec = atoi(val) ? 1 : 0;
 }
 
+static int g_loaded_file;
+
 static void
 load_settings(void)
 {
@@ -321,11 +324,13 @@ load_settings(void)
 	g_dec = 0;
 	g_alt[0] = 0;
 	g_beta[0] = 0;
+	g_loaded_file = 0;
 	if (!path)
 		return;
 	f = fopen(path, "rb");
 	if (!f)
 		return;
+	g_loaded_file = 1;
 	while (fgets(line, sizeof line, f)) {
 		char *eq;
 		size_t n = strlen(line);
@@ -353,6 +358,12 @@ void
 opt_boot(void)
 {
 	load_settings();
+	/* First launch uses the same catalog as the preview. An empty
+	 * saved address still means the official repository. */
+	if (!g_loaded_file && !g_alt[0]) {
+		copy_str(g_alt, sizeof g_alt, "https://bit.ly/mprepo");
+		save_settings();
+	}
 	set_status(g_alt[0] ? "alternate repository set" : "official repository");
 }
 
@@ -1624,6 +1635,18 @@ opt_open(void)
 	g_job = JOB_NONE;
 	if (!g_status[0])
 		set_status(g_alt[0] ? "alternate repository set" : "official repository");
+}
+
+void
+opt_open_repo(void)
+{
+	g_open = 1;
+	g_view = VIEW_MENU;
+	g_cursor = 1;
+	g_job = JOB_FETCH;
+	g_then_upgrade = 0;
+	g_armed = 1;
+	set_status("loading repository");
 }
 
 int

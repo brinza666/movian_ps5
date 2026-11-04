@@ -1534,31 +1534,63 @@ add_pkg(const char *dir)
 	g_pkg_n++;
 }
 
+static void scan_tree(const char *dir, int depth);
+
+#ifdef MOVIAN_TITLE
+#include "dirwalk.h"
+
+struct plug_walk {
+	int depth;
+};
+
+static int
+plug_visit(const char *full, const char *name, int is_dir, void *ud)
+{
+	struct plug_walk *w = ud;
+	if (!name || name[0] == '.' || !is_dir)
+		return 0;
+	scan_tree(full, w->depth + 1);
+	return g_pkg_n >= PLUG_MAX;
+}
+#endif
+
 static void
 scan_tree(const char *dir, int depth)
 {
-	DIR *d;
-	struct dirent *de;
-	if (depth > 2 || g_pkg_n >= PLUG_MAX)
+	if (depth > 3 || g_pkg_n >= PLUG_MAX)
 		return;
 	if (has_plugin_json(dir)) {
 		add_pkg(dir);
 		return;
 	}
-	d = opendir(dir);
-	if (!d)
-		return;
-	while ((de = readdir(d)) != NULL) {
-		char next[640];
-		struct stat st;
-		if (de->d_name[0] == '.')
-			continue;
-		snprintf(next, sizeof next, "%s/%s", dir, de->d_name);
-		if (stat(next, &st) != 0 || !S_ISDIR(st.st_mode))
-			continue;
-		scan_tree(next, depth + 1);
+#ifdef MOVIAN_TITLE
+	{
+		struct plug_walk w;
+		int err = 0;
+		w.depth = depth;
+		dir_walk(dir, plug_visit, &w, &err);
+		(void)err;
 	}
-	closedir(d);
+#else
+	{
+		DIR *d;
+		struct dirent *de;
+		d = opendir(dir);
+		if (!d)
+			return;
+		while ((de = readdir(d)) != NULL) {
+			char next[640];
+			struct stat st;
+			if (de->d_name[0] == '.')
+				continue;
+			snprintf(next, sizeof next, "%s/%s", dir, de->d_name);
+			if (stat(next, &st) != 0 || !S_ISDIR(st.st_mode))
+				continue;
+			scan_tree(next, depth + 1);
+		}
+		closedir(d);
+	}
+#endif
 }
 
 int
@@ -1568,8 +1600,10 @@ plug_scan(void)
 		"/mnt/usb0/plugins",
 		"/mnt/usb1/plugins",
 		"/mnt/usb0/movian/plugins",
+		"/mnt/usb0/usb/plugins",
 		"/data/movian/plugins",
 		"/user/movian/plugins",
+		"/download0/movian/plugins",
 		NULL
 	};
 	int i;
