@@ -25,6 +25,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <sys/event.h>
 
@@ -178,7 +179,21 @@ static int g_opt;
 static int g_plug_i;
 static int g_plug_view;
 static int g_plug_wait;
+static int g_late_scan;
 static int g_plug_job;
+
+static void
+request_sandbox(void)
+{
+	FILE *f;
+	/* Same request PS5MC writes: a resident etaHEN or Lapy daemon
+	 * opens the title sandbox so /mnt/usb0 and /data show up. */
+	f = fopen("/download0/etahen_jailbreak", "w");
+	if (!f)
+		return;
+	fprintf(f, "{\"PID\":\"%d\"}\n", (int)getpid());
+	fclose(f);
+}
 static char g_stream[768];
 static char g_stream_name[180];
 
@@ -1315,7 +1330,13 @@ proof_pattern(uint8_t *dst, int stride, int w, int h, int frame, int scale)
 		fill_rect_px(dst, stride, w, h, x0, 0, rw, h, cols[i]);
 	}
 	snprintf(line, sizeof line, "SPLICER  %d", frame);
-	draw_text(dst, stride, w, h, w / 8, h / 2 - 16 * scale, "SPLICER", (const uint8_t *)"\x10\x10\x10", scale * 3);
+	draw_text(dst, stride, w, h, w / 8, h / 2 - 16 * scale,
+#ifdef MOVIAN_TITLE
+		  "MOVIAN",
+#else
+		  "SPLICER",
+#endif
+		  (const uint8_t *)"\x10\x10\x10", scale * 3);
 	draw_text(dst, stride, w, h, w / 8, h / 2 + 20 * scale, line, (const uint8_t *)"\x10\x10\x10", scale);
 	draw_text(dst, stride, w, h, w / 8, h / 2 + 36 * scale, "PAYLOAD RUNNING", (const uint8_t *)"\x10\x10\x10", scale);
 }
@@ -2074,7 +2095,13 @@ render_loop(void)
 	bilinear = (vis_w * vis_h) <= (1920 * 1200);
 	scale = vis_h >= 2000 ? 3 : (vis_h >= 1000 ? 2 : 1);
 	snprintf(g_status, sizeof g_status, "flip %dx%d", vis_w, vis_h);
-	notify("SPLICER on screen");
+	notify(
+#ifdef MOVIAN_TITLE
+		"MOVIAN on screen"
+#else
+		"SPLICER on screen"
+#endif
+	);
 
 	tprev = now_sec();
 	while (g_run) {
@@ -2098,16 +2125,33 @@ render_loop(void)
 				      (int)frame_id, scale);
 		} else {
 			if (frame_id == 180) {
+#ifdef MOVIAN_TITLE
+				notify("MOVIAN");
+#else
 				notify("SPLICER scanning USB");
+#endif
 				hwdec_probe();
 				g_nfiles = 0;
 				scan_media();
 				load_buses();
 				snprintf(g_status, sizeof g_status, "%d reels %s", g_nfiles,
 					 hwdec_status());
+#ifdef MOVIAN_TITLE
+				notify(hwdec_ready() ? "MOVIAN hardware decoder" :
+						       "MOVIAN software decoder");
+#else
 				notify(hwdec_ready() ? "SPLICER hardware decoder" :
 						       "SPLICER software decoder");
+#endif
 			}
+#ifdef MOVIAN_TITLE
+			if (frame_id == 480 && !g_late_scan && g_nfiles <= 0) {
+				g_late_scan = 1;
+				scan_media();
+				load_buses();
+				notify(g_nfiles > 0 ? "MOVIAN found files" : "MOVIAN no files yet");
+			}
+#endif
 			if (!extras) {
 				load_optional();
 				pad = open_pad(&user);
@@ -2360,7 +2404,12 @@ int
 main(void)
 {
 	sceSystemServiceHideSplashScreen();
+#ifdef MOVIAN_TITLE
+	request_sandbox();
+	notify("MOVIAN");
+#else
 	notify("SPLICER payload started");
+#endif
 	opt_boot();
 	plug_set_uri_hook(opt_uri_hook);
 	g_layout = opt_layout();

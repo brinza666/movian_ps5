@@ -23,6 +23,10 @@ Pre-alpha ELF: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/rel
 
 Send `payload.elf` to an ELF loader that is already running, port 9021. A magnet or a `.torrent` plays in that file while the pieces arrive. Options opens the player menu; Repository on that menu is the alternate plugin feed. Codecs and the pad: [ps5-splicer/README.md](ps5-splicer/README.md). The pre-alpha ELF does not include these menus until the tree is rebuilt.
 
+## Home screen
+
+ShadowMountPlus title `PPSA99455`: [SHADOWMOUNT.md](SHADOWMOUNT.md). Release [`shadowmount`](https://github.com/brinza666/movian_ps5/releases/tag/shadowmount). Copy the folder to `/data/homebrew/PPSA99455` and launch Movian from the home screen. That file is not the 9021 ELF.
+
 ## Tree
 
 - `plugins/` — alternative Movian plugin repository.
