@@ -1,6 +1,6 @@
 # Environment already running
 
-The splicer does not replace these. They are what the console is already running when `payload.elf` is sent to port 9021.
+The home-screen title and the loader ELF do not replace these. They are what the console is already running. Install of the title: [../docs/install.md](../docs/install.md). USB: [../docs/usb.md](../docs/usb.md).
 
 | File | Role |
 | --- | --- |

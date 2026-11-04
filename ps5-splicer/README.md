@@ -1,5 +1,9 @@
 # SPLICER
 
+Loader ELF for port 9021. The file you launch from the console home screen is the ShadowMount title, not this ELF. Install that one from [../docs/install.md](../docs/install.md). Which file to send here: [../docs/payload.md](../docs/payload.md).
+
+`payload.elf` in this directory is the previous loader build. The sources below are ahead of that file. The `shadowmount` release is built from these sources with `MOVIAN_TITLE` and is not produced by `make` in this folder.
+
 Two pictures, one scanout. `payload.elf` is a PIE x86-64 ELF for a loader that is already running (elfldr, websrv, or the jar loader) on TCP port 9021.
 
 Pre-alpha download: [release `pre-alpha`](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha).

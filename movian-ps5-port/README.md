@@ -1,8 +1,8 @@
 # movian-go overlay
 
-Platform layer for [czz/movian-go](https://github.com/czz/movian-go) (GPL-3.0). A normal `go build` does not boot here.
+Manuals for the player that runs today: [../docs/README.md](../docs/README.md).
 
-The ELF that plays video today is [../ps5-splicer](../ps5-splicer). This overlay is not that file.
+Platform layer for [czz/movian-go](https://github.com/czz/movian-go) (GPL-3.0). A normal `go build` does not boot here. The ELF that plays video is [../ps5-splicer](../ps5-splicer). This overlay is not that file.
 
 ## Why a stock Go binary stops
 

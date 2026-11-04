@@ -4,4 +4,4 @@
 
 The page loads `app.nmf` / `app.pexe`. The native module draws the GLW skin and decodes. The host handles the window, dropped files, URLs and sockets. Its plugin feed string is `https://repo.movian.eu/plugins-v1.json`.
 
-That package is not a PS5 binary. The alternative feed for this tree is [../PLUGINS.md](../PLUGINS.md).
+That package is not a PS5 binary. The alternative feed for this tree is [../docs/plugins.md](../docs/plugins.md).

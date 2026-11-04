@@ -1,0 +1,17 @@
+# License
+
+`ps5-splicer/` payload and title sources are GPL-3.0-or-later.
+The scanout sequence follows the public hbldr sample,
+Copyright (C) 2023 John Törnblom, GPL-3.0-or-later.
+
+| Piece | License |
+| --- | --- |
+| pl_mpeg | MIT, Dominic Szablewski |
+| FFmpeg 7.1 | LGPL-2.1-or-later |
+| font8x8 | Public domain, Daniel Hepper |
+| Duktape | MIT |
+| Movian plugin API scripts under `ps5-splicer/js/` | From Movian, GPL-3.0-or-later |
+| `movian-ps5-port/` | Overlay notes for movian-go, GPL-3.0 |
+
+The GNU GPL v3 text is at <https://www.gnu.org/licenses/gpl-3.0.txt>.
+The GNU LGPL v2.1 text is at <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt>.
