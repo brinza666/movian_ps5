@@ -23,10 +23,12 @@ Firmware 4.03 is the one this port is aimed at. The packaging itself is the nati
 4. Restart ShadowMountPlus, or the console, and wait until the home screen shows Movian.
 5. Start Movian from the home screen.
 
+The picture is 1080p. The home-screen scanout is tiled, so the frame is swizzled before it is shown. The first picture is color bars and the word MOVIAN.
+
 sha256 of `PPSA99455.zip`:
 
 ```
-abcaffb8974265163f2721997500facdabb1e769bc756b8c273ec08ba4b3ed71
+b9cfc8f1c1ef552adec297571a090e33210d5ee6eb5072fa018eb867c0e8aee5
 ```
 
 ## What it does

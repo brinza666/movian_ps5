@@ -126,6 +126,20 @@ int sceKernelMapDirectMemory(void **, size_t, int, int, intptr_t, size_t);
 int sceKernelCreateEqueue(struct kevent **, const char *);
 int sceKernelWaitEqueue(struct kevent *, struct kevent *, int, int *, uint *);
 int sceKernelSendNotificationRequest(int, notify_request_t *, size_t, int);
+#ifdef MOVIAN_TITLE
+size_t sceKernelGetDirectMemorySize(void);
+int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t, size_t, int, int64_t *);
+int scePadInit(void);
+int scePadOpen(int, int, int, const void *);
+int scePadReadState(int, void *);
+int sceUserServiceInitialize(void *);
+int sceUserServiceGetInitialUser(int *);
+int sceAudioOutInit(void);
+int sceAudioOutOpen(int, int, int, unsigned int, unsigned int, unsigned int);
+int sceAudioOutOutput(int, const void *);
+int sceAudioOutSetVolume(int, int, int *);
+int sceAudioOutClose(int);
+#endif
 
 int sceVideoOutOpen(int, int, int, const void *);
 int sceVideoOutGetOutputStatus(int, vout_stat_t *);
@@ -1242,6 +1256,25 @@ load_optional(void)
 		p_scePadOpen = dlsym(p, "scePadOpen");
 		p_scePadReadState = dlsym(p, "scePadReadState");
 	}
+#ifdef MOVIAN_TITLE
+	/* A home-screen title already imports these. dlopen of the sprx does not. */
+	if (!p_scePadOpen) {
+		p_scePadInit = scePadInit;
+		p_scePadOpen = scePadOpen;
+		p_scePadReadState = scePadReadState;
+	}
+	if (!p_sceUserServiceGetInitialUser) {
+		p_sceUserServiceInitialize = sceUserServiceInitialize;
+		p_sceUserServiceGetInitialUser = sceUserServiceGetInitialUser;
+	}
+	if (!p_sceAudioOutOpen) {
+		p_sceAudioOutInit = sceAudioOutInit;
+		p_sceAudioOutOpen = sceAudioOutOpen;
+		p_sceAudioOutOutput = sceAudioOutOutput;
+		p_sceAudioOutSetVolume = sceAudioOutSetVolume;
+		p_sceAudioOutClose = sceAudioOutClose;
+	}
+#endif
 }
 
 static int
@@ -2032,6 +2065,75 @@ alloc_direct(void **vaddr, intptr_t *paddr, int *memsize_out)
 	return -1;
 }
 
+#ifdef MOVIAN_TITLE
+/* Native VideoOut reads a 128x128 tile swizzle, not scanlines.
+ * Same addressing as the home-screen CPU renderer. */
+static uint8_t *g_linear;
+
+static size_t
+tile_off(unsigned x, unsigned y, unsigned width)
+{
+	uint32_t offset = ((y << 4) & 0x70u) ^ ((y << 5) & 0xf00u) ^
+			  ((y << 9) & 0x1000u) ^ ((y << 8) & 0x4000u) ^
+			  ((x << 2) & 0xcu) ^ ((x << 5) & 0x380u) ^
+			  ((x << 4) & 0x400u) ^ ((x << 6) & 0x800u) ^
+			  ((x << 9) & 0xa000u);
+	uint32_t blocks = (width + 127u) >> 7;
+	uint32_t block = (y >> 7) * blocks + (x >> 7);
+	return ((size_t)block << 16) + offset;
+}
+
+static void
+swizzle_frame(uint8_t *tiled, const uint8_t *linear, int w, int h)
+{
+	int y, x;
+	for (y = 0; y < h; y++) {
+		const uint32_t *src =
+			(const uint32_t *)(linear + (size_t)y * (size_t)w * 4u);
+		for (x = 0; x < w; x++)
+			*(uint32_t *)(tiled + tile_off((unsigned)x, (unsigned)y,
+						       (unsigned)w)) = src[x];
+	}
+}
+
+static void
+flush_range(void *address, size_t length)
+{
+	uint8_t *at = address;
+	uint8_t *end = at + length;
+	for (; at < end; at += 64)
+		__asm__ volatile("clflush (%0)" ::"r"(at) : "memory");
+	__asm__ volatile("mfence" ::: "memory");
+}
+
+static int
+alloc_scanout(void **vaddr, int *memsize_out)
+{
+	size_t bytes = 0x2000000;
+	size_t align = 0x200000;
+	size_t pool;
+	int64_t pa = 0;
+	void *va = NULL;
+	pool = sceKernelGetDirectMemorySize();
+	if (pool >= bytes &&
+	    sceKernelAllocateDirectMemory(0, (int64_t)pool, bytes, align, 3, &pa) == 0 &&
+	    sceKernelMapDirectMemory(&va, bytes, 0x33, 0, (intptr_t)pa, align) == 0) {
+		*vaddr = va;
+		*memsize_out = (int)bytes;
+		return 0;
+	}
+	pa = 0;
+	va = NULL;
+	if (sceKernelAllocateMainDirectMemory(bytes, align, 3, (intptr_t *)&pa) == 0 &&
+	    sceKernelMapDirectMemory(&va, bytes, 0x33, 0, (intptr_t)pa, align) == 0) {
+		*vaddr = va;
+		*memsize_out = (int)bytes;
+		return 0;
+	}
+	return -1;
+}
+#endif
+
 static int
 render_loop(void)
 {
@@ -2062,8 +2164,13 @@ render_loop(void)
 	memset(&vattr, 0, sizeof vattr);
 	memset(&vstat, 0, sizeof vstat);
 
+#ifdef MOVIAN_TITLE
+	if (alloc_scanout(&vaddr, &memsize))
+		fail_loop("direct memory failed");
+#else
 	if (alloc_direct(&vaddr, &paddr, &memsize))
 		fail_loop("direct memory failed");
+#endif
 
 	vout = sceVideoOutOpen(0xff, 0, 0, NULL);
 	if (vout < 0)
@@ -2075,6 +2182,11 @@ render_loop(void)
 	if (sceVideoOutAddFlipEvent(evt_queue, vout, NULL))
 		fail_loop("flip event failed");
 	sceVideoOutSetFlipRate(vout, 0);
+#ifdef MOVIAN_TITLE
+	/* 1080p is the layout the tile swizzle was checked against. */
+	vis_w = 1920;
+	vis_h = 1080;
+#else
 	if (vstat.res == 2) {
 		vis_w *= 2;
 		vis_h *= 2;
@@ -2084,14 +2196,27 @@ render_loop(void)
 		vis_w = 1920;
 		vis_h = 1080;
 	}
+#endif
 	sceVideoOutSetBufferAttribute2(&vattr, 0x8000000022000000UL, 0,
 				       (uint32_t)vis_w, (uint32_t)vis_h, 0, 0, 0);
+#ifdef MOVIAN_TITLE
+	vbuf[0].data = vaddr;
+	vbuf[1].data = (uint8_t *)vaddr + 0x1000000;
+	g_linear = calloc((size_t)vis_w * (size_t)vis_h, 4);
+	if (!g_linear)
+		fail_loop("frame buffer failed");
+#else
 	vbuf[0].data = vaddr;
 	vbuf[1].data = (uint8_t *)vaddr + (memsize / 2);
+#endif
 	if (sceVideoOutRegisterBuffers2(vout, 0, 0, vbuf, 2, &vattr, 0, NULL))
 		fail_loop("register buffers failed");
 
+#ifdef MOVIAN_TITLE
+	stride = vis_w;
+#else
 	stride = (vis_w + 0x3f) & ~0x3f;
+#endif
 	bilinear = (vis_w * vis_h) <= (1920 * 1200);
 	scale = vis_h >= 2000 ? 3 : (vis_h >= 1000 ? 2 : 1);
 	snprintf(g_status, sizeof g_status, "flip %dx%d", vis_w, vis_h);
@@ -2118,10 +2243,15 @@ render_loop(void)
 			dt = 0.1;
 
 		idx = (uint8_t)(frame_id & 1);
+#ifdef MOVIAN_TITLE
+		uint8_t *framepx = g_linear;
+#else
+		uint8_t *framepx = (uint8_t *)vbuf[idx].data;
+#endif
 
 		/* Nothing else runs until color bars have actually flipped. */
 		if (frame_id < 180) {
-			proof_pattern((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h,
+			proof_pattern(framepx, stride, vis_w, vis_h,
 				      (int)frame_id, scale);
 		} else {
 			if (frame_id == 180) {
@@ -2361,19 +2491,23 @@ render_loop(void)
 						render_live(&g_bus[i], now);
 				}
 			}
-			clear_frame((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h);
+			clear_frame(framepx, stride, vis_w, vis_h);
 			if (g_opt) {
-				draw_options((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+				draw_options(framepx, stride, vis_w, vis_h, scale);
 			} else if (g_plug) {
-				draw_plugins((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+				draw_plugins(framepx, stride, vis_w, vis_h, scale);
 			} else {
-				composite((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, bilinear);
-				draw_hud((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
+				composite(framepx, stride, vis_w, vis_h, bilinear);
+				draw_hud(framepx, stride, vis_w, vis_h, scale);
 			}
 			if (g_opt_menu)
-				draw_opt_menu((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, scale);
-			border((uint8_t *)vbuf[idx].data, stride, vis_w, vis_h, 10, 0xFF5AA1E2u);
+				draw_opt_menu(framepx, stride, vis_w, vis_h, scale);
+			border(framepx, stride, vis_w, vis_h, 10, 0xFF5AA1E2u);
 		}
+#ifdef MOVIAN_TITLE
+		swizzle_frame((uint8_t *)vbuf[idx].data, g_linear, vis_w, vis_h);
+		flush_range(vbuf[idx].data, 0x1000000);
+#endif
 
 		if (sceVideoOutSubmitFlip(vout, idx, 1, frame_id))
 			fail_loop("flip failed");
