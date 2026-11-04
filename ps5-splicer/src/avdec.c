@@ -7,6 +7,7 @@
 
 #include <libavformat/avio.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +44,20 @@ struct avdec {
 	avdec_seek_fn io_seek;
 	void *io_user;
 };
+
+static char g_av_err[96];
+
+const char *
+avdec_error(void)
+{
+	return g_av_err;
+}
+
+static void
+av_fail(const char *why)
+{
+	snprintf(g_av_err, sizeof g_av_err, "%s", why ? why : "unreadable");
+}
 
 static int
 clip8(int v)
@@ -84,17 +99,35 @@ convert(avdec_t *a)
 {
 	AVFrame *f = a->frame;
 	int x, y, w = a->w, h = a->h;
+	int sw = f->width;
+	int sh = f->height;
+	int stepx, stepy;
 	uint8_t *dst = a->rgba;
-	if (!dst || f->width < w || f->height < h)
+	if (!dst || sw < 2 || sh < 2)
 		return -1;
+	stepx = sw / w;
+	stepy = sh / h;
+	if (stepx < 1)
+		stepx = 1;
+	if (stepy < 1)
+		stepy = 1;
 	if (f->format == AV_PIX_FMT_YUV420P || f->format == AV_PIX_FMT_YUVJ420P) {
 		int full = f->format == AV_PIX_FMT_YUVJ420P;
 		for (y = 0; y < h; y++) {
-			const uint8_t *yp = f->data[0] + (size_t)y * f->linesize[0];
-			const uint8_t *up = f->data[1] + (size_t)(y / 2) * f->linesize[1];
-			const uint8_t *vp = f->data[2] + (size_t)(y / 2) * f->linesize[2];
+			int sy = y * stepy;
+			const uint8_t *yp;
+			const uint8_t *up;
+			const uint8_t *vp;
+			if (sy >= sh)
+				sy = sh - 1;
+			yp = f->data[0] + (size_t)sy * f->linesize[0];
+			up = f->data[1] + (size_t)(sy / 2) * f->linesize[1];
+			vp = f->data[2] + (size_t)(sy / 2) * f->linesize[2];
 			for (x = 0; x < w; x++) {
-				put_rgb(dst, yp[x], up[x / 2], vp[x / 2], full);
+				int sx = x * stepx;
+				if (sx >= sw)
+					sx = sw - 1;
+				put_rgb(dst, yp[sx], up[sx / 2], vp[sx / 2], full);
 				dst += 4;
 			}
 		}
@@ -102,10 +135,39 @@ convert(avdec_t *a)
 	}
 	if (f->format == AV_PIX_FMT_NV12) {
 		for (y = 0; y < h; y++) {
-			const uint8_t *yp = f->data[0] + (size_t)y * f->linesize[0];
-			const uint8_t *uv = f->data[1] + (size_t)(y / 2) * f->linesize[1];
+			int sy = y * stepy;
+			const uint8_t *yp;
+			const uint8_t *uv;
+			if (sy >= sh)
+				sy = sh - 1;
+			yp = f->data[0] + (size_t)sy * f->linesize[0];
+			uv = f->data[1] + (size_t)(sy / 2) * f->linesize[1];
 			for (x = 0; x < w; x++) {
-				put_rgb(dst, yp[x], uv[(x & ~1)], uv[(x & ~1) + 1], 0);
+				int sx = x * stepx;
+				if (sx >= sw)
+					sx = sw - 1;
+				put_rgb(dst, yp[sx], uv[(sx & ~1)], uv[(sx & ~1) + 1], 0);
+				dst += 4;
+			}
+		}
+		return 0;
+	}
+	if (f->format == AV_PIX_FMT_YUV422P || f->format == AV_PIX_FMT_YUVJ422P) {
+		for (y = 0; y < h; y++) {
+			int sy = y * stepy;
+			const uint8_t *yp;
+			const uint8_t *up;
+			const uint8_t *vp;
+			if (sy >= sh)
+				sy = sh - 1;
+			yp = f->data[0] + (size_t)sy * f->linesize[0];
+			up = f->data[1] + (size_t)sy * f->linesize[1];
+			vp = f->data[2] + (size_t)sy * f->linesize[2];
+			for (x = 0; x < w; x++) {
+				int sx = x * stepx;
+				if (sx >= sw)
+					sx = sw - 1;
+				put_rgb(dst, yp[sx], up[sx / 2], vp[sx / 2], 0);
 				dst += 4;
 			}
 		}
@@ -113,16 +175,26 @@ convert(avdec_t *a)
 	}
 	if (f->format == AV_PIX_FMT_YUV420P10LE) {
 		for (y = 0; y < h; y++) {
-			const uint16_t *yp = (const uint16_t *)(f->data[0] + (size_t)y * f->linesize[0]);
-			const uint16_t *up = (const uint16_t *)(f->data[1] + (size_t)(y / 2) * f->linesize[1]);
-			const uint16_t *vp = (const uint16_t *)(f->data[2] + (size_t)(y / 2) * f->linesize[2]);
+			int sy = y * stepy;
+			const uint16_t *yp;
+			const uint16_t *up;
+			const uint16_t *vp;
+			if (sy >= sh)
+				sy = sh - 1;
+			yp = (const uint16_t *)(f->data[0] + (size_t)sy * f->linesize[0]);
+			up = (const uint16_t *)(f->data[1] + (size_t)(sy / 2) * f->linesize[1]);
+			vp = (const uint16_t *)(f->data[2] + (size_t)(sy / 2) * f->linesize[2]);
 			for (x = 0; x < w; x++) {
-				put_rgb(dst, yp[x] >> 2, up[x / 2] >> 2, vp[x / 2] >> 2, 0);
+				int sx = x * stepx;
+				if (sx >= sw)
+					sx = sw - 1;
+				put_rgb(dst, yp[sx] >> 2, up[sx / 2] >> 2, vp[sx / 2] >> 2, 0);
 				dst += 4;
 			}
 		}
 		return 0;
 	}
+	av_fail("picture format");
 	return -1;
 }
 
@@ -534,19 +606,25 @@ open_streams(avdec_t *a, uint8_t **rgba, int *w, int *h, double *duration)
 	const AVCodec *codec;
 	AVStream *st;
 	int i, ret;
-	if (avformat_find_stream_info(a->fmt, NULL) < 0)
+	if (avformat_find_stream_info(a->fmt, NULL) < 0) {
+		av_fail("cannot read file");
 		return -1;
+	}
 	for (i = 0; i < (int)a->fmt->nb_streams; i++) {
 		enum AVCodecID id = a->fmt->streams[i]->codecpar->codec_id;
 		if (a->fmt->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)
 			continue;
-		if (id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC) {
+		if (!avcodec_find_decoder(id))
+			continue;
+		if (a->vindex < 0 || id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC)
 			a->vindex = i;
+		if (id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC)
 			break;
-		}
 	}
-	if (a->vindex < 0)
+	if (a->vindex < 0) {
+		av_fail("no supported video");
 		return -1;
+	}
 	st = a->fmt->streams[a->vindex];
 	a->pkt = av_packet_alloc();
 	a->frame = av_frame_alloc();
@@ -563,20 +641,36 @@ open_streams(avdec_t *a, uint8_t **rgba, int *w, int *h, double *duration)
 		return 0;
 	}
 	codec = avcodec_find_decoder(st->codecpar->codec_id);
-	if (!codec)
+	if (!codec) {
+		av_fail("no decoder");
 		return -1;
+	}
 	a->codec = avcodec_alloc_context3(codec);
 	if (!a->codec)
 		return -1;
 	if (avcodec_parameters_to_context(a->codec, st->codecpar) < 0)
 		return -1;
 	a->codec->thread_count = 1;
-	if (avcodec_open2(a->codec, codec, NULL) < 0)
+	if (avcodec_open2(a->codec, codec, NULL) < 0) {
+		av_fail("decoder refused");
 		return -1;
-	a->w = a->codec->width;
-	a->h = a->codec->height;
-	if (a->w < 16 || a->h < 16 || a->w > 1920 || a->h > 1088)
-		return -1;
+	}
+	{
+		int sw = a->codec->width;
+		int sh = a->codec->height;
+		int dw = sw;
+		int dh = sh;
+		if (sw < 16 || sh < 16) {
+			av_fail("picture too small");
+			return -1;
+		}
+		while ((dw > 1920 || dh > 1080) && dw > 16 && dh > 16) {
+			dw /= 2;
+			dh /= 2;
+		}
+		a->w = dw;
+		a->h = dh;
+	}
 	a->rgba = (uint8_t *)malloc((size_t)a->w * (size_t)a->h * 4);
 	if (!a->rgba)
 		return -1;
@@ -610,10 +704,16 @@ avdec_open(avdec_t **out, const char *path, uint8_t **rgba, int *w, int *h,
 	a->aindex = -1;
 	a->on_pcm = pcm;
 	a->pcm_user = pcm_user;
-	if (avformat_open_input(&a->fmt, path, NULL, NULL) < 0)
+	if (avformat_open_input(&a->fmt, path, NULL, NULL) < 0) {
+		av_fail("cannot open");
 		goto fail;
-	if (open_streams(a, rgba, w, h, duration) != 0)
+	}
+	g_av_err[0] = 0;
+	if (open_streams(a, rgba, w, h, duration) != 0) {
+		if (!g_av_err[0])
+			av_fail("cannot play");
 		goto fail;
+	}
 	*out = a;
 	return 0;
 fail:
@@ -676,10 +776,15 @@ avdec_open_io(avdec_t **out, avdec_read_fn read, avdec_seek_fn seek, void *io,
 		goto fail;
 	a->fmt->pb = a->avio;
 	a->fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
-	if (avformat_open_input(&a->fmt, NULL, NULL, NULL) < 0)
+	if (avformat_open_input(&a->fmt, NULL, NULL, NULL) < 0) {
+		av_fail("cannot open");
 		goto fail;
-	if (open_streams(a, rgba, w, h, duration) != 0)
+	}
+	if (open_streams(a, rgba, w, h, duration) != 0) {
+		if (!g_av_err[0])
+			av_fail("cannot play");
 		goto fail;
+	}
 	*out = a;
 	return 0;
 fail:

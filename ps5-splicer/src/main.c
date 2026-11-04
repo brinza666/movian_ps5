@@ -38,6 +38,7 @@
 #include "font8x8_basic.h"
 #ifdef MOVIAN_TITLE
 #include "dirwalk.h"
+#include "ftpio.h"
 #endif
 
 #define MAX_FILES 48
@@ -206,12 +207,16 @@ static int g_plug_job;
 #ifdef MOVIAN_TITLE
 static int g_nav;
 static int g_src;
+static int g_side;
+static int g_dev;
+static int g_tor_i;
 static int g_list_i;
 static int g_list_n;
 static int g_list[MAX_FILES];
 static int g_scan_tries;
 static int g_scan_wait;
 static int g_scan_announced;
+static int g_ftp_gave_up;
 static char g_scan_line[180];
 static char g_scan_sample[48];
 
@@ -221,7 +226,7 @@ typedef struct {
 	int dents;
 	int kept;
 } root_t;
-#define ROOT_CAP 8
+#define ROOT_CAP 16
 static root_t g_rootst[ROOT_CAP];
 static int g_nrootst;
 #endif
@@ -254,8 +259,9 @@ write_pid_file(const char *path, int quoted)
 static void
 request_sandbox(void)
 {
-	/* etaHEN reads a quoted pid. Lapy reads an unquoted pid from
-	 * elevate_proc. Either daemon has to be loaded before launch. */
+	/* Lapy ignores the marker unless seteuid ran in this process first.
+	 * etaHEN reads the quoted file and does not need that call. */
+	seteuid(geteuid());
 	write_pid_file("/download0/etahen_jailbreak", 1);
 	write_pid_file("/download0/elevate_proc", 0);
 }
@@ -314,8 +320,8 @@ is_video_name(const char *name)
 	       ends_with_ci(name, ".mkv") || ends_with_ci(name, ".ts") ||
 	       ends_with_ci(name, ".m2ts") || ends_with_ci(name, ".mts") ||
 	       ends_with_ci(name, ".avi") || ends_with_ci(name, ".webm") ||
-	       ends_with_ci(name, ".wmv") || ends_with_ci(name, ".flv") ||
-	       ends_with_ci(name, ".vob");
+	       ends_with_ci(name, ".wmv") || ends_with_ci(name, ".asf") ||
+	       ends_with_ci(name, ".flv") || ends_with_ci(name, ".vob");
 }
 
 static int
@@ -640,9 +646,62 @@ is_mpeg_name(const char *name)
 	       ends_with_ci(name, ".m2v");
 }
 
+#ifdef MOVIAN_TITLE
+static ftp_file *g_ftp;
+
+static int
+bus_open_ftp(bus_t *b, const char *url)
+{
+	ftp_file *f;
+	avdec_t *av = NULL;
+	uint8_t *rgba = NULL;
+	int w = 0, h = 0;
+	double duration = 0;
+	f = ftp_file_open(url);
+	if (!f)
+		return -1;
+	if (g_ftp)
+		ftp_file_close(g_ftp);
+	g_ftp = f;
+	aq_reset(&b->aq);
+	if (avdec_open_io(&av, ftp_file_read, ftp_file_seek, f, &rgba, &w, &h, &duration,
+			  on_av_pcm, b) != 0) {
+		ftp_file_close(f);
+		g_ftp = NULL;
+		return -1;
+	}
+	if (b->plm) {
+		plm_destroy(b->plm);
+		b->plm = NULL;
+	}
+	if (b->av)
+		avdec_close(b->av);
+	free(b->rgba);
+	b->av = av;
+	b->rgba = rgba;
+	b->w = w;
+	b->h = h;
+	b->has = 1;
+	b->live = 0;
+	b->kind = 0;
+	b->duration = duration;
+	snprintf(b->path, sizeof b->path, "%s", url);
+	basename_copy(b->name, sizeof b->name, url);
+	return 0;
+}
+#endif
+
 static int
 bus_open_file(bus_t *b, const char *path, int half_seek)
 {
+#ifdef MOVIAN_TITLE
+	if (strncmp(path, "ftp://", 6) == 0)
+		return bus_open_ftp(b, path);
+	if (g_ftp) {
+		ftp_file_close(g_ftp);
+		g_ftp = NULL;
+	}
+#endif
 	if (is_bt_src(path)) {
 		if (bt_start(path) != 0)
 			return -1;
@@ -765,6 +824,32 @@ scan_root(const char *path, int depth, int *dents, int *kept, int *err)
 		*err = EIO;
 }
 
+typedef struct {
+	int dents;
+	int kept;
+} ftp_count_t;
+
+static int
+ftp_visit(const char *url, const char *name, int is_dir, void *ud)
+{
+	ftp_count_t *c = ud;
+	if (!name || name[0] == '.')
+		return 0;
+	c->dents++;
+	if (!g_scan_sample[0])
+		snprintf(g_scan_sample, sizeof g_scan_sample, "%.46s", name);
+	if (is_dir)
+		return 0;
+	if (!is_video_name(name) && !is_bt_name(name))
+		return 0;
+	if (have_file(url) || g_nfiles >= MAX_FILES)
+		return g_nfiles >= MAX_FILES;
+	snprintf(g_files[g_nfiles], sizeof g_files[0], "%s", url);
+	g_nfiles++;
+	c->kept++;
+	return g_nfiles >= MAX_FILES;
+}
+
 static void
 format_scan_line(void)
 {
@@ -792,6 +877,8 @@ format_scan_line(void)
 			n = snprintf(p, left, "%s%s gone", sep, tag);
 		else if (err == EPERM || err == EACCES)
 			n = snprintf(p, left, "%s%s denied", sep, tag);
+		else if (err == ECONNREFUSED)
+			n = snprintf(p, left, "%s%s off", sep, tag);
 		else if (err == EINVAL)
 			n = snprintf(p, left, "%s%s small", sep, tag);
 		else
@@ -928,11 +1015,14 @@ scan_media(void)
 			int depth;
 		} roots[] = {
 			{"/mnt/usb0", "usb0", 4},
-			{"/mnt/usb1", "usb1", 4},
+			{"/mnt/usb1", "usb1", 3},
+			{"/mnt/usb2", "usb2", 2},
+			{"/mnt/usb3", "usb3", 2},
+			{"/mnt/ext0", "ext0", 2},
+			{"/mnt/ext1", "ext1", 2},
 			{"/data", "data", 3},
-			{"/mnt", "mnt", 2},
-			{"/usb0", "usbA", 3},
-			{"/mnt/usb", "usbb", 3},
+			{"/mnt/shadowmnt", "img", 2},
+			{"/user", "user", 1},
 		};
 		int r;
 		g_nrootst = 0;
@@ -947,6 +1037,45 @@ scan_media(void)
 				g_rootst[g_nrootst].err = err;
 				g_rootst[g_nrootst].dents = dents;
 				g_rootst[g_nrootst].kept = kept;
+				g_nrootst++;
+			}
+		}
+		{
+			int usb_seen = 0;
+			int port = 0;
+			int r;
+			for (r = 0; r < g_nrootst; r++) {
+				if (strcmp(g_rootst[r].tag, "usb0") == 0 && g_rootst[r].err == 0 &&
+				    (g_rootst[r].dents > 0 || g_rootst[r].kept > 0))
+					usb_seen = 1;
+			}
+			if (!usb_seen && !g_ftp_gave_up && ftp_probe(&port) == 0) {
+				static const char *fp[] = {
+					"/mnt/usb0", "/mnt/usb1", "/mnt/usb2", "/mnt/ext0", "/data", NULL
+				};
+				ftp_count_t count;
+				int ferr = ENOENT;
+				int fi;
+				count.dents = 0;
+				count.kept = 0;
+				for (fi = 0; fp[fi]; fi++) {
+					if (ftp_walk(port, fp[fi], 3, ftp_visit, &count, NULL) == 0)
+						ferr = 0;
+				}
+				if (g_nrootst < ROOT_CAP) {
+					g_rootst[g_nrootst].tag = "ftp";
+					g_rootst[g_nrootst].err = ferr;
+					g_rootst[g_nrootst].dents = count.dents;
+					g_rootst[g_nrootst].kept = count.kept;
+					g_nrootst++;
+				}
+			} else if (!usb_seen && g_nrootst < ROOT_CAP) {
+				if (!g_ftp_gave_up)
+					g_ftp_gave_up = 1;
+				g_rootst[g_nrootst].tag = "ftp";
+				g_rootst[g_nrootst].err = ECONNREFUSED;
+				g_rootst[g_nrootst].dents = 0;
+				g_rootst[g_nrootst].kept = 0;
 				g_nrootst++;
 			}
 		}
@@ -2369,14 +2498,16 @@ file_matches_src(int src, const char *path)
 	if (src == 4)
 		return is_bt_src(path);
 	if (src == 0)
-		return strncmp(path, "/mnt/usb1", 9) != 0 &&
-		       (strncmp(path, "/mnt/", 5) == 0 || strncmp(path, "/usb0", 5) == 0);
+		return strstr(path, "/mnt/usb0") != NULL || strstr(path, "/mnt/ext0") != NULL ||
+		       strstr(path, "/usb0") != NULL || strstr(path, "/mnt/shadowmnt") != NULL ||
+		       (strncmp(path, "/mnt/", 5) == 0 && strstr(path, "/mnt/usb1") == NULL &&
+			strstr(path, "/mnt/ext1") == NULL);
 	if (src == 1)
-		return strncmp(path, "/mnt/usb1", 9) == 0;
+		return strstr(path, "/mnt/usb1") != NULL;
 	if (src == 2)
-		return strncmp(path, "/data/", 6) == 0;
+		return strstr(path, "/data/") != NULL || strncmp(path, "/data", 5) == 0;
 	if (src == 3)
-		return strstr(path, "/video/") != NULL || strncmp(path, "/data/video", 11) == 0;
+		return is_video_name(path) && !is_bt_src(path);
 	return 0;
 }
 
@@ -2424,8 +2555,12 @@ play_current(void)
 	g_paused = 0;
 	basename_copy(base, sizeof base, g_files[fi]);
 	if (bus_open_file(&g_bus[0], g_files[fi], 0) != 0) {
-		bus_live(&g_bus[0], 0, "unreadable");
-		notify("MOVIAN unreadable");
+		const char *why = avdec_error();
+		if (!why || !why[0])
+			why = "unreadable";
+		snprintf(g_status, sizeof g_status, "%s", why);
+		notify(why);
+		return;
 	}
 	snprintf(g_status, sizeof g_status, "%s", base);
 	g_nav = 2;
@@ -2443,40 +2578,90 @@ play_rel(int dir)
 }
 
 static int
-roots_closed(void)
+usb_hidden(void)
 {
 	int i;
-	int opened = 0;
-	if (g_nrootst <= 0)
-		return 1;
-	for (i = 0; i < g_nrootst && i < 4; i++) {
-		if (g_rootst[i].err == 0)
-			opened = 1;
+	for (i = 0; i < g_nrootst; i++) {
+		if (strcmp(g_rootst[i].tag, "usb0") == 0 && g_rootst[i].err == 0 &&
+		    (g_rootst[i].dents > 0 || g_rootst[i].kept > 0))
+			return 0;
+		if (strcmp(g_rootst[i].tag, "ftp") == 0 && g_rootst[i].err == 0 &&
+		    g_rootst[i].kept > 0)
+			return 0;
 	}
-	return !opened;
+	return 1;
 }
 
 static void
 movian_keys(uint32_t down)
 {
 	if (g_nav == 0) {
-		if ((down & BTN_LEFT) && (g_src % 2) == 1)
-			g_src--;
-		if ((down & BTN_RIGHT) && (g_src % 2) == 0 && g_src + 1 < SRC_N)
-			g_src++;
-		if ((down & BTN_UP) && g_src >= 2)
-			g_src -= 2;
-		if ((down & BTN_DOWN) && g_src + 2 < SRC_N)
-			g_src += 2;
+		if (down & BTN_UP) {
+			if (g_side == 0 && g_dev > 0)
+				g_dev--;
+			else if (g_side > 0) {
+				g_side--;
+				if (g_side == 0)
+					g_dev = 2;
+			}
+		}
+		if (down & BTN_DOWN) {
+			if (g_side == 0 && g_dev < 2)
+				g_dev++;
+			else if (g_side < 3) {
+				g_side++;
+				if (g_side == 0)
+					g_dev = 0;
+			}
+		}
 		if (down & (BTN_L1 | BTN_R1)) {
+			g_ftp_gave_up = 0;
 			request_sandbox();
 			scan_media();
 			notify(g_nfiles > 0 ? "MOVIAN found files" : "MOVIAN rescanned");
 		}
 		if (down & BTN_CROSS) {
-			if (g_src == 5) {
+			if (g_side == 3) {
 				g_opt = 1;
 				opt_open_repo();
+			} else if (g_side == 2) {
+				g_src = 4;
+				g_nav = 3;
+				g_tor_i = 0;
+			} else if (g_side == 1) {
+				g_src = 3;
+				g_nav = 1;
+				g_list_i = 0;
+				rebuild_list();
+			} else {
+				g_src = g_dev;
+				g_nav = 1;
+				g_list_i = 0;
+				rebuild_list();
+			}
+		}
+	} else if (g_nav == 3) {
+		if (down & BTN_UP)
+			g_tor_i = 0;
+		if (down & BTN_DOWN)
+			g_tor_i = 1;
+		if (down & BTN_CIR)
+			g_nav = 0;
+		if (down & BTN_CROSS) {
+			if (g_tor_i == 0) {
+				g_paused = 0;
+				g_focus = 0;
+				if (bus_open_file(&g_bus[0],
+						  "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Sintel"
+						  "&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce"
+						  "&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce"
+						  "&tr=http%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce",
+						  0) == 0) {
+					snprintf(g_status, sizeof g_status, "Sintel");
+					g_nav = 2;
+				} else {
+					notify("MOVIAN torrent failed");
+				}
 			} else {
 				g_nav = 1;
 				g_list_i = 0;
@@ -2499,6 +2684,7 @@ movian_keys(uint32_t down)
 		if (down & BTN_CIR)
 			g_nav = 0;
 		if (down & (BTN_L1 | BTN_R1)) {
+			g_ftp_gave_up = 0;
 			request_sandbox();
 			scan_media();
 			rebuild_list();
@@ -2508,8 +2694,9 @@ movian_keys(uint32_t down)
 			g_paused = !g_paused;
 		if (down & BTN_CIR) {
 			g_paused = 1;
-			g_nav = 1;
-			rebuild_list();
+			g_nav = g_src == 4 ? 3 : 1;
+			if (g_nav == 1)
+				rebuild_list();
 		}
 		if (down & BTN_LEFT)
 			seek_bus(&g_bus[0], -opt_seek());
@@ -2525,45 +2712,104 @@ movian_keys(uint32_t down)
 static void
 draw_movian_home(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
 {
-	int margin = 48 * scale;
-	int gap = 16 * scale;
-	int top = 72 * scale;
-	int usable_w = vis_w - margin * 2;
-	int usable_h = vis_h - top - 56 * scale;
-	int tw = (usable_w - gap) / 2;
-	int th = (usable_h - gap * 2) / 3;
-	int s;
-	char line[64];
+	static const char *side_name[] = {"Home", "Videos", "BitTorrent", "Plugins"};
+	static const char *dev_name[] = {"USB 0", "USB 1", "Data"};
+	int rail = 168 * scale;
+	int i;
+	int x0;
+	char line[80];
 	fill_rect_px(dst, stride, vis_w, vis_h, 0, 0, vis_w, vis_h, 0xFF0A0A0Au);
-	draw_text(dst, stride, vis_w, vis_h, margin, 16 * scale, "Movian", COL_ACCENT, scale + 1);
-	draw_text(dst, stride, vis_w, vis_h, margin, 40 * scale, "Home", COL_PAPER, scale);
-	if (tw < 8 || th < 8)
-		return;
-	for (s = 0; s < SRC_N; s++) {
-		int col = s % 2;
-		int row = s / 2;
-		int x = margin + col * (tw + gap);
-		int y = top + row * (th + gap);
-		int n = src_count(s);
-		fill_rect_px(dst, stride, vis_w, vis_h, x, y, tw, th,
-			     s == g_src ? 0xFF242424u : 0xFF161616u);
-		if (s == g_src)
-			fill_rect_px(dst, stride, vis_w, vis_h, x, y, 6 * scale, th, 0xFFFF9241u);
-		draw_text(dst, stride, vis_w, vis_h, x + 18 * scale, y + th / 2 - 14 * scale,
-			  SRC_NAME[s], s == g_src ? COL_ACCENT : COL_PAPER, scale);
-		if (s == 5)
-			snprintf(line, sizeof line, n > 0 ? "%d on USB" : "repository", n);
-		else
+	fill_rect_px(dst, stride, vis_w, vis_h, 0, 0, rail, vis_h, 0xFF121212u);
+	fill_rect_px(dst, stride, vis_w, vis_h, rail - scale, 0, scale, vis_h, 0xFF1C1C1Cu);
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, 18 * scale, "Movian", COL_ACCENT, scale);
+	for (i = 0; i < 4; i++) {
+		int y = 56 * scale + i * 28 * scale;
+		if (i == g_side)
+			fill_rect_px(dst, stride, vis_w, vis_h, 0, y - 4 * scale, rail - scale, 24 * scale,
+				     0xFF242424u);
+		if (i == g_side)
+			fill_rect_px(dst, stride, vis_w, vis_h, 0, y - 4 * scale, 4 * scale, 24 * scale,
+				     0xFFFF9241u);
+		draw_text(dst, stride, vis_w, vis_h, 16 * scale, y, side_name[i],
+			  i == g_side ? COL_ACCENT : COL_PAPER, scale);
+	}
+	draw_text(dst, stride, vis_w, vis_h, 16 * scale, vis_h - 28 * scale, "L1 rescan", COL_SAGE,
+		  scale > 1 ? scale - 1 : 1);
+	x0 = rail + 28 * scale;
+	if (g_side == 0) {
+		draw_text(dst, stride, vis_w, vis_h, x0, 20 * scale, "Home", COL_PAPER, scale + 1);
+		for (i = 0; i < 3; i++) {
+			int y = 64 * scale + i * 52 * scale;
+			int on = i == g_dev;
+			int n = src_count(i);
+			fill_rect_px(dst, stride, vis_w, vis_h, x0, y, vis_w - x0 - 28 * scale, 44 * scale,
+				     on ? 0xFF242424u : 0xFF161616u);
+			if (on)
+				fill_rect_px(dst, stride, vis_w, vis_h, x0, y, 4 * scale, 44 * scale,
+					     0xFFFF9241u);
+			draw_text(dst, stride, vis_w, vis_h, x0 + 16 * scale, y + 8 * scale, dev_name[i],
+				  on ? COL_ACCENT : COL_PAPER, scale);
 			snprintf(line, sizeof line, "%d", n);
-		draw_text(dst, stride, vis_w, vis_h, x + 18 * scale, y + th / 2 + 4 * scale,
-			  line, COL_SAGE, scale);
+			draw_text(dst, stride, vis_w, vis_h, x0 + 16 * scale, y + 24 * scale, line, COL_SAGE,
+				  scale);
+		}
+	} else if (g_side == 1) {
+		draw_text(dst, stride, vis_w, vis_h, x0, 20 * scale, "Videos", COL_PAPER, scale + 1);
+		snprintf(line, sizeof line, "%d videos", src_count(3));
+		draw_text(dst, stride, vis_w, vis_h, x0, 52 * scale, line, COL_ACCENT, scale);
+		draw_text(dst, stride, vis_w, vis_h, x0, 76 * scale,
+			  "Every video Movian can see, on USB or in data.", COL_SAGE, scale);
+	} else if (g_side == 2) {
+		draw_text(dst, stride, vis_w, vis_h, x0, 20 * scale, "BitTorrent", COL_PAPER, scale + 1);
+		draw_text(dst, stride, vis_w, vis_h, x0, 52 * scale, "Sintel", COL_ACCENT, scale);
+		draw_text(dst, stride, vis_w, vis_h, x0, 72 * scale,
+			  "Plays in this app while the pieces arrive.", COL_SAGE, scale);
+		snprintf(line, sizeof line, "%d torrent files", src_count(4));
+		draw_text(dst, stride, vis_w, vis_h, x0, 96 * scale, line, COL_SAGE, scale);
+	} else {
+		draw_text(dst, stride, vis_w, vis_h, x0, 20 * scale, "Plugins", COL_PAPER, scale + 1);
+		draw_text(dst, stride, vis_w, vis_h, x0, 52 * scale, "https://bit.ly/mprepo", COL_ACCENT, scale);
+		draw_text(dst, stride, vis_w, vis_h, x0, 76 * scale,
+			  "Cross opens the catalog. Options changes the address.", COL_SAGE, scale);
 	}
 	if (g_scan_line[0])
-		draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 34 * scale, g_scan_line,
-			  COL_SAGE, scale > 1 ? scale - 1 : 1);
-	draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 18 * scale,
-		  "Cross open   Options settings   L1 rescan   videos stay on the USB stick",
-		  COL_PAPER, scale > 1 ? scale - 1 : 1);
+		draw_text(dst, stride, vis_w, vis_h, x0, vis_h - 48 * scale, g_scan_line, COL_SAGE,
+			  scale > 1 ? scale - 1 : 1);
+	if (usb_hidden())
+		draw_text(dst, stride, vis_w, vis_h, x0, vis_h - 28 * scale,
+			  "USB stays hidden until etaHEN or Lapy opens it. ftp off means etaHEN FTP is not listening.",
+			  COL_PAPER, scale > 1 ? scale - 1 : 1);
+	else
+		draw_text(dst, stride, vis_w, vis_h, x0, vis_h - 28 * scale, "Cross open    Options settings",
+			  COL_PAPER, scale > 1 ? scale - 1 : 1);
+}
+
+static void
+draw_movian_torrent(uint8_t *dst, int stride, int vis_w, int vis_h, int scale)
+{
+	int margin = 48 * scale;
+	int y0 = 80 * scale;
+	int th = 72 * scale;
+	int i;
+	static const char *row[] = {"Sintel", "Torrent files"};
+	static const char *sub[] = {"Public domain", "On USB or data"};
+	fill_rect_px(dst, stride, vis_w, vis_h, 0, 0, vis_w, vis_h, 0xFF0A0A0Au);
+	draw_text(dst, stride, vis_w, vis_h, margin, 20 * scale, "BitTorrent", COL_ACCENT, scale + 1);
+	draw_text(dst, stride, vis_w, vis_h, margin, 44 * scale,
+		  "Plays in this app while the pieces arrive", COL_SAGE, scale);
+	for (i = 0; i < 2; i++) {
+		int y = y0 + i * (th + 12 * scale);
+		fill_rect_px(dst, stride, vis_w, vis_h, margin, y, vis_w - margin * 2, th,
+			     i == g_tor_i ? 0xFF242424u : 0xFF161616u);
+		if (i == g_tor_i)
+			fill_rect_px(dst, stride, vis_w, vis_h, margin, y, 6 * scale, th, 0xFFFF9241u);
+		draw_text(dst, stride, vis_w, vis_h, margin + 20 * scale, y + 16 * scale, row[i],
+			  i == g_tor_i ? COL_ACCENT : COL_PAPER, scale);
+		draw_text(dst, stride, vis_w, vis_h, margin + 20 * scale, y + 36 * scale, sub[i],
+			  COL_SAGE, scale);
+	}
+	draw_text(dst, stride, vis_w, vis_h, margin, vis_h - 24 * scale,
+		  "Cross open    Circle back", COL_PAPER, scale);
 }
 
 static void
@@ -2798,8 +3044,8 @@ render_loop(void)
 #endif
 			}
 #ifdef MOVIAN_TITLE
-			if (frame_id > BOOT_FRAMES && g_nav < 2 && roots_closed() &&
-			    g_scan_tries < 8) {
+			if (frame_id > BOOT_FRAMES && g_nav < 2 && usb_hidden() &&
+			    g_scan_tries < 12) {
 				if (g_scan_wait > 0)
 					g_scan_wait--;
 				else {
@@ -3061,6 +3307,8 @@ render_loop(void)
 #ifdef MOVIAN_TITLE
 				if (g_nav == 0)
 					draw_movian_home(framepx, stride, vis_w, vis_h, scale);
+				else if (g_nav == 3)
+					draw_movian_torrent(framepx, stride, vis_w, vis_h, scale);
 				else if (g_nav == 1)
 					draw_movian_list(framepx, stride, vis_w, vis_h, scale);
 				else

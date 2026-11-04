@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-/* H.264 / HEVC. Hardware (libSceVideodec2) when the running HEN can load
- * that module, otherwise FFmpeg software. Not REA.
+/* Picture comes from FFmpeg. H.264 and HEVC try libSceVideodec2 first.
+ * MPEG-4, MPEG-2, MJPEG, VC-1, WMV and VP8 are software. Not REA.
  */
 typedef struct avdec avdec_t;
 
@@ -30,5 +30,7 @@ double avdec_time(const avdec_t *a);
 void avdec_seek(avdec_t *a, double seconds);
 /* "HW" or "SW". */
 const char *avdec_mode(const avdec_t *a);
+/* Why the last avdec_open failed. Empty if it succeeded. */
+const char *avdec_error(void);
 
 #endif

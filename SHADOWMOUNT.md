@@ -28,19 +28,19 @@ The picture is 1080p and tiled. The first moment is color bars, then the Movian 
 sha256 of `PPSA99455.zip`:
 
 ```
-4fbcef9fcbefdc6490b1dc48a87d28a5a4a842b9d59fe38b069d7b2204386f03
+8cc2fbbe6b9459992333264b9065e17358ab0c4a84a3017b2fa3f8b45ea869ff
 ```
 
 ## What it does
 
-The home screen is six tiles: USB 0, USB 1, Data, Videos, BitTorrent, Plugins. Cross opens a tile. Cross on a file plays it full frame. Circle goes back. Options opens settings. L1 scans again.
+The screen matches the preview's four places: Home, Videos, BitTorrent, Plugins. Up and Down move. On Home, Up and Down also move between USB 0, USB 1 and Data. Cross opens the highlighted row. Cross on a file plays it full frame. Circle goes back. Options opens settings. L1 scans again.
 
-Plugins opens the catalog. With no settings file yet, that address is `https://bit.ly/mprepo`. An empty saved address is the official repository. On the repository row, Right moves to the next address.
+Videos is every video file the scan kept. BitTorrent opens Sintel and any `.torrent` files on USB or in data. Plugins opens the catalog. With no settings file yet, that address is `https://bit.ly/mprepo`. An empty saved address is the official repository. On the repository row, Right moves to the next address.
 
-A line at the bottom says what each directory did. `usb0 4` is four videos. `usb0 gone` means that path is not there. `usb0 denied` means the sandbox is still closed. `usb0 listed 12` means the directory opened and nothing in it had a video name. `saw name` is the first name it read.
+A line at the bottom says what each directory did. `usb0 4` is four videos. `usb0 gone` means that path is not there. `usb0 denied` means the sandbox is still closed. `usb0 listed 12` means the directory opened and nothing in it had a video name. `ftp 3` means etaHEN's FTP server listed files the sandbox itself could not. `ftp off` means nothing is listening on 127.0.0.1 ports 2121, 1337, 2122 or 21. `saw name` is the first name it read.
 
-On startup the title asks etaHEN (`/download0/etahen_jailbreak`, quoted pid) and Lapy (`/download0/elevate_proc`, unquoted pid) to open the sandbox. The daemon has to already be running. Directories are read with `getdents` and a buffer of at least 64 KiB. The system directory call returns nothing on these filesystems when the buffer is smaller than one block.
+ShadowMountPlus mounts this folder as the application and scans USB for other homebrew folders. It does not give this title the console's USB mounts. etaHEN makes `/data` listable. USB is read directly when the sandbox allows it (`/mnt/usb0` through `/mnt/usb3`, `/mnt/ext0`, `/mnt/ext1`). If USB is still denied, Movian asks etaHEN's FTP server on the console and plays those files from there. Turn FTP on in etaHEN if the line says `ftp off`. Lapy, loaded before launch, is the other way to open USB directly. The title asks etaHEN (`/download0/etahen_jailbreak`, quoted pid) and Lapy (`/download0/elevate_proc`, unquoted pid) on startup. Directories are read with `getdents` and a buffer of at least 64 KiB.
 
-Playback is the same player as `payload.elf`: MPEG-1 with audio, and H.264 or HEVC in MP4, MKV and MPEG-TS. The names it also lists are AVI, WebM, WMV, FLV and VOB. Hardware decode is libSceVideodec2 when that module loads, otherwise FFmpeg. Packages under `plugins/` on USB, `/data/movian/plugins` or `/download0/movian/plugins` are listed with the same directory read. L2 opens the ones already on disk.
+Playback covers MPEG-1, H.264, HEVC, MPEG-4, MPEG-2, MJPEG, WMV, VC-1 and VP8 in MP4, MKV, MPEG-TS, AVI, WMV, ASF, FLV and MPEG. Pictures above 1080p are scaled down in software. Hardware decode is libSceVideodec2 for H.264 and HEVC when that module loads. A file that still will not open stays on the list and the status line says why (`no supported video`, `cannot open`, `picture format`). Packages under `plugins/` on USB, `/data/movian/plugins` or `/download0/movian/plugins` are listed with the same directory read. L2 opens the ones already on disk.
 
 The loader build is still [payload.elf](ps5-splicer/README.md) on port 9021. This folder is the one that appears on the home screen.
