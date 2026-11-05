@@ -29,24 +29,15 @@ It mounts those folders as titles. It does not give Movian the console's USB mou
 
 ## What the title does
 
-On startup Movian asks etaHEN and Lapy to open the sandbox:
+Movian asks for that only after the picture is on screen and the pad, audio and video modules have loaded. Kodi does the same: a request any earlier loses the race, and once the sandbox is open a system module will not load. The request is the file Kodi writes, `{"PID":"<pid>"}` in `/download0/etahen_jailbreak`. Lapy also reads `/download0/elevate_proc`. The title waits until the etaHEN file is removed, then reads the drives with `getdents` and a buffer of at least 64 KiB:
 
-- etaHEN reads `/download0/etahen_jailbreak` with a quoted pid
-- Lapy reads `/download0/elevate_proc` with an unquoted pid
-
-The daemon has to already be loaded. etaHEN makes `/data` listable. USB is still a separate mount.
-
-Movian then reads, with `getdents` and a buffer of at least 64 KiB:
-
-- `/mnt/usb0` through `/mnt/usb3`
+- `/mnt/usb0` through `/mnt/usb7`
 - `/mnt/ext0` and `/mnt/ext1`
 - `/data`
 - `/mnt/shadowmnt`
 - `/user`
 
-If USB did not list anything, it asks etaHEN's FTP server on `127.0.0.1`, ports 2121, 1337, 2122, then 21, and plays files from there. Turn FTP on in etaHEN if you want that path. Lapy, loaded before Movian starts, is the other way to open USB directly.
-
-The title keeps asking for about twelve scans after launch. L1 asks again immediately.
+If the file was taken and USB is still hidden, it asks once more, then checks again every two seconds. etaHEN's FTP on `127.0.0.1` (ports 2121, 1337, 2122, then 21) is tried once after that, and plays files from there. Turn FTP on in etaHEN if the line says `ftp off`. Lapy, loaded before Movian starts, is the other way to open USB directly. L1 asks again immediately.
 
 ## The bottom line
 

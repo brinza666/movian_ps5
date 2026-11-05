@@ -42,7 +42,7 @@ The picture is 1080p. The first moment is color bars, then the Movian home. How 
 sha256 of `PPSA99455.zip`:
 
 ```text
-8cc2fbbe6b9459992333264b9065e17358ab0c4a84a3017b2fa3f8b45ea869ff
+aac19eccfc04599bdba49278d495d30dfa94587ab5311f3e109de9d076c40615
 ```
 
 The loader ELF is a separate download. See [Loader ELF](payload.md).

@@ -4,7 +4,7 @@ Four places, the same ones as the preview: Home, Videos, BitTorrent, Plugins.
 
 ![Home](images/home.jpg)
 
-On the television the list is on the left and the page is on the right. The font is the console font, not this phone layout.
+Home is one list, the same entries as the preview: USB 0, USB 1, Data, Videos, BitTorrent, Plugins, Settings. Up and Down move. Cross opens the row.
 
 ## Pad
 
