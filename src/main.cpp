@@ -28,6 +28,10 @@ void ps5_log_init(void) {
         fprintf(g_log_file, "TitleID: %s\n", kTitleId);
         fflush(g_log_file);
     }
+    /* Also log to stderr for serial/debug console */
+    fprintf(stderr, "=== Movian PS5 Log Start ===\n");
+    fprintf(stderr, "Version: %s\n", kVersion);
+    fprintf(stderr, "TitleID: %s\n", kTitleId);
 }
 
 void ps5_log_shutdown(void) {
@@ -36,17 +40,18 @@ void ps5_log_shutdown(void) {
         fclose(g_log_file);
         g_log_file = nullptr;
     }
+    fprintf(stderr, "=== Movian PS5 Log End ===\n");
 }
 
 void ps5_log(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     
-    // Also print to stderr for console/serial output
+    /* Print to stderr (serial console / FTP debug) */
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
     
-    // Write to log file
+    /* Write to log file */
     if (g_log_file) {
         vfprintf(g_log_file, fmt, args);
         fprintf(g_log_file, "\n");
@@ -68,6 +73,7 @@ double NowSeconds() noexcept {
 
 bool InitAll() noexcept {
     ps5_log_init();
+
     LOG("========================================");
     LOG("Movian PS5 v%s starting...", kVersion);
     LOG("TitleID: %s", kTitleId);
