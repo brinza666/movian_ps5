@@ -110,9 +110,9 @@ done
 if [ ! -f "$root/src/duktape.h" ]; then
     echo "==> [duktape] Downloading Duktape 2.7.0 JS engine..."
     curl -sL --fail -o "$root/src/duktape.h" \
-        "https://raw.githubusercontent.com/svaarala/duktape/master/src-input/duktape.h"
+        "https://raw.githubusercontent.com/svaarala/duktape/master/src/duktape.h"
     curl -sL --fail -o "$root/src/duktape.c" \
-        "https://raw.githubusercontent.com/svaarala/duktape/master/src-input/duktape.c"
+        "https://raw.githubusercontent.com/svaarala/duktape/master/src/duktape.c"
     if [ ! -f "$root/src/duktape.h" ] || [ ! -f "$root/src/duktape.c" ]; then
         echo "ERROR: Failed to download Duktape source files" >&2
         exit 2
