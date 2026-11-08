@@ -17,27 +17,60 @@ constexpr double kTargetFrameTime = 1.0 / 60.0;
 
 volatile bool g_running = true;
 
-/* Debug logging to file on PS5 (/download0/movian.log) */
-static FILE* g_log_file = nullptr;
+/* Debug logging to multiple locations for maximum visibility */
+static FILE* g_log_file_download0 = nullptr;
+static FILE* g_log_file_data = nullptr;
+static FILE* g_log_file_user = nullptr;
 
 void ps5_log_init(void) {
-    g_log_file = fopen("/download0/movian.log", "w");
-    if (g_log_file) {
-        fprintf(g_log_file, "=== Movian PS5 Log Start ===\n");
-        fprintf(g_log_file, "Version: %s\n", kVersion);
-        fprintf(g_log_file, "TitleID: %s\n", kTitleId);
-        fflush(g_log_file);
+    /* Try /download0/movian.log (inside mounted container) */
+    g_log_file_download0 = fopen("/download0/movian.log", "w");
+    if (g_log_file_download0) {
+        fprintf(g_log_file_download0, "=== Movian PS5 Log Start ===\n");
+        fprintf(g_log_file_download0, "Version: %s\n", kVersion);
+        fprintf(g_log_file_download0, "TitleID: %s\n", kTitleId);
+        fflush(g_log_file_download0);
     }
+
+    /* Try /data/movian.log (host filesystem) */
+    g_log_file_data = fopen("/data/movian.log", "w");
+    if (g_log_file_data) {
+        fprintf(g_log_file_data, "=== Movian PS5 Log Start ===\n");
+        fprintf(g_log_file_data, "Version: %s\n", kVersion);
+        fprintf(g_log_file_data, "TitleID: %s\n", kTitleId);
+        fflush(g_log_file_data);
+    }
+
+    /* Try /user/movian.log (host filesystem) */
+    g_log_file_user = fopen("/user/movian.log", "w");
+    if (g_log_file_user) {
+        fprintf(g_log_file_user, "=== Movian PS5 Log Start ===\n");
+        fprintf(g_log_file_user, "Version: %s\n", kVersion);
+        fprintf(g_log_file_user, "TitleID: %s\n", kTitleId);
+        fflush(g_log_file_user);
+    }
+
+    /* Always log to stderr for serial/debug */
     fprintf(stderr, "=== Movian PS5 Log Start ===\n");
     fprintf(stderr, "Version: %s\n", kVersion);
     fprintf(stderr, "TitleID: %s\n", kTitleId);
 }
 
 void ps5_log_shutdown(void) {
-    if (g_log_file) {
-        fprintf(g_log_file, "=== Movian PS5 Log End ===\n");
-        fclose(g_log_file);
-        g_log_file = nullptr;
+    if (g_log_file_download0) {
+        fprintf(g_log_file_download0, "=== Movian PS5 Log End ===\n");
+        fclose(g_log_file_download0);
+        g_log_file_download0 = nullptr;
+    }
+    if (g_log_file_data) {
+        fprintf(g_log_file_data, "=== Movian PS5 Log End ===\n");
+        fclose(g_log_file_data);
+        g_log_file_data = nullptr;
+    }
+    if (g_log_file_user) {
+        fprintf(g_log_file_user, "=== Movian PS5 Log End ===\n");
+        fclose(g_log_file_user);
+        g_log_file_user = nullptr;
     }
     fprintf(stderr, "=== Movian PS5 Log End ===\n");
 }
@@ -50,13 +83,21 @@ void ps5_log(const char* fmt, ...) {
     va_end(args);
     if (len <= 0) return;
 
-    /* Print to stderr (serial console / FTP debug) */
+    /* Log to stderr */
     fprintf(stderr, "%s\n", buf);
 
-    /* Write to log file */
-    if (g_log_file) {
-        fprintf(g_log_file, "%s\n", buf);
-        fflush(g_log_file);
+    /* Log to all files */
+    if (g_log_file_download0) {
+        fprintf(g_log_file_download0, "%s\n", buf);
+        fflush(g_log_file_download0);
+    }
+    if (g_log_file_data) {
+        fprintf(g_log_file_data, "%s\n", buf);
+        fflush(g_log_file_data);
+    }
+    if (g_log_file_user) {
+        fprintf(g_log_file_user, "%s\n", buf);
+        fflush(g_log_file_user);
     }
 }
 
