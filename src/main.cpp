@@ -9,12 +9,55 @@
 #include "duktape_ps5.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdarg>
 
 constexpr char kVersion[] = "0.2.0";
 constexpr char kTitleId[] = "PPSA99455";
 constexpr double kTargetFrameTime = 1.0 / 60.0;
 
 volatile bool g_running = true;
+
+/* Debug logging to file on PS5 (/download0/movian.log) */
+static FILE* g_log_file = nullptr;
+
+void ps5_log_init(void) {
+    g_log_file = fopen("/download0/movian.log", "w");
+    if (g_log_file) {
+        fprintf(g_log_file, "=== Movian PS5 Log Start ===\n");
+        fprintf(g_log_file, "Version: %s\n", kVersion);
+        fprintf(g_log_file, "TitleID: %s\n", kTitleId);
+        fflush(g_log_file);
+    }
+}
+
+void ps5_log_shutdown(void) {
+    if (g_log_file) {
+        fprintf(g_log_file, "=== Movian PS5 Log End ===\n");
+        fclose(g_log_file);
+        g_log_file = nullptr;
+    }
+}
+
+void ps5_log(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    
+    // Also print to stderr for console/serial output
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    
+    // Write to log file
+    if (g_log_file) {
+        vfprintf(g_log_file, fmt, args);
+        fprintf(g_log_file, "\n");
+        fflush(g_log_file);
+    }
+    va_end(args);
+}
+
+#define LOG(fmt, ...) ps5_log("[MOVIAN] " fmt, ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...) ps5_log("[ERROR] " fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) ps5_log("[WARN] " fmt, ##__VA_ARGS__)
 
 extern "C" double ps5_now_seconds(void);
 extern "C" void ps5_sleep_ms(int ms);
@@ -24,36 +67,64 @@ double NowSeconds() noexcept {
 }
 
 bool InitAll() noexcept {
-    std::printf("========================================\n");
-    std::printf("Movian PS5 v%s\n", kVersion);
-    std::printf("TitleID: %s\n", kTitleId);
-    std::printf("Firmware: 4.03\n");
-    std::printf("========================================\n");
+    ps5_log_init();
+    LOG("========================================");
+    LOG("Movian PS5 v%s starting...", kVersion);
+    LOG("TitleID: %s", kTitleId);
+    LOG("Firmware: 4.03");
+    LOG("========================================");
 
+    LOG("Initializing video...");
     if (ps5_video_global_init() != 0) {
-        std::fprintf(stderr, "FATAL: Video initialization failed\n");
+        LOG_ERR("FATAL: Video initialization failed");
         return false;
     }
+    LOG("Video initialized OK");
+
+    LOG("Initializing audio...");
     if (ps5_audio_global_init() != 0) {
-        std::fprintf(stderr, "WARNING: Audio initialization failed\n");
+        LOG_WARN("Audio initialization failed (continuing)");
+    } else {
+        LOG("Audio initialized OK");
     }
+
+    LOG("Initializing input...");
     if (ps5_input_global_init() != 0) {
-        std::fprintf(stderr, "WARNING: Input initialization failed\n");
+        LOG_WARN("Input initialization failed (continuing)");
+    } else {
+        LOG("Input initialized OK");
     }
+
+    LOG("Initializing media player...");
     if (ps5_media_global_init() != 0) {
-        std::fprintf(stderr, "WARNING: Media player initialization failed\n");
+        LOG_WARN("Media player initialization failed (continuing)");
+    } else {
+        LOG("Media player initialized OK");
     }
 
+    LOG("Getting video handle...");
     auto* video = ps5_video_get_global();
-    if (video && ps5_ui_init(static_cast<int>(video->width),
-                              static_cast<int>(video->height)) != 0) {
-        std::fprintf(stderr, "WARNING: UI initialization failed\n");
+    if (video) {
+        LOG("Video: %ux%u, pitch=%u, format=%u", video->width, video->height, video->pitch, video->format);
+        
+        LOG("Initializing UI (%ux%u)...", video->width, video->height);
+        if (ps5_ui_init(static_cast<int>(video->width), static_cast<int>(video->height)) != 0) {
+            LOG_WARN("UI initialization failed (continuing)");
+        } else {
+            LOG("UI initialized OK");
+        }
+    } else {
+        LOG_ERR("Failed to get video handle!");
     }
 
+    LOG("Initializing plugin system...");
     if (ps5_plugin_init() != 0) {
-        std::fprintf(stderr, "WARNING: Plugin system initialization failed\n");
+        LOG_WARN("Plugin system initialization failed (continuing)");
+    } else {
+        LOG("Plugin system initialized OK");
     }
 
+    LOG("Registering UI settings...");
     int speed_val = 100;
     int subtitle_val = 0;
     int auto_upgrade_val = 1;
@@ -64,15 +135,14 @@ bool InitAll() noexcept {
     ps5_ui_register_setting("subtitle_enabled", "Subtitles Enabled", 0, &subtitle_val);
     ps5_ui_register_setting("repository_url", "Repository URL", 1, repo_url);
     ps5_ui_register_setting("auto_upgrade", "Auto Upgrade", 0, &auto_upgrade_val);
-    ps5_ui_register_setting("install_on_demand", "Install on Demand", 0,
-                           &install_on_demand_val);
+    ps5_ui_register_setting("install_on_demand", "Install on Demand", 0, &install_on_demand_val);
 
-    std::printf("Movian PS5 initialized successfully\n");
+    LOG("Movian PS5 initialized successfully");
     return true;
 }
 
 void ShutdownAll() noexcept {
-    std::printf("Shutting down Movian PS5...\n");
+    LOG("Shutting down Movian PS5...");
 
     ps5_media_stop();
     ps5_plugin_shutdown();
@@ -84,7 +154,8 @@ void ShutdownAll() noexcept {
     ps5_audio_global_shutdown();
     ps5_video_global_shutdown();
 
-    std::printf("Movian PS5 shutdown complete\n");
+    ps5_log_shutdown();
+    LOG("Movian PS5 shutdown complete");
 }
 
 void RenderFrame() noexcept {
@@ -103,7 +174,7 @@ void RenderFrame() noexcept {
         double current_time = ps5_media_get_time();
         const char* subtitle_text = ps5_subtitle_get_text(current_time);
         if (subtitle_text) {
-            std::printf("[Subtitle] %s\n", subtitle_text);
+            LOG("[Subtitle] %s", subtitle_text);
         }
 
         uint8_t* audio_buf = nullptr;
@@ -123,42 +194,45 @@ void HandleInput() noexcept {
 
     ps5_input_poll(input);
 
-    if (ps5_input_button_pressed(input, 0x0001)) {
+    if (ps5_input_button_pressed(input, 0x0001)) { // Cross
         ps5_ui_key(0x0D, 1);
     }
-    if (ps5_input_button_pressed(input, 0x0002)) {
+    if (ps5_input_button_pressed(input, 0x0002)) { // Circle
         ps5_ui_key(0x1B, 1);
     }
-    if (ps5_input_button_pressed(input, 0x0004)) {
+    if (ps5_input_button_pressed(input, 0x0004)) { // Square
         ps5_ui_keyboard_show();
     }
-    if (ps5_input_button_pressed(input, 0x4000)) {
+    if (ps5_input_button_pressed(input, 0x4000)) { // D-pad Up
         ps5_ui_key(0x26, 1);
     }
-    if (ps5_input_button_pressed(input, 0x8000)) {
+    if (ps5_input_button_pressed(input, 0x8000)) { // D-pad Down
         ps5_ui_key(0x28, 1);
     }
-    if (ps5_input_button_pressed(input, 0x10000)) {
+    if (ps5_input_button_pressed(input, 0x10000)) { // D-pad Right
         ps5_ui_key(0x25, 1);
     }
-    if (ps5_input_button_pressed(input, 0x20000)) {
+    if (ps5_input_button_pressed(input, 0x20000)) { // D-pad Left
         ps5_ui_key(0x27, 1);
     }
-    if (ps5_input_button_pressed(input, 0x1000)) {
+    if (ps5_input_button_pressed(input, 0x1000)) { // Options
         g_running = false;
     }
 }
 
 int main() {
+    LOG("main() entered");
+    
     if (!InitAll()) {
-        std::fprintf(stderr, "FATAL: Initialization failed\n");
+        LOG_ERR("FATAL: Initialization failed");
         ShutdownAll();
         return 1;
     }
 
-    std::printf("Entering main render loop...\n");
+    LOG("Entering main render loop...");
 
     double last_frame = NowSeconds();
+    int frame_count = 0;
 
     while (g_running) {
         double now = NowSeconds();
@@ -169,13 +243,20 @@ int main() {
         if (now - last_frame >= kTargetFrameTime) {
             RenderFrame();
             last_frame = now;
+            frame_count++;
+            
+            // Log every 60 frames (~1 second at 60fps)
+            if (frame_count % 60 == 0) {
+                LOG("Frame %d, running...", frame_count);
+            }
         }
 
         ps5_sleep_ms(1);
     }
 
+    LOG("Main loop exited after %d frames", frame_count);
     ShutdownAll();
 
-    std::printf("Movian PS5 exited cleanly\n");
+    LOG("Movian PS5 exited cleanly");
     return 0;
 }
