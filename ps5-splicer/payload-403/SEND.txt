@@ -1,0 +1,23 @@
+Firmware 4.03. Do not install a package. Send one ELF to the loader on port 9021.
+
+These are earlier tests, not the home-screen title. The title is PPSA99455.zip.
+See docs/install.md and docs/payload.md.
+
+1) splicer-linear.elf
+   Linear color bars. Toasts start with LIN.
+   "LIN start linear payload" then "LIN Open rc=" a positive number.
+   Log: /data/splicer/linear.log or /mnt/usb0/splicer-linear.log
+
+2) splicer-mpeg1.elf
+   Same display path. Plays the first .mpg .mpeg .mpv .m1v or .m2v in
+   /mnt/usb0, /mnt/usb1, /data/video, /data/splicer, or /user/splicer.
+   Up to 1920x1088. No audio in this file. Toasts start with M1.
+   No file: it flips red and amber instead.
+
+From a PC, with the loader already running:
+
+  nc -q 0 PS5_IP 9021 < splicer-linear.elf
+
+A payload sent in the background can open the display and still leave the
+console home screen on the television. The ShadowMount title is the file
+that replaces that screen.
