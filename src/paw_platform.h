@@ -226,11 +226,6 @@ void ps5_sleep_ms(int ms);
 double ps5_now_seconds(void);
 void ps5_sleep_ms(int ms);
 
-/* Kernel logging (sceSysUtilSendKlog syscall) */
-void ps5_klog_send(const char *buf, size_t len);
-void ps5_klog(const char *fmt, ...);
-void ps5_klog_stderr(const char *fmt, ...);
-
 #ifdef __cplusplus
 }
 #endif

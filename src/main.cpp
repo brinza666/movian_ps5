@@ -17,7 +17,7 @@ constexpr double kTargetFrameTime = 1.0 / 60.0;
 
 volatile bool g_running = true;
 
-/* Debug logging to file on PS5 (/download0/movian.log) AND kernel log (klog) */
+/* Debug logging to file on PS5 (/download0/movian.log) */
 static FILE* g_log_file = nullptr;
 
 void ps5_log_init(void) {
@@ -28,10 +28,9 @@ void ps5_log_init(void) {
         fprintf(g_log_file, "TitleID: %s\n", kTitleId);
         fflush(g_log_file);
     }
-    /* Also log to kernel log (visible in klogsrv on port 3232) */
-    ps5_klog("=== Movian PS5 Log Start ===");
-    ps5_klog("Version: %s", kVersion);
-    ps5_klog("TitleID: %s", kTitleId);
+    fprintf(stderr, "=== Movian PS5 Log Start ===\n");
+    fprintf(stderr, "Version: %s\n", kVersion);
+    fprintf(stderr, "TitleID: %s\n", kTitleId);
 }
 
 void ps5_log_shutdown(void) {
@@ -40,7 +39,7 @@ void ps5_log_shutdown(void) {
         fclose(g_log_file);
         g_log_file = nullptr;
     }
-    ps5_klog("=== Movian PS5 Log End ===");
+    fprintf(stderr, "=== Movian PS5 Log End ===\n");
 }
 
 void ps5_log(const char* fmt, ...) {
@@ -51,8 +50,8 @@ void ps5_log(const char* fmt, ...) {
     va_end(args);
     if (len <= 0) return;
 
-    /* Send to kernel log (klogsrv on port 3232) */
-    ps5_klog_send(buf, (size_t)len < sizeof(buf) ? (size_t)len : sizeof(buf) - 1);
+    /* Print to stderr (serial console / FTP debug) */
+    fprintf(stderr, "%s\n", buf);
 
     /* Write to log file */
     if (g_log_file) {
