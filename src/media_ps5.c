@@ -30,29 +30,6 @@ typedef struct SwrContext SwrContext;
 #endif
 
 /* Media state */
-typedef struct {
-    AVFormatContext *fmt_ctx;
-    int video_stream_index;
-    int audio_stream_index;
-    AVCodecContext *video_dec_ctx;
-    AVCodecContext *audio_dec_ctx;
-    AVFrame *video_frame;
-    AVFrame *audio_frame;
-    AVPacket *packet;
-    SwsContext *sws_ctx;
-    SwrContext *swr_ctx;
-    uint8_t *video_framebuf;
-    uint8_t *audio_framebuf;
-    int video_framebuf_size;
-    int audio_framebuf_size;
-    double duration;
-    double current_time;
-    int playing;
-    int paused;
-    double playback_speed;
-    int seek_requested;
-    double seek_target;
-} media_player_t;
 
 static media_player_t g_player = {0};
 

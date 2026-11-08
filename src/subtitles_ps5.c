@@ -1,20 +1,17 @@
-/*
- * Movian PS5 - Subtitle Support
- * Subtitle formats: srt, ass, sub, vobsub
- * OpenSubtitles integration
- */
-
 #include "paw_platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
+/* Forward declaration */
+static double ps5_subtitle_parse_time(const char *time_str);
+
 /* Subtitle entry */
 typedef struct {
-    double start_time;   /* seconds */
-    double end_time;     /* seconds */
-    char *text;          /* subtitle text */
+    double start_time;
+    double end_time;
+    char *text;
     struct subtitle_entry *next;
 } subtitle_entry_t;
 
@@ -50,49 +47,33 @@ static int ps5_subtitle_parse_srt(const char *path, subtitle_track_t *track) {
     content[size] = '\0';
     free(buf);
 
-    /* Parse SRT format:
-     * 1
-     * 00:00:20,000 --> 00:00:24,400
-     * Subtitle text line 1
-     * Subtitle text line 2
-     *
-     * 2
-     * 00:00:24,600 --> 00:00:27,800
-     * Next subtitle
-     */
-
     char *line = strtok(content, "\n");
     int entry_num = 0;
     subtitle_entry_t *last_entry = NULL;
 
     while (line) {
-        /* Skip empty lines */
         while (*line && isspace(*line)) line++;
         if (*line == '\0') {
             line = strtok(NULL, "\n");
             continue;
         }
 
-        /* Entry number */
         if (isdigit(*line)) {
             entry_num = atoi(line);
             line = strtok(NULL, "\n");
             continue;
         }
 
-        /* Timestamp line: HH:MM:SS,mmm --> HH:MM:SS,mmm */
         char *arrow = strstr(line, "-->");
         if (arrow) {
             subtitle_entry_t *entry = calloc(1, sizeof(subtitle_entry_t));
             if (!entry) break;
 
-            /* Parse start time */
             char start_str[32] = {0};
             strncpy(start_str, line, arrow - line);
             start_str[arrow - line] = '\0';
             entry->start_time = ps5_subtitle_parse_time(start_str);
 
-            /* Parse end time */
             char *end_start = arrow + 3;
             while (*end_start && isspace(*end_start)) end_start++;
             char *end_end = end_start;
@@ -103,7 +84,6 @@ static int ps5_subtitle_parse_srt(const char *path, subtitle_track_t *track) {
 
             line = strtok(NULL, "\n");
 
-            /* Collect text lines until blank line or next entry */
             char text_buf[1024] = {0};
             int text_len = 0;
             while (line) {
@@ -112,9 +92,11 @@ static int ps5_subtitle_parse_srt(const char *path, subtitle_track_t *track) {
                 if (isdigit(*line) && strstr(line, "-->") == NULL) break;
 
                 int len = strlen(line);
-                if (text_len + len + 1 < sizeof(text_buf)) {
-                    if (text_len > 0) text_buf[text_len++] = '\\';
-                    text_buf[text_len++] = 'n';
+                if (text_len + len + 1 < (int)sizeof(text_buf)) {
+                    if (text_len > 0) {
+                        text_buf[text_len++] = '\\';
+                        text_buf[text_len++] = 'n';
+                    }
                     memcpy(text_buf + text_len, line, len);
                     text_len += len;
                 }
@@ -124,7 +106,6 @@ static int ps5_subtitle_parse_srt(const char *path, subtitle_track_t *track) {
 
             entry->text = strdup(text_buf);
 
-            /* Add to list */
             if (!track->entries) {
                 track->entries = entry;
             } else {
@@ -143,7 +124,6 @@ static int ps5_subtitle_parse_srt(const char *path, subtitle_track_t *track) {
     return 0;
 }
 
-/* Parse timestamp string HH:MM:SS,mmm to seconds */
 double ps5_subtitle_parse_time(const char *time_str) {
     if (!time_str) return 0;
 
@@ -157,11 +137,9 @@ double ps5_subtitle_parse_time(const char *time_str) {
     return 0;
 }
 
-/* Load subtitle file */
 int ps5_subtitle_load(const char *path, const char *language) {
     if (!path) return -1;
 
-    /* Find free track slot */
     int slot = -1;
     for (int i = 0; i < 8; i++) {
         if (!g_subtitles[i].filename) {
@@ -179,15 +157,12 @@ int ps5_subtitle_load(const char *path, const char *language) {
     g_subtitles[slot].language = language ? strdup(language) : strdup("und");
     g_subtitles[slot].enabled = 0;
 
-    /* Parse based on extension */
     const char *ext = strrchr(path, '.');
     if (ext && strcmp(ext, ".srt") == 0) {
         ps5_subtitle_parse_srt(path, &g_subtitles[slot]);
     } else if (ext && strcmp(ext, ".ass") == 0) {
-        /* ASS parsing would go here */
         fprintf(stderr, "[PS5 Subtitle] ASS format not yet implemented\n");
     } else if (ext && (strcmp(ext, ".sub") == 0 || strcmp(ext, ".idx") == 0)) {
-        /* VOBsub parsing would go here */
         fprintf(stderr, "[PS5 Subtitle] VOBsub format not yet implemented\n");
     }
 
@@ -195,7 +170,6 @@ int ps5_subtitle_load(const char *path, const char *language) {
     fprintf(stderr, "[PS5 Subtitle] Loaded track %d: %s (%s)\n",
             slot, path, g_subtitles[slot].language);
 
-    /* Auto-enable first subtitle track */
     if (g_active_subtitle < 0 && g_subtitles[slot].entry_count > 0) {
         g_subtitles[slot].enabled = 1;
         g_active_subtitle = slot;
@@ -204,14 +178,12 @@ int ps5_subtitle_load(const char *path, const char *language) {
     return slot;
 }
 
-/* Enable/disable subtitle track */
 int ps5_subtitle_enable(int slot, int enabled) {
     if (slot < 0 || slot >= 8 || !g_subtitles[slot].filename) return -1;
 
     g_subtitles[slot].enabled = enabled;
 
     if (enabled) {
-        /* Disable other tracks */
         for (int i = 0; i < 8; i++) {
             if (i != slot && g_subtitles[i].filename) {
                 g_subtitles[i].enabled = 0;
@@ -225,7 +197,6 @@ int ps5_subtitle_enable(int slot, int enabled) {
     return 0;
 }
 
-/* Get subtitle text for current time */
 const char* ps5_subtitle_get_text(double current_time) {
     if (g_active_subtitle < 0) return NULL;
 
@@ -243,36 +214,29 @@ const char* ps5_subtitle_get_text(double current_time) {
     return NULL;
 }
 
-/* Get number of subtitle tracks */
 int ps5_subtitle_count(void) {
     return g_num_subtitle_tracks;
 }
 
-/* Get subtitle track language */
 const char* ps5_subtitle_get_language(int slot) {
     if (slot < 0 || slot >= 8) return NULL;
     return g_subtitles[slot].language;
 }
 
-/* Check if subtitle track is enabled */
 int ps5_subtitle_is_enabled(int slot) {
     if (slot < 0 || slot >= 8) return 0;
     return g_subtitles[slot].enabled;
 }
 
-/* Get active subtitle track */
 int ps5_subtitle_get_active(void) {
     return g_active_subtitle;
 }
 
-/* Download subtitles from OpenSubtitles */
 int ps5_subtitle_download_opensubtitles(const char *movie_hash, const char *language) {
     fprintf(stderr, "[PS5 Subtitle] OpenSubtitles download not yet implemented\n");
-    /* Would use HTTP to query OpenSubtitles API */
     return -1;
 }
 
-/* Shutdown all subtitle tracks */
 void ps5_subtitle_shutdown(void) {
     for (int i = 0; i < 8; i++) {
         if (g_subtitles[i].filename) {

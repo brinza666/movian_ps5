@@ -11,19 +11,6 @@
 #include <string.h>
 
 /* Plugin state */
-typedef struct {
-    char *id;
-    char *name;
-    char *version;
-    char *description;
-    char *author;
-    char *url;
-    char *local_path;
-    int installed;
-    int enabled;
-    duk_context *ctx;          /* Duktape context for plugin */
-    int api_version;           /* API v2 */
-} plugin_t;
 
 /* Plugin repository */
 static plugin_t g_plugins[64];
@@ -154,7 +141,7 @@ int ps5_plugin_find(const char *id) {
 }
 
 /* Execute plugin function via Duktape */
-int ps5_plugin_execute(duk_context *ctx, const char *plugin_id,
+int ps5_plugin_execute(void *duk_ctx, const char *plugin_id,
                         const char *function_name, int arg_count) {
     int slot = ps5_plugin_find(plugin_id);
     if (slot < 0) {
@@ -191,27 +178,27 @@ int ps5_plugin_execute(duk_context *ctx, const char *plugin_id,
             if (duk_peval_string(g_plugins[slot].ctx, code) != 0) {
                 fprintf(stderr, "[PS5 Plugin] Load error for %s: %s\n",
                         plugin_id, duk_safe_to_string(g_plugins[slot].ctx, -1));
-                duk_pop(g_plugins[slot].ctx);
+                duk_pop(g_plugins[slot].ctx, 1);
             }
             free(code);
         }
     }
 
     /* Call plugin function */
-    duk_ctx *pctx = g_plugins[slot].ctx;
-    duk_push_global_object(pctx);
-    duk_get_prop_string(pctx, -1, function_name);
-    if (duk_is_function(pctx, -1)) {
-        if (duk_pcall(pctx, arg_count) != 0) {
+    duk_context *ctx = g_plugins[slot].ctx;
+    duk_push_global_object(ctx);
+    duk_get_prop_string(ctx, -1, function_name);
+    if (duk_is_function(ctx, -1)) {
+        if (duk_pcall(ctx, arg_count) != 0) {
             fprintf(stderr, "[PS5 Plugin] Function error: %s\n",
-                    duk_safe_to_string(pctx, -1));
-            duk_pop(pctx);
-            duk_pop(pctx);
+                    duk_safe_to_string(ctx, -1));
+            duk_pop(ctx, 1);
+            duk_pop(ctx, 1);
             return -1;
         }
-        duk_pop(pctx);
+        duk_pop(ctx, 1);
     }
-    duk_pop(pctx);
+    duk_pop(ctx, 1);
 
     return 0;
 }

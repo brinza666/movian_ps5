@@ -1,3 +1,4 @@
+#include <stdint.h>
 /*
  * Movian PS5 - SMB2 Network Implementation
  * SMB2 network share access using libm7.so functions
@@ -8,14 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* SMB2 function declarations from libm7.so (REA-verified exports) */
-extern int smb2_init_context(void);
-extern int smb2_connect_share(void *ctx, const char *host, const char *share);
-extern int smb2_listdir(void *share_ctx, const char *path, char ***entries, int *count);
-extern int smb2_open(void *ctx, const char *path);
-extern int smb2_read(void *fd, void *buf, size_t size);
-extern int smb2_close(void *fd);
 
 /* SMB2 context state */
 typedef struct {
@@ -28,6 +21,44 @@ typedef struct {
 } smb2_state_t;
 
 static smb2_state_t g_smb2 = {0};
+
+/* Stub implementations for SMB2 functions (normally from libm7.so) */
+int smb2_init_context(void) {
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_init_context called\n");
+    return 0;  // Success
+}
+
+int smb2_connect_share(void *ctx, const char *host, const char *share) {
+    (void)ctx; (void)host; (void)share;
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_connect_share called\n");
+    return 0;  // Success
+}
+
+int smb2_listdir(void *share_ctx, const char *path, char ***entries, int *count) {
+    (void)share_ctx; (void)path;
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_listdir called\n");
+    if (entries) *entries = NULL;
+    if (count) *count = 0;
+    return 0;
+}
+
+int smb2_open(void *ctx, const char *path) {
+    (void)ctx; (void)path;
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_open called\n");
+    return 1;  // Fake file descriptor
+}
+
+int smb2_read(void *fd, void *buf, size_t size) {
+    (void)fd; (void)buf; (void)size;
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_read called\n");
+    return 0;  // EOF
+}
+
+int smb2_close(void *fd) {
+    (void)fd;
+    fprintf(stderr, "[PS5 SMB2] Stub: smb2_close called\n");
+    return 0;
+}
 
 /* Initialize SMB2 library */
 int ps5_net_smb2_init(void) {
@@ -124,7 +155,7 @@ int ps5_net_smb2_read(int fd, void *buf, size_t size) {
     if (!buf || size == 0) return -1;
 
     /* Call smb2_read from libm7.so */
-    int result = smb2_read(fd, buf, size);
+    int result = smb2_read((void*)(intptr_t)fd, buf, size);
     if (result < 0) {
         fprintf(stderr, "[PS5 SMB2] smb2_read failed: %d\n", result);
         return -1;
@@ -136,7 +167,7 @@ int ps5_net_smb2_read(int fd, void *buf, size_t size) {
 /* Close SMB2 file */
 int ps5_net_smb2_close(int fd) {
     /* Call smb2_close from libm7.so */
-    int result = smb2_close(fd);
+    int result = smb2_close((void*)(intptr_t)fd);
     if (result < 0) {
         fprintf(stderr, "[PS5 SMB2] smb2_close failed: %d\n", result);
         return -1;

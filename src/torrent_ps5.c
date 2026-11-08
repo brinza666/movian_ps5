@@ -11,20 +11,6 @@
 #include <time.h>
 
 /* Torrent state */
-typedef struct {
-    char info_hash[41];        /* SHA-1 hex */
-    char name[256];
-    char save_path[512];
-    int64_t total_size;
-    int64_t downloaded;
-    int64_t uploaded;
-    int num_peers;
-    int num_seeds;
-    double download_rate;      /* bytes/sec */
-    double upload_rate;        /* bytes/sec */
-    int state;                 /* 0=stopped, 1=starting, 2=downloading, 3=seeding, 4=error */
-    int priority;              /* piece priority for play-while-download */
-} torrent_t;
 
 /* Active torrents */
 static torrent_t g_torrents[16];

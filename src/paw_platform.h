@@ -1,8 +1,3 @@
-/*
- * Platform Abstraction Header for PS5
- * Updated with all subsystem declarations
- */
-
 #ifndef PAW_PLATFORM_PS5_H
 #define PAW_PLATFORM_PS5_H
 
@@ -12,6 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+typedef struct duk_context duk_context;
+
 
 /* Video */
 typedef struct {
@@ -67,6 +66,38 @@ int ps5_input_button_pressed(ps5_input_t *input, uint32_t button);
 ps5_input_t* ps5_input_get_global(void);
 int ps5_input_global_init(void);
 void ps5_input_global_shutdown(void);
+
+/* Media player state */
+typedef struct {
+    void *fmt_ctx;
+    int video_stream_index;
+    int audio_stream_index;
+    double duration;
+    double current_time;
+    int playing;
+    int paused;
+    double playback_speed;
+    int seek_requested;
+    double seek_target;
+} media_player_t;
+
+/* Media functions */
+int ps5_media_init(void);
+int ps5_media_open(const char *path);
+int ps5_media_play(void);
+int ps5_media_pause(void);
+int ps5_media_stop(void);
+int ps5_media_seek(double seconds);
+int ps5_media_set_speed(double speed);
+double ps5_media_get_time(void);
+double ps5_media_get_duration(void);
+int ps5_media_is_playing(void);
+int ps5_media_decode_video_frame(uint8_t **buf, int *w, int *h);
+int ps5_media_decode_audio_frame(uint8_t **buf, int *size);
+void ps5_media_close(void);
+media_player_t* ps5_media_get_global(void);
+int ps5_media_global_init(void);
+void ps5_media_global_shutdown(void);
 
 /* File System */
 int ps5_fs_exists(const char *path);
@@ -144,9 +175,11 @@ typedef struct {
     int installed;
     int enabled;
     int api_version;
+    duk_context *ctx;
 } plugin_t;
 
 int ps5_plugin_init(void);
+void ps5_plugin_load_installed(void);
 int ps5_plugin_install_from_repo(const char *plugin_id);
 int ps5_plugin_install_from_path(const char *path, const char *id);
 int ps5_plugin_enable(const char *id, int enabled);
@@ -185,33 +218,9 @@ int ps5_ui_set_setting_bool(const char *id, int val);
 int ps5_ui_set_setting_string(const char *id, const char *val);
 void ps5_ui_shutdown(void);
 
-/* Media */
-typedef struct {
-    int video_stream_index;
-    int audio_stream_index;
-    double duration;
-    double current_time;
-    int playing;
-    int paused;
-    double playback_speed;
-} media_player_t;
-
-int ps5_media_init(void);
-int ps5_media_open(const char *path);
-int ps5_media_play(void);
-int ps5_media_pause(void);
-int ps5_media_stop(void);
-int ps5_media_seek(double seconds);
-int ps5_media_set_speed(double speed);
-double ps5_media_get_time(void);
-double ps5_media_get_duration(void);
-int ps5_media_is_playing(void);
-int ps5_media_decode_video_frame(uint8_t **buf, int *w, int *h);
-int ps5_media_decode_audio_frame(uint8_t **buf, int *size);
-void ps5_media_close(void);
-media_player_t* ps5_media_get_global(void);
-int ps5_media_global_init(void);
-void ps5_media_global_shutdown(void);
+/* System utilities */
+double ps5_now_seconds(void);
+void ps5_sleep_ms(int ms);
 
 #ifdef __cplusplus
 }

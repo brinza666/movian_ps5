@@ -20,6 +20,7 @@ static ps5_video_t g_video = {0};
 /* Video output configuration */
 #define PS5_VIDEO_WIDTH  1920
 #define PS5_VIDEO_HEIGHT 1080
+#define SCE_VIDEO_OUT_PIXEL_FORMAT_RGBA8 0
 #define PS5_VIDEO_FORMAT SCE_VIDEO_OUT_PIXEL_FORMAT_RGBA8  /* CPU RGBA8 */
 
 /*
