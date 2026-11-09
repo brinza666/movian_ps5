@@ -30,7 +30,7 @@ static void Klog(const char* text) {
 }
 
 static void Klogf(const char* fmt, ...) {
-    char buf[512];
+    char buf[1024];
     va_list ap;
     va_start(ap, fmt);
     std::vsnprintf(buf, sizeof(buf), fmt, ap);
@@ -55,7 +55,7 @@ void ps5_log_init(void) {
     }
 
     /* Also log to klog for immediate visibility */
-    Klogf("=== Movian PS5 Log Start ===");
+    Klog("=== Movian PS5 Log Start ===");
     Klogf("Version: %s", kVersion);
     Klogf("TitleID: %s", kTitleId);
 }
@@ -242,13 +242,18 @@ void RenderFrame() noexcept {
     auto* video = ps5_video_get_global();
     if (!video) return;
 
+    /* Clear framebuffer */
+    ps5_video_clear(video, 0x1a, 0x1a, 0x2e, 0xFF);
+
+    /* Render UI */
     ps5_ui_render(video);
 
+    /* Render video frame if playing */
     if (ps5_media_is_playing()) {
         uint8_t* frame_buf = nullptr;
         int frame_w = 0, frame_h = 0;
         if (ps5_media_decode_video_frame(&frame_buf, &frame_w, &frame_h) > 0) {
-            // Decoded frame ready
+            // Decoded frame ready - would blit to framebuffer
         }
 
         double current_time = ps5_media_get_time();
@@ -266,6 +271,9 @@ void RenderFrame() noexcept {
             }
         }
     }
+
+    /* Flip and wait for vblank - this paces the frame rate to 60fps */
+    ps5_video_flip(video);
 }
 
 void HandleInput() noexcept {
@@ -331,6 +339,7 @@ int main() {
             }
         }
 
+        /* Small sleep to prevent 100% CPU when not rendering */
         ps5_sleep_ms(1);
     }
 

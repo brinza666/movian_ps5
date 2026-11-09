@@ -14,7 +14,7 @@ typedef struct duk_context duk_context;
 
 /* Video */
 typedef struct {
-    void *handle;
+    int handle;
     uint32_t width;
     uint32_t height;
     uint32_t pitch;
