@@ -10,6 +10,11 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdarg>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
 
 constexpr char kVersion[] = "0.2.0";
 constexpr char kTitleId[] = "PPSA99455";
@@ -17,87 +22,108 @@ constexpr double kTargetFrameTime = 1.0 / 60.0;
 
 volatile bool g_running = true;
 
-/* Debug logging to multiple locations for maximum visibility */
-static FILE* g_log_file_download0 = nullptr;
-static FILE* g_log_file_data = nullptr;
-static FILE* g_log_file_user = nullptr;
+/* Direct klog output via sceKernelDebugOutText syscall (works on PS5) */
+extern "C" int sceKernelDebugOutText(int channel, const char* text);
+
+static void Klog(const char* text) {
+    sceKernelDebugOutText(0, text);
+}
+
+static void Klogf(const char* fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    std::vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    Klog(buf);
+}
+
+/* Debug logging to file in /download0 (save data - accessible via FTP) */
+static FILE* g_log_file = nullptr;
 
 void ps5_log_init(void) {
-    /* Try /download0/movian.log (inside mounted container) */
-    g_log_file_download0 = fopen("/download0/movian.log", "w");
-    if (g_log_file_download0) {
-        fprintf(g_log_file_download0, "=== Movian PS5 Log Start ===\n");
-        fprintf(g_log_file_download0, "Version: %s\n", kVersion);
-        fprintf(g_log_file_download0, "TitleID: %s\n", kTitleId);
-        fflush(g_log_file_download0);
+    /* Ensure /download0/.movian directory exists */
+    mkdir("/download0", 0777);
+    mkdir("/download0/.movian", 0777);
+
+    g_log_file = fopen("/download0/.movian/movian.log", "w");
+    if (g_log_file) {
+        fprintf(g_log_file, "=== Movian PS5 Log Start ===\n");
+        fprintf(g_log_file, "Version: %s\n", kVersion);
+        fprintf(g_log_file, "TitleID: %s\n", kTitleId);
+        fflush(g_log_file);
     }
 
-    /* Try /data/movian.log (host filesystem) */
-    g_log_file_data = fopen("/data/movian.log", "w");
-    if (g_log_file_data) {
-        fprintf(g_log_file_data, "=== Movian PS5 Log Start ===\n");
-        fprintf(g_log_file_data, "Version: %s\n", kVersion);
-        fprintf(g_log_file_data, "TitleID: %s\n", kTitleId);
-        fflush(g_log_file_data);
-    }
-
-    /* Try /user/movian.log (host filesystem) */
-    g_log_file_user = fopen("/user/movian.log", "w");
-    if (g_log_file_user) {
-        fprintf(g_log_file_user, "=== Movian PS5 Log Start ===\n");
-        fprintf(g_log_file_user, "Version: %s\n", kVersion);
-        fprintf(g_log_file_user, "TitleID: %s\n", kTitleId);
-        fflush(g_log_file_user);
-    }
-
-    /* Always log to stderr for serial/debug */
-    fprintf(stderr, "=== Movian PS5 Log Start ===\n");
-    fprintf(stderr, "Version: %s\n", kVersion);
-    fprintf(stderr, "TitleID: %s\n", kTitleId);
+    /* Also log to klog for immediate visibility */
+    Klogf("=== Movian PS5 Log Start ===");
+    Klogf("Version: %s", kVersion);
+    Klogf("TitleID: %s", kTitleId);
 }
 
 void ps5_log_shutdown(void) {
-    if (g_log_file_download0) {
-        fprintf(g_log_file_download0, "=== Movian PS5 Log End ===\n");
-        fclose(g_log_file_download0);
-        g_log_file_download0 = nullptr;
+    if (g_log_file) {
+        fprintf(g_log_file, "=== Movian PS5 Log End ===\n");
+        fclose(g_log_file);
+        g_log_file = nullptr;
     }
-    if (g_log_file_data) {
-        fprintf(g_log_file_data, "=== Movian PS5 Log End ===\n");
-        fclose(g_log_file_data);
-        g_log_file_data = nullptr;
+    Klog("=== Movian PS5 Log End ===");
+}
+
+/* Make files in a directory tree world-readable/writable for FTP access */
+static int OpenUpTree(const char* path) {
+    struct stat st;
+    if (lstat(path, &st) != 0) return 0;
+    int failed = 0;
+    if (S_ISDIR(st.st_mode)) {
+        if (chmod(path, 0777) != 0) ++failed;
+        DIR* dir = opendir(path);
+        if (!dir) return failed;
+        while (struct dirent* e = readdir(dir)) {
+            if (!std::strcmp(e->d_name, ".") || !std::strcmp(e->d_name, "..")) continue;
+            char subpath[1024];
+            std::snprintf(subpath, sizeof(subpath), "%s/%s", path, e->d_name);
+            failed += OpenUpTree(subpath);
+        }
+        closedir(dir);
+    } else if (S_ISREG(st.st_mode) && chmod(path, 0666) != 0) {
+        ++failed;
     }
-    if (g_log_file_user) {
-        fprintf(g_log_file_user, "=== Movian PS5 Log End ===\n");
-        fclose(g_log_file_user);
-        g_log_file_user = nullptr;
+    return failed;
+}
+
+/* Create directory tree with world-writable permissions */
+static bool MakeDirs(const char* path) {
+    char tmp[1024];
+    std::strncpy(tmp, path, sizeof(tmp) - 1);
+    tmp[sizeof(tmp) - 1] = '\0';
+    
+    for (size_t pos = 1; pos <= std::strlen(tmp); ++pos) {
+        if (pos != std::strlen(tmp) && tmp[pos] != '/') continue;
+        tmp[pos] = '\0';
+        if (mkdir(tmp, 0777) != 0 && errno != EEXIST) {
+            Klogf("[MOVIAN] mkdir %s: errno %d", tmp, errno);
+            return false;
+        }
+        tmp[pos] = '/';
     }
-    fprintf(stderr, "=== Movian PS5 Log End ===\n");
+    return true;
 }
 
 void ps5_log(const char* fmt, ...) {
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    int len = std::vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     if (len <= 0) return;
 
-    /* Log to stderr */
-    fprintf(stderr, "%s\n", buf);
+    /* Output to klog (visible in klogsrv on port 3232) */
+    Klogf("[MOVIAN] %s", buf);
 
-    /* Log to all files */
-    if (g_log_file_download0) {
-        fprintf(g_log_file_download0, "%s\n", buf);
-        fflush(g_log_file_download0);
-    }
-    if (g_log_file_data) {
-        fprintf(g_log_file_data, "%s\n", buf);
-        fflush(g_log_file_data);
-    }
-    if (g_log_file_user) {
-        fprintf(g_log_file_user, "%s\n", buf);
-        fflush(g_log_file_user);
+    /* Write to log file in /download0/.movian/ */
+    if (g_log_file) {
+        fprintf(g_log_file, "%s\n", buf);
+        fflush(g_log_file);
     }
 }
 
@@ -120,6 +146,10 @@ bool InitAll() noexcept {
     LOG("TitleID: %s", kTitleId);
     LOG("Firmware: 4.03");
     LOG("========================================");
+
+    /* Fix file permissions in /download0/.movian for FTP access */
+    MakeDirs("/download0/.movian");
+    OpenUpTree("/download0/.movian");
 
     LOG("Initializing video...");
     if (ps5_video_global_init() != 0) {
@@ -200,6 +230,9 @@ void ShutdownAll() noexcept {
     ps5_input_global_shutdown();
     ps5_audio_global_shutdown();
     ps5_video_global_shutdown();
+
+    /* Fix permissions on shutdown for FTP access */
+    OpenUpTree("/download0/.movian");
 
     ps5_log_shutdown();
     LOG("Movian PS5 shutdown complete");
