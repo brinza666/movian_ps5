@@ -26,11 +26,21 @@ volatile bool g_running = true;
 extern "C" int sceKernelDebugOutText(int channel, const char* text);
 
 static void Klog(const char* text) {
-    sceKernelDebugOutText(0, text);
+    /* Split long messages to avoid kernel log buffer overflow */
+    const size_t max_len = 900;
+    size_t len = std::strlen(text);
+    for (size_t pos = 0; pos < len; pos += max_len) {
+        size_t chunk_len = len - pos > max_len ? max_len : len - pos;
+        char chunk[max_len + 2];
+        std::memcpy(chunk, text + pos, chunk_len);
+        chunk[chunk_len] = '\n';
+        chunk[chunk_len + 1] = '\0';
+        sceKernelDebugOutText(0, chunk);
+    }
 }
 
 static void Klogf(const char* fmt, ...) {
-    char buf[1024];
+    char buf[512];  /* Smaller buffer to avoid overflow */
     va_list ap;
     va_start(ap, fmt);
     std::vsnprintf(buf, sizeof(buf), fmt, ap);

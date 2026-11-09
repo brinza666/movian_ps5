@@ -1,8 +1,7 @@
 /*
  * Movian PS5 - Video Output Implementation
  * sceVideoOut integration for PS5 native display
- * Direct linking against libSceVideoOut.sprx with CORRECT symbol names
- * Verified via objdump -T on libSceVideoOut.so
+ * Direct linking with CORRECT symbols, graceful error handling
  */
 
 #include "paw_platform.h"
@@ -37,6 +36,7 @@ static ps5_video_t g_video = {0};
 /*
  * Open video output device
  * sceVideoOutOpen -> register buffers -> flip -> vblank pattern
+ * Returns 0 on success, -1 on failure (non-fatal, runs headless)
  */
 int ps5_video_open(ps5_video_t *video) {
     if (!video) return -1;
@@ -49,19 +49,20 @@ int ps5_video_open(ps5_video_t *video) {
     /* Open video output device */
     int result = sceVideoOutOpen(0, SCE_VIDEO_OUT_BINDING_MAIN, 0);
     if (result < 0) {
-        fprintf(stderr, "[PS5 Video] sceVideoOutOpen failed: 0x%x\n", result);
+        fprintf(stderr, "[PS5 Video] sceVideoOutOpen failed: 0x%x (running headless)\n", result);
         return -1;
     }
     video->handle = result;
 
-    /* Query display resolution */
+    /* Query display resolution - try primary function */
     SceVideoOutState state;
     memset(&state, 0, sizeof(state));
     result = sceVideoOutGetResolutionStatus(video->handle, &state);
     if (result < 0) {
-        fprintf(stderr, "[PS5 Video] sceVideoOutGetResolutionStatus failed: 0x%x\n", result);
-        sceVideoOutClose(video->handle);
-        return -1;
+        fprintf(stderr, "[PS5 Video] sceVideoOutGetResolutionStatus failed: 0x%x, trying fallback\n", result);
+        /* Fallback: use default resolution */
+        state.screen_width = PS5_VIDEO_WIDTH;
+        state.screen_height = PS5_VIDEO_HEIGHT;
     }
 
     /* Use display resolution if available */
@@ -90,7 +91,7 @@ int ps5_video_open(ps5_video_t *video) {
     };
     result = sceVideoOutRegisterBuffers(video->handle, buffers, 2, fb_size / 2);
     if (result < 0) {
-        fprintf(stderr, "[PS5 Video] sceVideoOutRegisterBuffers failed: 0x%x\n", result);
+        fprintf(stderr, "[PS5 Video] sceVideoOutRegisterBuffers failed: 0x%x (running headless)\n", result);
         free(fb_ptr);
         sceVideoOutClose(video->handle);
         return -1;
@@ -212,9 +213,20 @@ ps5_video_t* ps5_video_get_global(void) {
     return &g_video;
 }
 
-/* Initialize global video */
+/* Initialize global video - non-fatal, returns 0 even on failure */
 int ps5_video_global_init(void) {
-    return ps5_video_open(&g_video);
+    int result = ps5_video_open(&g_video);
+    if (result < 0) {
+        fprintf(stderr, "[PS5 Video] Initialization failed, running headless\n");
+        /* Zero out the video struct for headless mode */
+        memset(&g_video, 0, sizeof(g_video));
+        g_video.width = PS5_VIDEO_WIDTH;
+        g_video.height = PS5_VIDEO_HEIGHT;
+        g_video.format = PS5_VIDEO_FORMAT;
+        g_video.pitch = PS5_VIDEO_WIDTH * 4;
+        return 0;  /* Non-fatal */
+    }
+    return 0;
 }
 
 /* Shutdown global video */
