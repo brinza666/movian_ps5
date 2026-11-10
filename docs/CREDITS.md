@@ -8,7 +8,7 @@ headers, and loaders. This page is the canonical attribution list.
 | Work | People | How we use it |
 | --- | --- | --- |
 | [andoma/movian](https://github.com/andoma/movian) (Showtime) | Andreas Öman | Original media center, flat skin, plugin model |
-| M7 7.0.273 | Dean Kasabow — [apps.movian.eu](https://apps.movian.eu/) | PS3 reference player this port follows |
+| M7 7.0.273 (WSL/Linux/PS3) / 7.0.288 (Android) | Dean Kasabow — [apps.movian.eu](https://apps.movian.eu/) | Reference player; live WSL copy harvested 11 Nov 2026 ([M7_CAPABILITIES.md](M7_CAPABILITIES.md)) |
 | [czz/movian-go](https://github.com/czz/movian-go) | czz | Idiomatic Go rewrite: plugin API v2, BitTorrent backend, settings, USER_GUIDE. **Behaviour reference, not the PS5 binary** |
 | Alternate plugin feed | community packagers | `plugins/repo.json`, advertised as https://bit.ly/mprepo |
 

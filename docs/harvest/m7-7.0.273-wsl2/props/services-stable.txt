@@ -1,0 +1,7 @@
+stable (ref:2 xref:2) is a directory
+  <unnamed>
+  <unnamed>
+  <unnamed>
+  <unnamed>
+  <unnamed>
+  <unnamed>

@@ -1,0 +1,11 @@
+model (ref:2 xref:1) is a directory
+  type
+  metadata
+  nodes
+  loading
+  loadingStatus
+  contents
+  safeui
+  mayadd
+  options
+  canPaste

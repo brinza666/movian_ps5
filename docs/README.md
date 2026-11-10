@@ -7,6 +7,8 @@
 | [PORTING_PLAN.md](PORTING_PLAN.md) | Phased work |
 | [STATUS.md](STATUS.md) | Honest capability table |
 | [PRODUCT.md](PRODUCT.md) | What Movian should feel like |
+| [M7_CAPABILITIES.md](M7_CAPABILITIES.md) | Official M7 inventory (live WSL2 + Android) |
+| [harvest/](harvest/README.md) | Raw extracts; binaries are gitignored |
 | [BUILDING.md](BUILDING.md) | WSL build |
 | [DEPLOY.md](DEPLOY.md) | FTP, ShadowMount, klog |
 | [CREDITS.md](CREDITS.md) | Authors of the tools we rely on |

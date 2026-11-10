@@ -40,9 +40,11 @@ sent to port 9021.
 | Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |
 | Go `movian-go` ELF | Abandoned for PS5 (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |
 
-Product behaviour we are aiming at is documented from M7 and movian-go in
+Product behaviour we are aiming at is documented from a **live** M7 7.0.273
+WSL install in [docs/M7_CAPABILITIES.md](docs/M7_CAPABILITIES.md) and
 [docs/PRODUCT.md](docs/PRODUCT.md). The engineering plan is
-[docs/PORTING_PLAN.md](docs/PORTING_PLAN.md).
+[docs/PORTING_PLAN.md](docs/PORTING_PLAN.md). Run the reference with
+`wsl -d Ubuntu-24.04 -- showtime`.
 
 ## Why we copy VLC, not Go
 

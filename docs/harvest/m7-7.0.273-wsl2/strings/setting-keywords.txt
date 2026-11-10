@@ -1,0 +1,967 @@
+                       Intended for plugin development
+   --disable-upnp    - Disable UPNP/DLNA stack.
+   --plugin-repo     - URL to plugin repository
+   -p                - Path to plugin directory to load
+  green_metadata_num_pictures: %d
+  green_metadata_num_seconds: %d
+  green_metadata_period_type: %d
+  green_metadata_type: %d
+ (metadata)
+"urn:schemas-upnp-org:service:%s:%d#%s"
+%s FTP server (%s  Version %s) ready.
+%s is not a recognized subtitle format
+%s subtitle scan for %s (imdbid:%s) year:%d season:%d episode:%d duration:%d opensubhash:%016lx
+%s/bittorrentcache
+%s/installedplugins
+%s/plugins/%s
+%s: Decoded metadata
+%s: Metadata %sfound
+%s:%d malformed packet smbhdrlen %d
+%sMetadata:
+%sSERVER: Movian,%s,UPnP/1.0,Movian,%s
+--disable-upnp
+--plugin-repo
+/api/stpp
+/home/dean/movian_linux/src/backend/bittorrent/magnet.c
+/home/dean/movian_linux/src/backend/bittorrent/tracker.c
+/home/dean/movian_linux/src/ecmascript/es_subtitles.c
+/home/dean/movian_linux/src/fileaccess/smb/fa_nativesmb.c
+/home/dean/movian_linux/src/fileaccess/smb2/fa_libsmb2_pool.c
+/home/dean/movian_linux/src/metadata/browsemdb.c
+/home/dean/movian_linux/src/metadata/metadata_sources.c
+/home/dean/movian_linux/src/metadata/metadb.c
+/home/dean/movian_linux/src/plugins.c
+/home/dean/movian_linux/src/upnp/upnp_event.c
+/upnp/AVTransport/control
+/upnp/AVTransport/scpd.xml
+/upnp/AVTransport/subscribe
+/upnp/ConnectionManager/control
+/upnp/ConnectionManager/scpd.xml
+/upnp/ConnectionManager/subscribe
+/upnp/RenderingControl/control
+/upnp/RenderingControl/scpd.xml
+/upnp/RenderingControl/subscribe
+/upnp/description.xml
+::upnp:rootdevice
+::urn:schemas-upnp-org:device:MediaRenderer:2
+::urn:schemas-upnp-org:service:AVTransport:2
+::urn:schemas-upnp-org:service:ConnectionManager:2
+::urn:schemas-upnp-org:service:RenderingControl:2
+</upnp:album>
+</upnp:albumArtURI>
+</upnp:artist>
+<?xml version="1.0" encoding="utf-8"?><e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
+<Event xmlns="urn:schemas-upnp-org:metadata-1-0/RCS/"><InstanceID val="0">
+<Showtime-Main>/_Go/Playqueue
+<u:%sResponse xmlns:u="urn:schemas-upnp-org:service:%s:%d">
+<upnp:album xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+<upnp:albumArtURI xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+<upnp:artist xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+?https://www.thetvdb.com/api/
+?leftPx
+A hardware frames or device context is required for hardware accelerated decoding.
+AVSubtitleRect
+Added new bookmark: %s
+Allocate streams according to the onMetaData array
+Allow Changing Metadata Per-Frame
+Allow remote control
+Alternate plugin Repository URL
+Any subtitle in central folder
+Any subtitle in same folder as video
+Applications and installed plugins
+Attached picture metadata block too big %u
+Audio & Subtitles
+Auto installed plugin %s (Version %s)
+Auto-start plugin: %s
+Available plugins
+BITTORRENT
+BitTorrent
+BitTorrent protocol
+Bookmark at %d.
+Bookmark moved to %d.
+Bookmarks
+Browse available plugins
+BrowseMetadata
+Can only use seal with SMB3
+Cant handle upnp:class %s (%s)
+Central subtitle folder
+Character encoding is only supported with subtitles codecs
+Clear all metadata
+Clearing all metadata means losing <b>all</b> metadata cached from external sources such as themoviedb.org, etc
+Codec '%s' is bitmap-based, subtitles character encoding will be ignored
+Content Light Level Metadata, MaxCLL=%d, MaxFALL=%d
+Content Light Level Metadata:
+Content light level metadata
+Correcting truncated metadata picture size from %u to %u
+Corrupt plugin bundle
+Cross-share SMB2 rename not supported
+CurrentTrackMetaData
+CurrentURIMetaData
+D D"D$D&D(D*D,D.D0D2D4D6D8D:D<D>D@DBDDDFDQDSDUDWDYD^D`DbDdDfDhDjDlDnDpDrDtDvDxDzD
+DLNA.ORG_PN=JPEG_TN
+DVB subtitles with multiple languages
+DVD playback is not supported
+DVDSCR
+DVDSCREENER
+DVDVIDEO-VTS
+D_WEBVTT/METADATA
+D_WEBVTT/SUBTITLES
+Debug Bittorrent disk I/O
+Debug Bittorrent general events
+Debug Bittorrent peer connections
+Debug Bittorrent peer downloading
+Debug Bittorrent peer uploading
+Debug Bittorrent tracker communication
+Debug FTP Client
+Debug FTP Server
+Debug HLS
+Debug SMB/CIFS (Windows File Sharing)
+Debug UPNP
+Debug metadata lookups
+Deinterlacer created and configured
+Device type %s expected for hardware decoding, but got %s.
+Downloading plugin %s from %s
+Dropping %d duplicated subtitle events
+Dump full metadata of the onMetadata
+Empty Mastering Display Metadata box
+Enable FTP server
+EnableScreenSaver
+Export full XMP metadata
+Export metadata as side data
+Export unrecognized metadata entries
+FTP-SERVER
+FTP-session
+Failed to add iovector for set-info passthrough buffer
+Failed to allocate smb2_url
+Failed to allocate smb2dir.
+Failed to allocate smbfh
+Failed to decode smb2 header: %s
+Failed to download plugin %s from %s -- %s
+Failed to load TMDB configuration
+Failed to open smb2 socket. Errno:%s(%d).
+Field "id" not found in plugin.json
+First vector is not same size as smb2 header
+Folder for screensaver images
+Force primary stream to resynchronize due to subtitle switch
+Force subtitles to reside on video frame
+Formatting node at %d is before bookmark at %d; decrementing.
+G;FFMETADATA
+GET /api/stpp HTTP/1.1
+Generic settings for video subtitles
+Got bad metadata piece size (%d/%d) is %d bytes
+Got metadata piece %d/%d (%d bytes) from peer %s
+Green Metadata Info SEI message
+HDDVDRIP
+HDR Dynamic Metadata SMPTE2094-40 (HDR10+)
+HLS %s %s
+HLS SD width limit
+HLS master playlist detected
+HLS player done
+HLS%s %s
+HLS%s %s%dx%d
+HLS%s %s%dx%d (%d kb/s)
+Icy-MetaData
+Installed plugin at %s has unknown type %s but keeping anyway, since it might be upgraded
+Installed plugins
+Insufficient RLE data for subtitle
+Invalid DVB subtitles stream extradata!
+Invalid SMB2 URL
+Invalid SMB2 URL: %s
+Invalid TMDB url
+Invalid UTF-8 in decoded subtitles text; maybe missing -sub_charenc option
+Invalid media type for subtitles
+Invalid metadata size
+Invalid spherical metadata found
+Launch plugin on M7 start (bgTV, skyF1)
+LeftPress
+Loaded dev plugin %s
+METADATA_BLOCK_PICTURE
+Mastering Display Metadata:
+Mastering display metadata
+Metadata Update
+Metadata configuration and provider settings
+Metadata loaded from <b>%s</b> based on %s
+Metadata mode
+Metadata relevant to a downmix procedure
+Metadata source
+MetadataSection
+MiniDLNA
+Moving bookmark to %d.
+New bookmark
+NextAVTransportURIMetaData
+No sequence header available: unable to parse scalability metadata.
+Not a WEBDAV share
+Number of extra hardware frames to allocate for the user
+Only show forced subtitles
+Out of memory while enumerating SMB2 shares
+Out of memory while opening SMB2 file
+Out of memory while opening SMB2 session
+Out of memory while parsing SMB2 URL
+Out of memory while preparing SMB2 login
+Out of memory while scanning SMB2 directory
+PCM DVD unsupported sample depth %i
+PGS subtitle decoder
+Playqueue finished
+Plugin
+Plugin "%s" already loaded
+Plugin %s %s has been uninstalled because it may cause problems.
+Plugin %s from %s -- not a valid bundle
+Plugin %s has been uninstalled - %s
+Plugin %s valid ZIP archive %d bytes
+Plugin cannot be blacklisted: %s
+Plugin categories
+Plugin main:      Compile:%dms Exec:%dms
+Plugins
+Plugins %s
+Pre-resolve failed for dot-less name '%s' (DNS: %s; NBT: no answer) -- falling back to libsmb2's own resolution
+Preferred views from plugins
+Primary subtitle language code
+Providers for Subtitles
+Read past end of metadata
+Refresh metadata
+Registered %s (%s) via SMB2 probe
+Reloaded dev plugin %s
+Remote control
+Remove bookmark
+Removed bookmark: %s
+Requesting metadata piece %d
+Reset subtitle font to default
+Restricted plugin [%s] -- Repository not authorized
+Restricted plugin [%s] -- Repository not authorized [%s]
+Restricted plugin [%s] -- Server not authorized
+Restricted plugin [%s] -- Server not authorized [%s]
+SMB Error 0x%08x
+SMB Extended Attributes
+SMB Large Buffer
+SMB2 %s timed out
+SMB2 URL does not identify a file
+SMB2 URL does not identify a path
+SMB2 operation timed out
+SMB2 probe of %s failed -- %s
+SMB2 probe of %s: negotiated dialect 0x%04x but anonymous session refused (%s) -- confirming via negotiate only
+SMB2 server '%s'
+SMB2 session closed
+SMB2 session is disconnected
+SMB2 socket poll failed
+SMB2 transport is dead
+SMB2AESCCM
+SMB2AESCMAC
+SMB2_STATUS_ABIOS_INVALID_COMMAND
+SMB2_STATUS_ABIOS_INVALID_LID
+SMB2_STATUS_ABIOS_INVALID_SELECTOR
+SMB2_STATUS_ABIOS_LID_ALREADY_OWNED
+SMB2_STATUS_ABIOS_LID_NOT_EXIST
+SMB2_STATUS_ABIOS_NOT_LID_OWNER
+SMB2_STATUS_ABIOS_NOT_PRESENT
+SMB2_STATUS_ABIOS_SELECTOR_NOT_AVAILABLE
+SMB2_STATUS_ACCESS_VIOLATION
+SMB2_STATUS_ACCOUNT_EXPIRED
+SMB2_STATUS_ACCOUNT_LOCKED_OUT
+SMB2_STATUS_ADAPTER_HARDWARE_ERROR
+SMB2_STATUS_ADDRESS_ALREADY_ASSOCIATED
+SMB2_STATUS_ADDRESS_ALREADY_EXISTS
+SMB2_STATUS_ADDRESS_CLOSED
+SMB2_STATUS_ADDRESS_NOT_ASSOCIATED
+SMB2_STATUS_AGENTS_EXHAUSTED
+SMB2_STATUS_ALIAS_EXISTS
+SMB2_STATUS_ALLOCATE_BUCKET
+SMB2_STATUS_ALLOTTED_SPACE_EXCEEDED
+SMB2_STATUS_APP_INIT_FAILURE
+SMB2_STATUS_ARRAY_BOUNDS_EXCEEDED
+SMB2_STATUS_AUDIT_FAILED
+SMB2_STATUS_BACKUP_CONTROLLER
+SMB2_STATUS_BAD_COMPRESSION_BUFFER
+SMB2_STATUS_BAD_DESCRIPTOR_FORMAT
+SMB2_STATUS_BAD_DEVICE_TYPE
+SMB2_STATUS_BAD_DLL_ENTRYPOINT
+SMB2_STATUS_BAD_FUNCTION_TABLE
+SMB2_STATUS_BAD_IMPERSONATION_LEVEL
+SMB2_STATUS_BAD_INHERITANCE_ACL
+SMB2_STATUS_BAD_INITIAL_PC
+SMB2_STATUS_BAD_INITIAL_STACK
+SMB2_STATUS_BAD_LOGON_SESSION_STATE
+SMB2_STATUS_BAD_MASTER_BOOT_RECORD
+SMB2_STATUS_BAD_NETWORK_PATH
+SMB2_STATUS_BAD_REMOTE_ADAPTER
+SMB2_STATUS_BAD_SERVICE_ENTRYPOINT
+SMB2_STATUS_BAD_STACK
+SMB2_STATUS_BAD_TOKEN_TYPE
+SMB2_STATUS_BAD_VALIDATION_CLASS
+SMB2_STATUS_BAD_WORKING_SET_LIMIT
+SMB2_STATUS_BUFFER_TOO_SMALL
+SMB2_STATUS_CANNOT_IMPERSONATE
+SMB2_STATUS_CANNOT_LOAD_REGISTRY_FILE
+SMB2_STATUS_CANT_ACCESS_DOMAIN_INFO
+SMB2_STATUS_CANT_DISABLE_MANDATORY
+SMB2_STATUS_CANT_OPEN_ANONYMOUS
+SMB2_STATUS_CANT_TERMINATE_SELF
+SMB2_STATUS_CANT_WAIT
+SMB2_STATUS_CHILD_MUST_BE_VOLATILE
+SMB2_STATUS_CLIENT_SERVER_PARAMETERS_INVALID
+SMB2_STATUS_COMMITMENT_LIMIT
+SMB2_STATUS_CONFLICTING_ADDRESSES
+SMB2_STATUS_CONNECTION_ABORTED
+SMB2_STATUS_CONNECTION_ACTIVE
+SMB2_STATUS_CONNECTION_COUNT_LIMIT
+SMB2_STATUS_CONNECTION_DISCONNECTED
+SMB2_STATUS_CONNECTION_INVALID
+SMB2_STATUS_CONNECTION_IN_USE
+SMB2_STATUS_CONNECTION_REFUSED
+SMB2_STATUS_CONNECTION_RESET
+SMB2_STATUS_CONTROL_C_EXIT
+SMB2_STATUS_CONVERT_TO_LARGE
+SMB2_STATUS_COULD_NOT_INTERPRET
+SMB2_STATUS_CTL_FILE_NOT_SUPPORTED
+SMB2_STATUS_DATA_LATE_ERROR
+SMB2_STATUS_DATA_NOT_ACCEPTED
+SMB2_STATUS_DATA_OVERRUN
+SMB2_STATUS_DEBUG_ATTACH_FAILED
+SMB2_STATUS_DEVICE_ALREADY_ATTACHED
+SMB2_STATUS_DEVICE_CONFIGURATION_ERROR
+SMB2_STATUS_DEVICE_DOES_NOT_EXIST
+SMB2_STATUS_DEVICE_NOT_CONNECTED
+SMB2_STATUS_DEVICE_NOT_PARTITIONED
+SMB2_STATUS_DEVICE_NOT_READY
+SMB2_STATUS_DEVICE_POWER_FAILURE
+SMB2_STATUS_DEVICE_PROTOCOL_ERROR
+SMB2_STATUS_DISK_CORRUPT_ERROR
+SMB2_STATUS_DISK_OPERATION_FAILED
+SMB2_STATUS_DISK_RECALIBRATE_FAILED
+SMB2_STATUS_DISK_RESET_FAILED
+SMB2_STATUS_DLL_INIT_FAILED
+SMB2_STATUS_DLL_NOT_FOUND
+SMB2_STATUS_DOMAIN_CONTROLLER_NOT_FOUND
+SMB2_STATUS_DOMAIN_CTRLR_CONFIG_ERROR
+SMB2_STATUS_DOMAIN_EXISTS
+SMB2_STATUS_DOMAIN_LIMIT_EXCEEDED
+SMB2_STATUS_DOMAIN_TRUST_INCONSISTENT
+SMB2_STATUS_DRIVER_CANCEL_TIMEOUT
+SMB2_STATUS_DRIVER_ENTRYPOINT_NOT_FOUND
+SMB2_STATUS_DRIVER_INTERNAL_ERROR
+SMB2_STATUS_DRIVER_ORDINAL_NOT_FOUND
+SMB2_STATUS_DUPLICATE_NAME
+SMB2_STATUS_DUPLICATE_OBJECTID
+SMB2_STATUS_EAS_NOT_SUPPORTED
+SMB2_STATUS_EA_CORRUPT_ERROR
+SMB2_STATUS_EA_TOO_LARGE
+SMB2_STATUS_ENTRYPOINT_NOT_FOUND
+SMB2_STATUS_EOM_OVERFLOW
+SMB2_STATUS_EVENTLOG_CANT_START
+SMB2_STATUS_EVENTLOG_FILE_CHANGED
+SMB2_STATUS_EVENTLOG_FILE_CORRUPT
+SMB2_STATUS_FAIL_CHECK
+SMB2_STATUS_FILES_OPEN
+SMB2_STATUS_FILE_CORRUPT_ERROR
+SMB2_STATUS_FILE_FORCED_CLOSED
+SMB2_STATUS_FILE_INVALID
+SMB2_STATUS_FILE_IS_OFFLINE
+SMB2_STATUS_FLOAT_DENORMAL_OPERAND
+SMB2_STATUS_FLOAT_DIVIDE_BY_ZERO
+SMB2_STATUS_FLOAT_INEXACT_RESULT
+SMB2_STATUS_FLOAT_INVALID_OPERATION
+SMB2_STATUS_FLOAT_OVERFLOW
+SMB2_STATUS_FLOAT_STACK_CHECK
+SMB2_STATUS_FLOAT_UNDERFLOW
+SMB2_STATUS_FLOPPY_BAD_REGISTERS
+SMB2_STATUS_FLOPPY_ID_MARK_NOT_FOUND
+SMB2_STATUS_FLOPPY_UNKNOWN_ERROR
+SMB2_STATUS_FLOPPY_VOLUME
+SMB2_STATUS_FLOPPY_WRONG_CYLINDER
+SMB2_STATUS_FOUND_OUT_OF_SCOPE
+SMB2_STATUS_FREE_VM_NOT_AT_BASE
+SMB2_STATUS_FS_DRIVER_REQUIRED
+SMB2_STATUS_FT_MISSING_MEMBER
+SMB2_STATUS_FT_ORPHANING
+SMB2_STATUS_FULLSCREEN_MODE
+SMB2_STATUS_GENERIC_NOT_MAPPED
+SMB2_STATUS_GRACEFUL_DISCONNECT
+SMB2_STATUS_GROUP_EXISTS
+SMB2_STATUS_GUIDS_EXHAUSTED
+SMB2_STATUS_HANDLE_NOT_WAITABLE
+SMB2_STATUS_HOST_UNREACHABLE
+SMB2_STATUS_ILLEGAL_CHARACTER
+SMB2_STATUS_ILLEGAL_FLOAT_CONTEXT
+SMB2_STATUS_ILLEGAL_INSTRUCTION
+SMB2_STATUS_ILL_FORMED_PASSWORD
+SMB2_STATUS_ILL_FORMED_SERVICE_ENTRY
+SMB2_STATUS_IMAGE_ALREADY_LOADED
+SMB2_STATUS_IMAGE_CHECKSUM_MISMATCH
+SMB2_STATUS_IMAGE_MP_UP_MISMATCH
+SMB2_STATUS_INCOMPATIBLE_FILE_MAP
+SMB2_STATUS_INFO_LENGTH_MISMATCH
+SMB2_STATUS_INSTANCE_NOT_AVAILABLE
+SMB2_STATUS_INSTRUCTION_MISALIGNMENT
+SMB2_STATUS_INSUFFICIENT_LOGON_INFO
+SMB2_STATUS_INSUFFICIENT_RESOURCES
+SMB2_STATUS_INTEGER_DIVIDE_BY_ZERO
+SMB2_STATUS_INTEGER_OVERFLOW
+SMB2_STATUS_INTERNAL_DB_CORRUPTION
+SMB2_STATUS_INTERNAL_DB_ERROR
+SMB2_STATUS_INTERNAL_ERROR
+SMB2_STATUS_INVALID_ACCOUNT_NAME
+SMB2_STATUS_INVALID_ACL
+SMB2_STATUS_INVALID_ADDRESS
+SMB2_STATUS_INVALID_ADDRESS_COMPONENT
+SMB2_STATUS_INVALID_ADDRESS_WILDCARD
+SMB2_STATUS_INVALID_BLOCK_LENGTH
+SMB2_STATUS_INVALID_BUFFER_SIZE
+SMB2_STATUS_INVALID_CID
+SMB2_STATUS_INVALID_COMPUTER_NAME
+SMB2_STATUS_INVALID_CONNECTION
+SMB2_STATUS_INVALID_DEVICE_STATE
+SMB2_STATUS_INVALID_DISPOSITION
+SMB2_STATUS_INVALID_DOMAIN_ROLE
+SMB2_STATUS_INVALID_DOMAIN_STATE
+SMB2_STATUS_INVALID_FILE_FOR_SECTION
+SMB2_STATUS_INVALID_GROUP_ATTRIBUTES
+SMB2_STATUS_INVALID_HW_PROFILE
+SMB2_STATUS_INVALID_ID_AUTHORITY
+SMB2_STATUS_INVALID_IMAGE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_LE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_NE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_NOT_MZ
+SMB2_STATUS_INVALID_IMAGE_PROTECT
+SMB2_STATUS_INVALID_IMAGE_WIN_16
+SMB2_STATUS_INVALID_INFO_CLASS
+SMB2_STATUS_INVALID_LDT_DESCRIPTOR
+SMB2_STATUS_INVALID_LDT_OFFSET
+SMB2_STATUS_INVALID_LDT_SIZE
+SMB2_STATUS_INVALID_LEVEL
+SMB2_STATUS_INVALID_LOGON_TYPE
+SMB2_STATUS_INVALID_MEMBER
+SMB2_STATUS_INVALID_NETWORK_RESPONSE
+SMB2_STATUS_INVALID_OPLOCK_PROTOCOL
+SMB2_STATUS_INVALID_OWNER
+SMB2_STATUS_INVALID_PAGE_PROTECTION
+SMB2_STATUS_INVALID_PARAMETER_1
+SMB2_STATUS_INVALID_PARAMETER_10
+SMB2_STATUS_INVALID_PARAMETER_11
+SMB2_STATUS_INVALID_PARAMETER_12
+SMB2_STATUS_INVALID_PARAMETER_2
+SMB2_STATUS_INVALID_PARAMETER_3
+SMB2_STATUS_INVALID_PARAMETER_4
+SMB2_STATUS_INVALID_PARAMETER_5
+SMB2_STATUS_INVALID_PARAMETER_6
+SMB2_STATUS_INVALID_PARAMETER_7
+SMB2_STATUS_INVALID_PARAMETER_8
+SMB2_STATUS_INVALID_PARAMETER_9
+SMB2_STATUS_INVALID_PARAMETER_MIX
+SMB2_STATUS_INVALID_PIPE_STATE
+SMB2_STATUS_INVALID_PLUGPLAY_DEVICE_PATH
+SMB2_STATUS_INVALID_PORT_ATTRIBUTES
+SMB2_STATUS_INVALID_PRIMARY_GROUP
+SMB2_STATUS_INVALID_QUOTA_LOWER
+SMB2_STATUS_INVALID_READ_MODE
+SMB2_STATUS_INVALID_SECURITY_DESCR
+SMB2_STATUS_INVALID_SERVER_STATE
+SMB2_STATUS_INVALID_SID
+SMB2_STATUS_INVALID_SUB_AUTHORITY
+SMB2_STATUS_INVALID_SYSTEM_SERVICE
+SMB2_STATUS_INVALID_UNWIND_TARGET
+SMB2_STATUS_INVALID_USER_BUFFER
+SMB2_STATUS_INVALID_VARIANT
+SMB2_STATUS_INVALID_VOLUME_LABEL
+SMB2_STATUS_INVALID_WORKSTATION
+SMB2_STATUS_IN_PAGE_ERROR
+SMB2_STATUS_IO_DEVICE_ERROR
+SMB2_STATUS_IO_PRIVILEGE_FAILED
+SMB2_STATUS_IO_TIMEOUT
+SMB2_STATUS_IP_ADDRESS_CONFLICT1
+SMB2_STATUS_IP_ADDRESS_CONFLICT2
+SMB2_STATUS_KEY_DELETED
+SMB2_STATUS_KEY_HAS_CHILDREN
+SMB2_STATUS_LAST_ADMIN
+SMB2_STATUS_LICENSE_QUOTA_EXCEEDED
+SMB2_STATUS_LINK_FAILED
+SMB2_STATUS_LINK_TIMEOUT
+SMB2_STATUS_LM_CROSS_ENCRYPTION_REQUIRED
+SMB2_STATUS_LOCAL_DISCONNECT
+SMB2_STATUS_LOGIN_TIME_RESTRICTION
+SMB2_STATUS_LOGIN_WKSTA_RESTRICTION
+SMB2_STATUS_LOGON_NOT_GRANTED
+SMB2_STATUS_LOGON_SERVER_CONFLICT
+SMB2_STATUS_LOGON_SESSION_COLLISION
+SMB2_STATUS_LOGON_SESSION_EXISTS
+SMB2_STATUS_LOGON_TYPE_NOT_GRANTED
+SMB2_STATUS_LOG_FILE_FULL
+SMB2_STATUS_LOST_WRITEBEHIND_DATA
+SMB2_STATUS_LPC_REPLY_LOST
+SMB2_STATUS_LUIDS_EXHAUSTED
+SMB2_STATUS_MAPPED_ALIGNMENT
+SMB2_STATUS_MAPPED_FILE_SIZE_ZERO
+SMB2_STATUS_MARSHALL_OVERFLOW
+SMB2_STATUS_MEMBERS_PRIMARY_GROUP
+SMB2_STATUS_MEMBER_IN_ALIAS
+SMB2_STATUS_MEMBER_IN_GROUP
+SMB2_STATUS_MEMBER_NOT_IN_ALIAS
+SMB2_STATUS_MEMBER_NOT_IN_GROUP
+SMB2_STATUS_MEMORY_NOT_ALLOCATED
+SMB2_STATUS_MESSAGE_NOT_FOUND
+SMB2_STATUS_MISSING_SYSTEMFILE
+SMB2_STATUS_MUTANT_LIMIT_EXCEEDED
+SMB2_STATUS_MUTANT_NOT_OWNED
+SMB2_STATUS_NAME_TOO_LONG
+SMB2_STATUS_NETLOGON_NOT_STARTED
+SMB2_STATUS_NETWORK_BUSY
+SMB2_STATUS_NETWORK_CREDENTIAL_CONFLICT
+SMB2_STATUS_NETWORK_NAME_DELETED
+SMB2_STATUS_NETWORK_UNREACHABLE
+SMB2_STATUS_NET_WRITE_FAULT
+SMB2_STATUS_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT
+SMB2_STATUS_NOLOGON_SERVER_TRUST_ACCOUNT
+SMB2_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT
+SMB2_STATUS_NONCONTINUABLE_EXCEPTION
+SMB2_STATUS_NONEXISTENT_EA_ENTRY
+SMB2_STATUS_NONEXISTENT_SECTOR
+SMB2_STATUS_NONE_MAPPED
+SMB2_STATUS_NOT_CLIENT_SESSION
+SMB2_STATUS_NOT_COMMITTED
+SMB2_STATUS_NOT_FOUND
+SMB2_STATUS_NOT_LOCKED
+SMB2_STATUS_NOT_LOGON_PROCESS
+SMB2_STATUS_NOT_MAPPED_DATA
+SMB2_STATUS_NOT_MAPPED_VIEW
+SMB2_STATUS_NOT_REGISTRY_FILE
+SMB2_STATUS_NOT_SERVER_SESSION
+SMB2_STATUS_NOT_SUPPORTED
+SMB2_STATUS_NOT_TINY_STREAM
+SMB2_STATUS_NO_BROWSER_SERVERS_FOUND
+SMB2_STATUS_NO_CALLBACK_ACTIVE
+SMB2_STATUS_NO_EAS_ON_FILE
+SMB2_STATUS_NO_EVENT_PAIR
+SMB2_STATUS_NO_GUID_TRANSLATION
+SMB2_STATUS_NO_IMPERSONATION_TOKEN
+SMB2_STATUS_NO_LDT
+SMB2_STATUS_NO_LOGON_SERVERS
+SMB2_STATUS_NO_LOG_SPACE
+SMB2_STATUS_NO_MEDIA
+SMB2_STATUS_NO_MEMORY
+SMB2_STATUS_NO_PAGEFILE
+SMB2_STATUS_NO_SECURITY_ON_OBJECT
+SMB2_STATUS_NO_SPOOL_SPACE
+SMB2_STATUS_NO_SUCH_ALIAS
+SMB2_STATUS_NO_SUCH_DOMAIN
+SMB2_STATUS_NO_SUCH_GROUP
+SMB2_STATUS_NO_SUCH_LOGON_SESSION
+SMB2_STATUS_NO_SUCH_MEMBER
+SMB2_STATUS_NO_SUCH_PACKAGE
+SMB2_STATUS_NO_SUCH_PRIVILEGE
+SMB2_STATUS_NO_SUCH_USER
+SMB2_STATUS_NO_TOKEN
+SMB2_STATUS_NO_TRUST_LSA_SECRET
+SMB2_STATUS_NO_TRUST_SAM_ACCOUNT
+SMB2_STATUS_NO_USER_SESSION_KEY
+SMB2_STATUS_NT_CROSS_ENCRYPTION_REQUIRED
+SMB2_STATUS_OBJECTID_EXISTS
+SMB2_STATUS_OPEN_FAILED
+SMB2_STATUS_OPLOCK_NOT_GRANTED
+SMB2_STATUS_ORDINAL_NOT_FOUND
+SMB2_STATUS_PAGEFILE_CREATE_FAILED
+SMB2_STATUS_PAGEFILE_QUOTA
+SMB2_STATUS_PAGEFILE_QUOTA_EXCEEDED
+SMB2_STATUS_PARITY_ERROR
+SMB2_STATUS_PARTITION_FAILURE
+SMB2_STATUS_PASSWORD_MUST_CHANGE
+SMB2_STATUS_PASSWORD_RESTRICTION
+SMB2_STATUS_PATH_NOT_COVERED
+SMB2_STATUS_PIPE_BROKEN
+SMB2_STATUS_PIPE_BUSY
+SMB2_STATUS_PIPE_CLOSING
+SMB2_STATUS_PIPE_CONNECTED
+SMB2_STATUS_PIPE_EMPTY
+SMB2_STATUS_PIPE_LISTENING
+SMB2_STATUS_PIPE_NOT_AVAILABLE
+SMB2_STATUS_PLUGPLAY_NO_DEVICE
+SMB2_STATUS_PORT_ALREADY_SET
+SMB2_STATUS_PORT_MESSAGE_TOO_LONG
+SMB2_STATUS_PORT_UNREACHABLE
+SMB2_STATUS_POSSIBLE_DEADLOCK
+SMB2_STATUS_PRINT_CANCELLED
+SMB2_STATUS_PRINT_QUEUE_FULL
+SMB2_STATUS_PRIVILEGED_INSTRUCTION
+SMB2_STATUS_PROCEDURE_NOT_FOUND
+SMB2_STATUS_PROFILING_AT_LIMIT
+SMB2_STATUS_PROFILING_NOT_STARTED
+SMB2_STATUS_PROFILING_NOT_STOPPED
+SMB2_STATUS_PROPSET_NOT_FOUND
+SMB2_STATUS_PROTOCOL_UNREACHABLE
+SMB2_STATUS_PWD_HISTORY_CONFLICT
+SMB2_STATUS_PWD_TOO_RECENT
+SMB2_STATUS_PWD_TOO_SHORT
+SMB2_STATUS_QUOTA_EXCEEDED
+SMB2_STATUS_QUOTA_LIST_INCONSISTENT
+SMB2_STATUS_RANGE_NOT_LOCKED
+SMB2_STATUS_RECOVERY_FAILURE
+SMB2_STATUS_REDIRECTOR_PAUSED
+SMB2_STATUS_REDIRECTOR_STARTED
+SMB2_STATUS_REGISTRY_CORRUPT
+SMB2_STATUS_REGISTRY_IO_FAILED
+SMB2_STATUS_REGISTRY_QUOTA_LIMIT
+SMB2_STATUS_REMOTE_DISCONNECT
+SMB2_STATUS_REMOTE_NOT_LISTENING
+SMB2_STATUS_REMOTE_RESOURCES
+SMB2_STATUS_REMOTE_SESSION_LIMIT
+SMB2_STATUS_REPLY_MESSAGE_MISMATCH
+SMB2_STATUS_REQUEST_ABORTED
+SMB2_STATUS_REQUEST_NOT_ACCEPTED
+SMB2_STATUS_RESOURCE_DATA_NOT_FOUND
+SMB2_STATUS_RESOURCE_LANG_NOT_FOUND
+SMB2_STATUS_RESOURCE_NAME_NOT_FOUND
+SMB2_STATUS_RESOURCE_NOT_OWNED
+SMB2_STATUS_RESOURCE_TYPE_NOT_FOUND
+SMB2_STATUS_RETRY
+SMB2_STATUS_REVISION_MISMATCH
+SMB2_STATUS_RXACT_COMMIT_FAILURE
+SMB2_STATUS_RXACT_INVALID_STATE
+SMB2_STATUS_SECRET_TOO_LONG
+SMB2_STATUS_SECTION_NOT_EXTENDED
+SMB2_STATUS_SECTION_NOT_IMAGE
+SMB2_STATUS_SECTION_PROTECTION
+SMB2_STATUS_SEMAPHORE_LIMIT_EXCEEDED
+SMB2_STATUS_SERIAL_NO_DEVICE_INITED
+SMB2_STATUS_SERVER_DISABLED
+SMB2_STATUS_SERVER_NOT_DISABLED
+SMB2_STATUS_SHARED_IRQ_BUSY
+SMB2_STATUS_SHARING_PAUSED
+SMB2_STATUS_SPECIAL_ACCOUNT
+SMB2_STATUS_SPECIAL_GROUP
+SMB2_STATUS_SPECIAL_USER
+SMB2_STATUS_STACK_OVERFLOW
+SMB2_STATUS_STACK_OVERFLOW_READ
+SMB2_STATUS_STOPPED_ON_SYMLINK
+SMB2_STATUS_SUSPEND_COUNT_EXCEEDED
+SMB2_STATUS_SYNCHRONIZATION_REQUIRED
+SMB2_STATUS_SYSTEM_PROCESS_TERMINATED
+SMB2_STATUS_THREAD_NOT_IN_PROCESS
+SMB2_STATUS_TIMER_NOT_CANCELED
+SMB2_STATUS_TIMER_RESOLUTION_NOT_SET
+SMB2_STATUS_TIME_DIFFERENCE_AT_DC
+SMB2_STATUS_TOKEN_ALREADY_IN_USE
+SMB2_STATUS_TOO_LATE
+SMB2_STATUS_TOO_MANY_ADDRESSES
+SMB2_STATUS_TOO_MANY_COMMANDS
+SMB2_STATUS_TOO_MANY_CONTEXT_IDS
+SMB2_STATUS_TOO_MANY_GUIDS_REQUESTED
+SMB2_STATUS_TOO_MANY_LINKS
+SMB2_STATUS_TOO_MANY_LUIDS_REQUESTED
+SMB2_STATUS_TOO_MANY_NAMES
+SMB2_STATUS_TOO_MANY_NODES
+SMB2_STATUS_TOO_MANY_SECRETS
+SMB2_STATUS_TOO_MANY_SESSIONS
+SMB2_STATUS_TOO_MANY_SIDS
+SMB2_STATUS_TOO_MANY_THREADS
+SMB2_STATUS_TRANSACTION_ABORTED
+SMB2_STATUS_TRANSACTION_INVALID_ID
+SMB2_STATUS_TRANSACTION_INVALID_TYPE
+SMB2_STATUS_TRANSACTION_NO_MATCH
+SMB2_STATUS_TRANSACTION_NO_RELEASE
+SMB2_STATUS_TRANSACTION_RESPONDED
+SMB2_STATUS_TRANSACTION_TIMED_OUT
+SMB2_STATUS_TRUSTED_DOMAIN_FAILURE
+SMB2_STATUS_TRUSTED_RELATIONSHIP_FAILURE
+SMB2_STATUS_TRUST_FAILURE
+SMB2_STATUS_UNABLE_TO_DECOMMIT_VM
+SMB2_STATUS_UNABLE_TO_DELETE_SECTION
+SMB2_STATUS_UNABLE_TO_FREE_VM
+SMB2_STATUS_UNABLE_TO_LOCK_MEDIA
+SMB2_STATUS_UNABLE_TO_UNLOAD_MEDIA
+SMB2_STATUS_UNDEFINED_CHARACTER
+SMB2_STATUS_UNEXPECTED_IO_ERROR
+SMB2_STATUS_UNEXPECTED_MM_CREATE_ERR
+SMB2_STATUS_UNEXPECTED_MM_EXTEND_ERR
+SMB2_STATUS_UNEXPECTED_MM_MAP_ERROR
+SMB2_STATUS_UNEXPECTED_NETWORK_ERROR
+SMB2_STATUS_UNHANDLED_EXCEPTION
+SMB2_STATUS_UNKNOWN_REVISION
+SMB2_STATUS_UNMAPPABLE_CHARACTER
+SMB2_STATUS_UNRECOGNIZED_MEDIA
+SMB2_STATUS_UNRECOGNIZED_VOLUME
+SMB2_STATUS_UNSUCCESSFUL
+SMB2_STATUS_UNSUPPORTED_COMPRESSION
+SMB2_STATUS_UNWIND
+SMB2_STATUS_USER_EXISTS
+SMB2_STATUS_USER_MAPPED_FILE
+SMB2_STATUS_USER_SESSION_DELETED
+SMB2_STATUS_VDM_HARD_ERROR
+SMB2_STATUS_VIRTUAL_CIRCUIT_CLOSED
+SMB2_STATUS_VOLUME_DISMOUNTED
+SMB2_STATUS_WORKING_SET_QUOTA
+SMB2_STATUS_WRONG_PASSWORD
+SMB2_STATUS_WRONG_PASSWORD_CORE
+SMB2_STATUS_WRONG_VOLUME
+SMBC2SCipherKey
+SMBFailed to allocate buffer for signature calculation
+SMBS2CCipherKey
+SMBSigningKey
+SSL - Hardware acceleration function returned with error
+SSL - Hardware acceleration function skipped / left alone data
+ST: urn:schemas-upnp-org:service:ContentDirectory:1
+STPP Discovery input
+STPP SUB BINARY cant handle event %d
+STPP started on '%s'
+STPP stopped on %s
+STPP/%s/multicast
+STPP/%s/unicast
+STREAMINFO must be first FLACMetadataBlock
+SUBTITLES
+Screensaver %s
+Screensaver delay
+Secondary subtitle language code
+Selected DVB subtitles sub-stream %d is not available
+Selecting view %s in plugin %s
+Server does not support NTSMB
+SetAVTransportURI: Unable to parse metadata -- %s
+SmbSign
+Strings Metadata
+Subtitle
+Subtitle Position
+Subtitle demuxer checking stream switch to streamid: %d -> %s
+Subtitle horizontal displacement
+Subtitle out of video bounds. x = %d, y = %d, video width = %d, video height = %d.
+Subtitle position
+Subtitle queue merge started
+Subtitle size
+Subtitle size and positioning
+Subtitle time!
+Subtitle vertical displacement
+Subtitles embedded in video file
+Subtitles packet is too big for recoding
+Subtitles with matching filename in central folder
+Subtitles with matching filename in same folder as video
+Switching to subtitle track %s
+TVDBv4
+Tertiary subtitle language code
+Thank you for using the Movian FTP service
+The hardware pixel format '%s' is not supported by the device type '%s'
+Timeout waiting for metadata piece %d/%d
+Too many I/O vectors when adding SMB2 header
+UPNP Video playback: No playable URL
+UPnP content directory
+URL does not start with 'smb://'
+Unable to connect to SMB2 share: %s
+Unable to enumerate SMB2 shares: %s
+Unable to initialize SMB2
+Unable to initialize SMB2 context
+Unable to load development plugin: %s
+Unable to load plugin.json: %s
+Unable to load plugin.json: Malformed JSON
+Unable to open SMB2 directory: %s
+Unable to open SMB2 file: %s
+Unable to probe subtitle contents?
+Unable to recode subtitle event "%s" from %s to UTF-8
+Unable to reload development plugin: %s
+Unable to rename SMB2 path: %s
+Unable to rename SMB2 path: out of memory
+Unable to scan %s for subtitles: %s
+Unable to set up SMB2 session
+Unable to stat SMB2 file: %s
+Unable to stat SMB2 path: %s
+Unhandled or malformed custom metadata of size %ld
+Unknown spherical metadata
+Unknown spherical metadata type %lu
+Unknown subtitle codec
+Unknown subtitle segment type 0x%x, length %d
+Unsupported Mastering Display Metadata box version %d
+Upgraded plugin %s to version %s
+WARNING: STPP input can't handle op %d
+WEBDAV share on %s:%d%s%s
+WEBDAV/PROPFIND: XML parsing failed:
+WEBDAV: DAV:multistatus not found in XML
+WEBDAV: File not found in XML reply
+WebM DASH Manifest demuxer
+Webdav sending request for %s (cid=%d)
+Writing metadata with key '%s' failed
+XResetScreenSaver
+Your platform doesn't suppport hardware accelerated AV1 decoding.
+_Playqueue
+ataTaza[aea;ajaaaVa)b'b+b+dMd[d]dtdvdrdsd}dudfd
+bad SMB signature in header
+bandwidth of this stream to be specified in the DASH manifest.
+bittorrent udp tracker
+bookmarked
+bookmarks2
+create SMB2 directory
+dVdXdkdmdodqdsdudwdyd{d}d
+deinterlace all frames
+delete SMB2 file
+dest->subtitle_header_size == src->subtitle_header_size
+disableScreensaver
+dvb_subtitle
+dvd_nav_packet
+dvd_subtitle
+dvdsub
+dvdsubdec
+ecmascript_plugin_load
+enable metadata containing input path information
+error parsing VorbisComment metadata
+export_path_metadata
+failed to allocate passthrough query info buffer
+ffmetadata
+flv_full_metadata
+flv_metadata
+ftp-server
+ftp://
+ftp://%s
+ftp://%s:%d
+ftpdebug
+ftpserver
+ftpserverdebug
+general:plugins
+green_metadata
+hardware accelerator failed to decode first field
+hardware accelerator failed to decode picture
+hdmv_pgs_subtitle
+hdmv_text_subtitle
+hls:%d
+hls:%s
+hls_limit_avc_227
+hls_limit_sd
+hlsdebug
+hlsv:%i
+ignore level even if the codec level used is unknown or higher than the maximum supported level reported by the hardware driver
+item.metadata.refresh
+lAttached picture metadata block too short
+last.fm
+libsmb2-%d
+libsmb2-H
+metadata_add_source
+metadata_header_padding
+metadata_type
+metadatacreator
+metadatadebug
+metadatamode
+metadb_metadata_get
+metadb_metadata_scandir
+metadb_metadata_write
+microdvd
+no_subtitle_scan
+node.metadata.category
+node.metadata.episode.number
+node.metadata.order
+node.metadata.popularity
+node.metadata.timestamp
+node.metadata.title
+node.metadata.track
+non-STREAMINFO FLACMetadataBlock(s) ignored
+not handling SMBv1 request
+obu->header.obu_type == AV1_OBU_METADATA
+onMetaData
+only deinterlace frames marked as interlaced
+open fstat rejected url=%s path='%s' smb2_type=%d reason=%s
+pBSUBTITLE
+pcm_dvd
+pcm_dvd_parse_header: header = %02x%02x%02x
+per_frame_metadata
+playqueue
+playqueue:
+plugin-%s%s%s
+plugin:
+plugin:repo
+plugin:repo:
+plugin:repo:%s
+plugin:repo:categories
+plugin:start
+pluginconf
+pluginsBG
+qBittorrent/5.0.2
+qBittorrent/5.1.6
+remove SMB2 directory
+screensaver
+screensaver2
+screensaverActive
+screensaverimageduration2
+selectSubtitleTrack
+set decoded text subtitle format
+set input text subtitles character encoding
+set input text subtitles character encoding mode
+set number of bytes to be written as padding in a metadata header
+settings:bittorrent
+settings:bookmarks
+settings:metadata
+settings:subtitles
+showtime:plugin
+smb2->user is NULL
+smb2://
+smb2://%s
+smb2:connection:%s
+smb2:connection:%s%s%s@%s
+smb2_notify_change failed
+smb2_open failed. %s
+smb2_open_async failed
+smb2_opendir_async failed
+smb2_service (in) failed with : %s
+smb2_service (out) failed with : %s
+smb2_service failed with : %s
+smb2_service: POLLERR, Unknown socket error.
+smb2_service: POLLHUP, socket error.
+smb2_service: socket error %s(%d) while connecting.
+smb2_service: socket error %s(%d).
+smb2io
+smb://
+smb://%s
+smb:connection:%s:%d
+smb:share:%s:%d:share
+smb_NetServerEnum2
+smb_get_xattr
+smb_large_read
+smb_open
+smb_set_xattr
+smb_tree_connect_andX
+smb_xattr
+smbdebug
+specify which frames to deinterlace
+src/libavcodec/dvdsubdec.c
+src/libavcodec/htmlsubtitles.c
+stat ok url=%s path='%s' smb2_type=%d type=%d size=%ld
+stpp://
+stpp://%d.%d.%d.%d:%d
+stpp:id:
+stpp_sub_json() can't deal with event %d
+stppclient
+subtitle1
+subtitle2
+subtitle3
+subtitleTrack
+subtitlefolder
+subtitleloader
+subtitleprovider
+subtitleprovider %s
+subtitleproviders
+subtitlestreams
+thetvdb.com
+tmdb:image:%s:%s
+tmdb:image:backdrop:
+tmdb:image:poster:
+tmdb:image:profile:
+tmdb:image:profile:%s
+tvdb:series:%s
+tvdb:series:%s:%d
+upnp/upnp:%s:%s:0
+upnp:event
+upnp:propchange
+urn:schemas-upnp-org:service:
+urn:schemas-upnp-org:service:ContentDirectory:1
+urn:schemas-upnp-org:service:ContentDirectory:2
+userscreensaverimages
+ut_metadata
+video/vnd.dlna.mpeg-tts
+videoMetadataBind
+videoscrobble
+webdav
+webdav://%s%s
+webdav://%s:%d%s%s
+webdavs
+webdavs://%s%s
+webm_dash_manifest
+webm_dash_manifest_bandwidth
+webm_dash_manifest_cluster_keyframe
+webm_dash_manifest_cue_timestamps
+webm_dash_manifest_cues_end
+webm_dash_manifest_cues_start
+webm_dash_manifest_duration
+webm_dash_manifest_file_name
+webm_dash_manifest_initialization_range
+webm_dash_manifest_track_number
+zip://%s/installedplugins/%s.zip
+zip://%s/plugin.json
+{"requests":[{"indexName":"TVDB","params":

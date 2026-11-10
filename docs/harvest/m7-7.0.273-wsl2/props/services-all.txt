@@ -1,0 +1,12 @@
+all (ref:2 xref:1) is a directory
+  showtime:plugin
+  showtime:discovered
+  showtime:settings
+  xdg-user-dir-MUSIC
+  xdg-user-dir-PICTURES
+  xdg-user-dir-VIDEOS
+  wsd_192_168_10_33
+  WORKGROUP_DESKTOP-UDHSAS3
+  WORKGROUP_HOMEASSISTANT
+  WORKGROUP_TRUENAS
+  WORKGROUP_WEB

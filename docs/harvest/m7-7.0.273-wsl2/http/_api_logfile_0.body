@@ -1,0 +1,43 @@
+--MARK-- START
+00:30:16.440: SYSTEM     |I| M7 7.0.273 | Linux/x86_64 Ubuntu 24.04.5 LTS | 20 CPU cores
+00:30:16.440: core       |D| Loading resources from /usr/share/showtime
+00:30:16.440: core       |D| Cache path: /home/brinza/.cache/movian
+00:30:16.440: blobcache  |D| Cache magic 0x62630207 1 items
+00:30:16.440: core       |D| Persistent path: /home/brinza/.hts/showtime
+00:30:16.440: blobcache  |I| Initialized: 1 items consuming 0.01 MB (out of maximum 1000.00 MB) on disk in /home/brinza/.cache/movian/bc2
+00:30:16.440: blobcache  |D| System time seems valid. Accepting writes
+00:30:16.441: DB         |D| Opened database /home/brinza/.hts/showtime/kvstore/kvstore.db pages: free=0 total=7
+00:30:16.441: DB         |D| kvstore: At current version 2
+00:30:16.441: DB         |D| Opened database /home/brinza/.hts/showtime/metadb/meta.db pages: free=1 total=50
+00:30:16.441: DB         |D| metadb: At current version 18
+00:30:16.442: ffmpeg     |I| Lavf58.76.100, Lavc58.134.100, Lavu56.70.100 (4.4.4) cpuflags:0xfd3db
+00:30:16.444: playqueue  |D| Shuffle set to off
+00:30:16.444: playqueue  |D| Repeat set to off
+00:30:16.444: playqueue  |D| Nothing on queue, waiting
+00:30:16.444: PA         |D| Headerversion: 13.99.0, library: 16.1.0
+00:30:16.447: i18n       |I| Unloading language definition
+00:30:16.447: i18n       |D| Default charset is auto
+00:30:16.448: UDP        |I| wsd: Listening on port 45721
+00:30:16.454: navigator  |N| Opening page:home
+00:30:16.473: TCP        |I| http-server: Listening on port 44364
+00:30:16.474: SSDP       |D| Trying to start on eth0
+00:30:16.475: UDP        |I| SSDP/eth0/multicast: Listening on port 1900
+00:30:16.476: UDP        |I| SSDP/eth0/unicast: Listening on port 44989
+00:30:16.476: SSDP       |D| SSDP started on 'eth0'
+00:30:16.487: UDP        |I| nmb: Listening on port 45863
+00:30:16.492: GLW        |D| GLX_SGI_swap_control extension is present
+00:30:16.498: UDP        |I| bittorrent udp tracker: Listening on port 46140
+00:30:16.502: GLW        |D| Window manager (Weston WM) detected, can fullscreen
+00:30:16.510: UDP        |I| STPP Discovery input: Listening on port 42000
+00:30:16.510: STPP       |D| Trying to start on eth0
+00:30:16.511: UDP        |I| STPP/eth0/unicast: Listening on port 43550
+00:30:16.511: STPP       |D| STPP started on 'eth0'
+00:30:16.514: GLW        |D| 32 texture image units available
+00:30:16.514: GLW        |I| OpenGL Renderer: 'llvmpipe (LLVM 20.1.2, 256 bits)' by 'Mesa'
+00:30:16.528: GLW        |I| OpenGL (WSL2) will use vertical sync set by Settings/Video/UI Refresh
+00:30:16.532: GLW        |D| UI size scale changed to 17 (user: 1, skin: 0) 
+00:30:16.532: GLW        |D| Screensaver allowed
+00:30:16.532: UPNP       |I| Unable to introspect http://192.168.10.211:60006/upnp/desc/aios_device/aios_device.xml -- No services
+00:30:16.532: Freetype   |D| Loaded font family='roboto condensed' fullname='roboto condensed regular' style='Regular' from /usr/share/showtime/glwskins/flat/fonts/RobotoCondensed-Regular.ttf domain:11
+00:30:16.545: GLW        |D| UI size scale changed to 21 (user: 1, skin: 4) 
+00:30:16.601: GEO        |D| Location: Belgium, Zottegem (time zone: Europe/Brussels) - Telenet BV

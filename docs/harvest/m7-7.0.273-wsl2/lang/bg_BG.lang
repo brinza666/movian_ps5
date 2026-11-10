@@ -1,0 +1,2230 @@
+language: Bulgarian
+native: Български
+maintainer: PROXIMO <v.stan4ev@gmail.com>
+# ver 1.18
+# ./glwskins/flat/ctxmenu/default_details.view
+#
+id: Bookmark
+msg: Отбелязване
+
+id: Bookmarked
+msg: Отбелязано
+
+id: Copy to clipboard
+msg: Копиране в клипборда
+
+id: Copy to location...
+msg: Копиране в…
+
+id: Delete
+msg: Изтриване
+
+id: Queue
+msg: Опашка
+
+#
+# ./glwskins/flat/ctxmenu/plugin_details.view
+#
+id: Author:
+msg: Автор:
+
+id: Available version:
+msg: Налична версия:
+
+id: Changelog
+msg: Промени
+
+id: Install
+msg: Инсталирай
+
+id: Installed version:
+msg: Инсталирана:
+
+id: Status:
+msg: Статус:
+
+id: Uninstall
+msg: Деинсталирай
+
+id: Upgrade
+msg: Обновяване
+
+#
+# ./glwskins/flat/ctxmenu/video_details.view
+#
+id: Continue from %s
+msg: Продължаване от %s
+
+id: Mark as seen
+msg: Отбележи като гледано
+
+id: Mark as unseen
+msg: Промени на Не гледано
+
+id: Play from beginning
+msg: Възпроизвеждане от началото
+
+id: Play until end of list
+msg: Възпроизвеждане до края на списъка
+
+id: Video Cast
+msg: Актьорски състав
+
+#
+# ./glwskins/flat/items/details/video.view
+#
+id: Season %d - Episode %d
+msg: Сезон %d - Епизод %d
+
+id: Seen %d times, %s
+msg[0]: Гледано %d пъти, %s
+msg[1]: Гледано %d път, %s
+
+#
+# ./glwskins/flat/items/list/add.view
+#
+id: Add new entry
+msg: Добавяне
+
+#
+# ./glwskins/flat/items/list/bool.view
+#
+id: Off
+msg: Изкл
+
+id: On
+msg: Вкл
+
+#
+# ./glwskins/flat/items/list/font.view
+#
+id: Condensed
+msg: Тесен
+
+id: Subtitles
+msg: Субтитри
+
+id: User interface
+msg: Интерфейс
+
+#
+# ./glwskins/flat/items/list/tvepisode.view
+#
+id: Episode %d - %s
+msg: Епизод %d - %s
+
+#
+# ./glwskins/flat/loading.view
+#
+id: %d k/s
+msg: %d кб/с
+
+id: Bitrate:
+msg: Битрейт:
+
+#
+# ./glwskins/flat/log.view
+#
+id: System log
+msg: Системен лог
+
+#
+# ./glwskins/flat/mediainfo.view
+#
+id: A/V diff
+msg: А/В разлика
+
+id: Audio bitrate
+msg: Аудио битрейт
+
+id: Audio codec
+msg: Аудио кодек
+
+id: Audio packets
+msg: Аудио пакети
+
+id: Buffer usage
+msg: Буфер
+
+id: No media loaded
+msg: Няма зареден файл
+
+id: Source
+msg: Източник
+
+id: Video bitrate
+msg: Видео битрейт
+
+id: Video codec
+msg: Видео кодек
+
+id: Video info
+msg: Видео инфо
+
+#
+# ./glwskins/flat/menu/sidebar.view
+#
+id: Bookmark page
+msg: Добави отметка
+
+id: Page settings
+msg: Настройки
+
+id: Paste
+msg: Поставяне
+
+id: Reload page
+msg: Презареди
+
+id: Remove bookmark
+msg: Премахни отметката
+
+id: Settings
+msg: Настройки
+
+#
+# ./glwskins/flat/menu/sidebar_common.view
+#
+id: Activate sleep timer
+msg: Активиране на таймер за изключване
+
+id: Disable sleep timer
+msg: Деактивиране на таймера
+
+id: Exit %s
+msg: Изход
+
+id: Exit
+msg: Изход
+
+id: Hide media info
+msg: Скрий медия информация
+
+id: Hide system info
+msg: Скрий системна информация
+
+id: Master volume
+msg: Обща сила на звука
+
+id: Show media info
+msg: Медия информация
+
+id: Show system info
+msg: Системна информация
+
+id: Suspend
+msg: Изключване
+
+id: Time until sleep
+msg: Време до изключване
+
+id: View log
+msg: Покажи системен лог
+
+id: dB
+msg: дБ
+
+id: min
+msg: мин
+
+#
+# ./glwskins/flat/osd/osd_audio.view
+#
+id: Audio
+msg: Аудио
+
+#
+# ./glwskins/flat/osd/osd_main.view
+#
+id: Audio settings
+msg: Аудио
+
+id: Subtitle settings
+msg: Субтитри
+
+id: Video settings
+msg: Видео
+
+#
+# ./glwskins/flat/osk.view
+#
+id: Default
+msg: По подразбиране
+
+id: Keyboard layout:
+msg: Клавиатурна подредба:
+
+#
+# ./glwskins/flat/pages/directory.view
+#
+id: Album
+msg: Албуми
+
+id: Artist
+msg: Артисти
+
+id: Custom
+msg: Персонализиран
+
+id: Grid
+msg: Решетка
+
+id: List
+msg: Списък
+
+id: Page layout
+msg: Изглед
+
+id: Search results
+msg: Резултати от търсене
+
+id: TV Season
+msg: ТВ Сезон
+
+#
+# ./glwskins/flat/pages/empty.view
+#
+id: No contents
+msg: Няма съдържание
+
+#
+# ./glwskins/flat/pages/home.view
+#
+id: Dismiss
+msg: Отхвърли
+
+id: Home
+msg: M7
+
+#
+# ./glwskins/flat/pages/openerror.view
+#
+id: Unable to open resource
+msg: Ресурсът не се отваря
+
+#
+# ./glwskins/flat/pages/playqueue.view
+#
+id: Playqueue
+msg: Опашка
+
+#
+# ./glwskins/flat/pages/searchresults.view
+#
+id: Show more
+msg: Покажи още
+
+id: %d hits
+msg[0]: %d резултата
+msg[1]: %d резултат
+
+#
+# ./glwskins/flat/pages/slideshow.view
+#
+id: Interval: %ds
+msg: Интервал: %ds
+
+id: Play/Pause
+msg: Пусни/Пауза
+
+id: Stop
+msg: Стоп
+
+#
+# ./glwskins/flat/pages/stpp.view
+#
+id: Remote control - %s
+msg: Дистанционно управление - %s
+
+id: Remote controlling %s
+msg: Дистанционно управление %s
+
+#
+# ./glwskins/flat/pages/stppstpp.view
+#
+id: Nested remote controll is not supported
+msg: Повторно дистанционно управление не се поддържа
+
+id: Remote control
+msg: Дистанционно управление
+
+#
+# ./glwskins/flat/pages/stppvideo.view
+#
+id: Audio tracks
+msg: Аудио песни
+
+id: Audio volume adjustment: %d dB
+msg: Регулиране силата на звука: %d дБ
+
+id: CPU is too slow to decode this video
+msg: Процесорът е твърде бавен
+
+id: Next
+msg: Следващ
+
+id: Previous
+msg: Предишен
+
+#
+# ./glwskins/flat/pages/tvseason.view
+#
+id: Season %d
+msg: Сезон %d
+
+#
+# ./glwskins/flat/pages/upgrade.view
+#
+id: M7 is up to date
+msg: M7 е актуален
+
+id: An error occured during download
+msg: Грешка при изтегляне на актуализацията
+
+id: Changelog for %s releases
+msg: Последни промени:
+
+id: Check for updates now
+msg: Проверка за обновление на M7
+
+id: Checking for updates
+msg: Проверяване за обновление
+
+id: Current version:
+msg: Инсталирана версия:
+
+id: Download and Re/Install
+msg: Инсталирай отново
+
+id: Downloading %s
+msg: Изтегляне на %s
+
+id: Downloading M7
+msg: Изтегляне на M7
+
+id: New version %s is available for download
+msg: Версия %s е налична за изтегляне
+
+id: No upgrade available
+msg: Няма обновления
+
+id: Retry
+msg: Повторен опит
+
+id: Stable
+msg: Стабилна
+
+id: Testing
+msg: Тестова
+
+id: Unable to query for new version
+msg: Невъзможна проверка на нова версия
+
+#
+# ./glwskins/flat/popups/auth.view
+#
+id: Domain
+msg: Домейн
+
+id: Password
+msg: Парола
+
+id: Remember me
+msg: Запаметяване
+
+id: Username
+msg: Потребител
+
+#
+# ./glwskins/flat/popups/common.view
+#
+id: Cancel
+msg: Отказ
+
+id: Ok
+msg: Ок
+
+#
+# ./glwskins/flat/popups/filepicker.view
+#
+id: Back
+msg: Назад
+
+id: Close
+msg: Затвори
+
+id: Folder select mode, press right to open subfolder
+msg: Режим избор на папка, натиснете надясно, за да отворите папката
+
+#
+# ./glwskins/flat/popups/resume.view
+#
+id: No, Start over
+msg: Не, Започни отначало
+
+id: Resume from %s
+msg: Продължи от %s
+
+id: Yes
+msg: Да
+
+#
+# ./glwskins/flat/popups/textDialog.view
+#
+id: OK
+msg: Ок
+
+#
+# ./glwskins/flat/sysinfo.view
+#
+id: CPU Temp
+msg: CPU температура
+
+id: Connected
+msg: Свързана
+
+id: Fragmentation
+msg: Фрагментация
+
+id: Framerate
+msg: Кадри
+
+id: UI Framerate
+msg: Опресняване
+
+id: GPU Temp
+msg: GPU температура
+
+id: HDD Avail
+msg: Твърд-диск
+
+id: IP Address
+msg: IP Адрес
+
+id: Inactive memory
+msg: Свободна памет
+
+id: Used by M7
+msg: Използвана памет
+
+id: Network
+msg: Мрежа
+
+id: Not available
+msg: Недостъпно
+
+id: System Free
+msg: Системна памет
+
+id: System Total
+msg: Обща памет
+
+id: VM Page In/Out
+msg: Виртуална памет
+
+id: M7 Version
+msg: M7 Версия
+
+#
+# ./glwskins/flat/universe.view
+#
+id: Audio muted
+msg: Без звук
+
+id: Copying %d files
+msg: Копиране на %d файла
+
+id: Master volume: %d dB
+msg: Сила на звука: %d дБ
+
+id: Overscan adjustment\nPosition border at screen edges
+msg: Настройка на екрана\nРазположете рамката в ъглите на екрана
+
+#
+# ./src/api/stpp.c
+#
+id: Allow remote control
+msg: Дистанционно управление
+
+id: Device not available
+msg: Устройството е недостъпно
+
+id: Movians for remote control
+msg: Movian за отдалечен контрол
+
+#
+# ./src/api/tmdb.c
+#
+id: Language (ISO 639-1 code)
+msg: Език по ISO 639-1 (bg, en, de)
+
+id: Use original title
+msg: Използване на оригиналното заглавие
+
+#
+# ./src/arch/android/android.c
+#
+id: Android Storage
+msg: Андроид файлове
+
+#
+# ./src/arch/linux/pulseaudio.c
+#
+id: Unable to initialize audio system %s -- %s
+msg: Невъзможна инициализация на аудио системата %s -- %s
+
+#
+# ./src/arch/ps3/ps3_main.c
+#
+id: System is low on memory (%d kB RAM available)
+msg: Недостатъчно памет (достъпна RAM %d кБ)
+
+#
+# ./src/arch/rpi/rpi_audio.c
+#
+id: 8 Channel PCM
+msg: 8 канален PCM
+
+id: AC3 Pass-Through
+msg: AC3
+
+id: Analog
+msg: Аналогов
+
+id: Audio output port
+msg: Аудио изход
+
+id: Autodetect
+msg: Автоматично
+
+id: DTS Pass-Through
+msg: DTS
+
+id: HDMI
+msg: HDMI
+
+#
+# ./src/arch/rpi/rpi_tv.c
+#
+id: Match display and content framerate
+msg: Регулиране честотата на кадрите на съдържанието и екрана
+
+#
+# ./src/audio2/audio.c
+#
+id: Audio delay
+msg: Забавяне звука
+
+id: Audio gain
+msg: Усилване на звука
+
+id: Setup audio output
+msg: Настройка на аудио изхода
+
+id: Video playback
+msg: Видео
+
+#
+# ./src/audio2/audio_test.c
+#
+id: 440Hz sinewave -12dB
+msg: 440Хц синусоида -12дБ
+
+id: Audio test
+msg: Звуков тест
+
+id: Center
+msg: Център
+
+id: Front Left
+msg: Преден ляв
+
+id: Front Right
+msg: Преден десен
+
+id: LFE
+msg: Бас (LFE)
+
+id: Pink noise
+msg: Шум
+
+id: Play test signal
+msg: Звуков тест
+
+id: Rear Left
+msg: Заден ляв
+
+id: Rear Right
+msg: Заден десен
+
+id: Speaker position
+msg: Разположение на говорителите
+
+id: Surround Left
+msg: Съраунд ляв
+
+id: Surround Right
+msg: Съраунд десен
+
+id: Test signal type
+msg: Тестов сигнал
+
+#
+# ./src/backend/bittorrent/bt_backend.c
+#
+id: No files in torrent
+msg: Няма файлове в торента
+
+id: Unable to open torrent: %s
+msg: Невъзможно отваряне на торент: %s
+
+#
+# ./src/backend/bittorrent/diskio.c
+#
+id: Cached torrents use %d MB out of allowed %d MB. Total free space on volume: %d MB
+msg: Кешираните торенти ползват %d МБ от позволените %d МБ. Общо свободно пространство: %d МБ
+
+#
+# ./src/backend/bittorrent/fa_torrent.c
+#
+id: Connected to
+msg: Свързан с
+
+id: Peers
+msg: Пиъри
+
+id: Receiving from
+msg: Получаване от
+
+id: Leechers
+msg: Лийчъри
+
+id: Seeders
+msg: Сийдъри
+
+id: Speed
+msg: Скорост
+
+id: Active
+msg: Сегменти
+
+id: Memory use (MB)
+msg: Използвана памет (MB)
+
+id: Cache
+msg: Kеш
+
+#
+# ./src/backend/bittorrent/torrent_settings.c
+#
+id: BitTorrent
+msg: БитТорент
+
+id: Clear cache
+msg: Изтриване на кеша
+
+id: Enable bittorrent
+msg: Активиране на БитТорент
+
+id: Max upload speed
+msg: Максимална скорост на качване
+
+id: Max usage of free space for caching torrents
+msg: Максимално пространство при кеширане
+
+id: Status
+msg: Статус
+
+id: Torrent cache path
+msg: Папка за кеширане на торенти
+
+#
+# ./src/backend/dvd/dvd.c
+#
+id: DVD
+msg: DVD
+
+id: DVD read error, restarting disc
+msg: Грешка при прочитане на DVD, рестартиране на диска
+
+#
+# ./src/backend/hls/hls.c
+#
+id: Primary
+msg: Основен
+
+id: Supplementary
+msg: Допълнителен
+
+#
+# ./src/backend/playlist.c
+#
+id: Unable to open playlist
+msg: Не може да отвори списъка
+
+#
+# ./src/backend/search.c
+#
+id: Search
+msg: Търсене
+
+id: Search result for: %s
+msg: Резултати за: %s
+
+#
+# ./src/backend/slideshow/slideshow.c
+#
+id: 3 seconds
+msg: 3 секунди
+
+id: 5 seconds
+msg: 5 секунди
+
+id: 7 seconds
+msg: 7 секунди
+
+id: Slideshow speed
+msg: Скорост на слайдшоу
+
+#
+# ./src/blobcache_file.c
+#
+id: Cache cleared
+msg: Кешът е почистен
+
+id: Clear cached files
+msg: Изтрий кешираните файлове
+
+#
+# ./src/fileaccess/fa_backend.c
+#
+id: Can't handle content type %d
+msg: Неподдържан вид съдържание %d
+
+id: Checking file contents
+msg: Зареждане…
+
+id: Invalid URL from redirect
+msg: Невалиден URL-адрес от пренасочване
+
+id: Unable to open file: %s
+msg: Файлът не може да се отвори: %s
+
+#id: Unable to probe file: %s
+msg: Файлът не може да се провери: %s
+
+#id: Invalid data found when processing input
+msg: Невалиден формат
+
+#
+# ./src/fileaccess/fa_filepicker.c
+#
+id: Select a file
+msg: Изберете файл
+
+#
+# ./src/fileaccess/fa_locatedb.c
+#
+id: Search using Unix locatedb
+msg: Търсене използващо Unix установена БД
+
+#
+# ./src/fileaccess/fa_scanner.c
+#
+id: Deleted %s
+msg: Изтрито: %s
+
+id: Filename
+msg: Име на файл
+
+id: Include in library
+msg: Добави в библиотека
+
+id: Newest first
+msg: Първо новите
+
+id: Oldest first
+msg: Първо старите
+
+id: Show only supported files
+msg: Показване само на поддържаните файлове
+
+id: Sort folders first
+msg: Първо папките
+
+id: Sort on
+msg: Сортиране
+
+id: Unable to delete %s\n%s
+msg: Не може да изтрие %s\n%s
+
+#
+# ./src/fileaccess/fa_spotlight.c
+#
+id: Search using spotlight
+msg: Търсене със спотлайт
+
+#
+# ./src/fileaccess/fileaccess.c
+#
+id: Are you sure you want to delete:
+msg: Сигурно ли сте че искате да изтриете:
+
+id: Browse archives as folders
+msg: Отваряне на архивите като папки
+
+id: Enable file deletion from item menu
+msg: Активиране на изтриването на файлове
+
+id: Show filename extensions
+msg: Показване на разширенията на файловете
+
+id: Store per-file settings in filesystem
+msg: Съхраняване на настройките в системата
+
+id: %d archive parts
+msg[0]: %d архивна част
+msg[1]: %d архивни части
+
+id: %d directories
+msg[0]: %d директория
+msg[1]: %d директории
+
+id: %d files
+msg[0]: %d файл
+msg[1]: %d файла
+
+#
+# ./src/fileaccess/smb/fa_nativesmb.c
+#
+id: Access denied
+msg: Отказан достъп
+
+id: Account restricted
+msg: Ограничен акаунт
+
+id: Bad network share name
+msg: Грешно мрежово име
+
+id: Logon failure
+msg: Неуспешно вписване
+
+id: Object name not found
+msg: Името на обекта не е намерено
+
+#
+# ./src/i18n.c
+#
+id: 12 Hour
+msg: 12 часов
+
+id: 24 Hour
+msg: 24 часов
+
+id: Default character set
+msg: Кодировка
+
+id: Ignore 'The' at beginning of words when sorting
+msg: Игнориране на 'The' при сортиране
+
+id: Language
+msg: Език
+
+id: Language codes should be configured as three character ISO codes, example (eng, swe, fra)
+msg: Езиковите кодове трябва да бъдат конфигурирани като трибуквени ISO кодове (bul, eng, fra)
+
+id: Languages
+msg: Език
+
+id: Preferred languages
+msg: Предпочитани езици
+
+id: Primary audio language code
+msg: Основен езиков код за аудио
+
+id: Primary subtitle language code
+msg: Основен езиков код за субтитри
+
+id: Secondary audio language code
+msg: Втори езиков код за аудио
+
+id: Secondary subtitle language code
+msg: Втори езиков код за субтитри
+
+id: System default
+msg: Настройки по подразбиране
+
+id: Tertiary audio language code
+msg: Трети езиков код за аудио
+
+id: Tertiary subtitle language code
+msg: Трети езиков код за субтитри
+
+id: Time format
+msg: Времеви формат
+
+id: Timezone
+msg: Часова зона
+
+#
+# ./src/ipc/libcec.c
+#
+id: Longpress SELECT for item menu
+msg: Задръжане на SELECT за меню
+
+id: Switch TV input source
+msg: Смяна на източника за телевизора
+
+id: Use STOP key for combo input
+msg: Използване клавиш STOP за комбинирано въвеждане
+
+#
+# ./src/keyring.c
+#
+id: Forget remembered passwords
+msg: Изтрий запаметените пароли
+
+id: Rembered passwords erased
+msg: Запаметените пароли са изтрити
+
+#
+# ./src/media/media_settings.c
+#
+id: Align on video frame
+msg: Позициониране в кадър
+
+id: Audio volume
+msg: Сила на звука
+
+id: Delay
+msg: Забавяне
+
+id: Go to standby after video ends
+msg: Изключване след края на видеото
+
+id: Horizontal pan
+msg: Хоризонтално отместване
+
+id: Horizontal position
+msg: Хоризонтална позиция
+
+id: Horizontal scale
+msg: Хоризонтално разпъване
+
+id: Reset defaults for folder '%s'
+msg: Възстановяване по подразбиране за папка '%s'
+
+id: Save as defaults for folder '%s'
+msg: Запазване по подразбиране за папка '%s'
+
+id: Save as global default
+msg: Запазване като глобална настройка
+
+id: Scaling
+msg: Мащабиране
+
+id: Stretch video to fullscreen
+msg: Разпъване до цял екран
+
+id: Stretch video to widescreen
+msg: Разпъване до широк екран
+
+id: Vertical pan
+msg: Вертикално отместване
+
+id: Vertical position
+msg: Вертикална позиция
+
+id: Vertical scale
+msg: Вертикално разпъване
+
+id: Video zoom
+msg: Видео мащабиране
+
+#
+# ./src/metadata/browsemdb.c
+#
+id: Indexing
+msg: Индексиране
+
+#
+# ./src/metadata/decoration.c
+#
+id: Automatic
+msg: Автоматично
+
+id: Erase all playback info
+msg: Изтрий информацията за възпроизвеждане
+
+id: Manual
+msg: Ръчно
+
+id: Mark all as seen
+msg: Маркиране на всички като гледани
+
+id: Mark all as unseen
+msg: Маркиране на всички като НЕ гледани
+
+id: Metadata mode
+msg: Режим на метаданни
+
+#
+# ./src/metadata/metadata.c
+#
+id: Embedded in file
+msg: Вграден във файл
+
+id: Track %d
+msg: Трак %d
+
+#
+# ./src/metadata/metadata_sources.c
+#
+id: Enabled
+msg: Активиране
+
+id: Metadata
+msg: Метаданни
+
+id: Metadata configuration and provider settings
+msg: Метаданни конфигурация и настройки на доставчик
+
+id: Providers for Music
+msg: За музика
+
+id: Providers for Video
+msg: За видео
+
+#
+# ./src/metadata/metadb.c
+#
+id: %d items deleted
+msg: %d изтрити елемента
+
+id: Clear all metadata
+msg: Изтрий всички метаданни
+
+id: Clearing all metadata means losing <b>all</b> metadata cached from external sources such as themoviedb.org, etc\n\nInformation about resume-points, playcount, etc will be saved.\nAre you sure you proceed?
+msg: Изчистването на метаданните означава загуба на <b>всички</b> метаданни, кеширани от външни източници, като themoviedb.org и други.\n\nИнформацията за точки на възпроизвеждане, брой гледания и т.н. ще бъде запазена.\nИскате ли да продължите?
+
+#
+# ./src/metadata/mlp.c
+#
+id: Custom search query
+msg: Персонализирана заявка за търсене
+
+id: Custom title
+msg: Персонализирано заглавие
+
+id: IMDb ID
+msg: IMDb ID
+
+id: Metadata loaded from <b>%s</b> based on %s
+msg: Метаданните са заредени от <b>%s</b> въз основа на %s
+
+id: Metadata source
+msg: Източник на метаданни
+
+id: Movie
+msg: Филм
+
+id: Movie title
+msg: Заглавие
+
+id: No data found
+msg: Няма намерени данни
+
+id: None
+msg: Нито един
+
+id: Refresh metadata
+msg: Обновяване на метаданните
+
+id: Title, Season, Episode
+msg: Заглавие, сезон, епизод
+
+id: custom IMDb ID
+msg: персонализирано IMDb ID
+
+id: custom query
+msg: персонализирано запитване
+
+id: filename
+msg: име на файл
+
+id: filename as TV episode
+msg: име на файл като ТВ епизод
+
+id: folder name
+msg: име на папка
+
+#
+# ./src/navigator.c
+#
+id: Add and remove items on homepage
+msg: Добавяне и премахване на елементи от началната страница
+
+id: Added %s to home page
+msg: %s добавен към началната страница
+
+id: Added new bookmark: %s
+msg: Добавяне на нова отметка: %s
+
+id: Bookmarks
+msg: Отметки
+
+id: Icon
+msg: Икона
+
+id: Music
+msg: Музика
+
+id: Other
+msg: Други
+
+id: Photos
+msg: Снимки
+
+id: Removed %s from homepage
+msg: %s премахнат от началната страница
+
+id: Removed bookmark: %s
+msg: Премахната отметка: %s
+
+id: TV
+msg: ТВ
+
+id: Title
+msg: Заглавие
+
+id: Type
+msg: Тип
+
+id: URL
+msg: URL адрес
+
+id: Video
+msg: Видео
+
+#
+# ./src/networking/connman.c
+#
+id: Enable Wi-Fi
+msg: Включете Wi-Fi
+
+id: Network connections
+msg: Мрежови връзки
+
+#
+# ./src/networking/ftp_server.c
+#
+id: Enable FTP server
+msg: Активиране на FTP сървър
+
+id: FTP server
+msg: FTP сървър
+
+id: Server TCP port
+msg: TCP порт на сървъра
+
+#
+# ./src/networking/http_server.c
+#
+id: Power Off
+msg: Изключване
+
+id: Rebooting
+msg: Рестартиране
+
+id: Restarting
+msg: Рестартиране
+
+id: Standby
+msg: В режим на готовност
+
+#
+# ./src/notifications.c
+#
+id: Show news on home screen
+msg: Показване на новини в началния екран
+
+#
+# ./src/plugins.c
+#
+id: Alternate plugin Repository URL
+msg: Алтернативен адрес на хранилище
+
+id: Audio decoders
+msg: Аудио декодери
+
+id: Auto install plugins on demand
+msg: Автоматично инсталиране на добавки
+
+id: Auto installed plugin %s (Version %s)
+msg: Автоматично инсталирана добавка %s (Версия %s)
+
+id: Automatically upgrade plugins
+msg: Автоматично обновяване на добавките
+
+id: Available plugins
+msg: Налични добавки
+
+id: Background
+msg: Фон
+
+id: Beta testing passwords
+msg: Парола за бета тестване
+
+id: Browse available plugins
+msg: Преглед на добавките
+
+id: Browsing
+msg: Визуализация на елементи
+
+id: Cloud services
+msg: Облачни услуги
+
+id: Corrupt plugin bundle
+msg: Повредена добавка
+
+id: Custom backgrounds can now be set in Settings -> Look and Feel
+msg: Персонализирания фон вече може да се зададе в Настройки -> Външен вид
+
+id: Disk write error
+msg: Грешка при запис на диска
+
+id: Downloading
+msg: Изтегляне
+
+id: File open error
+msg: Грешка при отваряне на файл
+
+id: Home page
+msg: Начална страница
+
+id: Images
+msg: Изображения
+
+id: Installed
+msg: Инсталирано
+
+id: Installed plugins
+msg: Инсталирани добавки
+
+id: Installed version higher than available
+msg: Инсталираната версия е по-висока от наличната
+
+id: Installing
+msg: Инсталиране
+
+id: List of albums
+msg: Списък с албуми
+
+id: Loading screen
+msg: Екран при зареждане
+
+id: Movies
+msg: Филми
+
+id: Music streaming
+msg: Аудио
+
+id: Not installable
+msg: Не може да се инсталира
+
+id: Not installed
+msg: Не е инсталирано
+
+id: Not upgradable
+msg: Не подлежи на обновяване
+
+id: On Screen Keyboards
+msg: Клавиатури
+
+id: Online TV
+msg: Онлайн ТВ
+
+id: Plugin %s %s has been uninstalled because it may cause problems.\nYou may try reinstalling a different version manually.
+msg: Добавката %s %s е деинсталирана, защото може да причини проблеми.\nОпитайте да инсталирате друга версия.
+
+id: Plugin %s has been uninstalled - %s
+msg: Добавката %s е деинсталирана - %s
+
+id: Plugin categories
+msg: Категории
+
+id: Plugins
+msg: Добавки
+
+id: Preferred views from plugins
+msg: Предпочитания от добавки
+
+id: Screen saver
+msg: Скрийнсейвър
+
+id: TV channels
+msg: ТВ канали
+
+id: Unable to load plugin.json: %s
+msg: Не може да зареди plugin.json: %s
+
+id: Unable to load plugin.json: Malformed JSON
+msg: Не може да зареди plugin.json: Невалиден JSON файл
+
+id: Uncategorized
+msg: Разни
+
+id: Up to date
+msg: Актуално
+
+id: Upgradable
+msg: Има нова версия
+
+id: Upgraded plugin %s to version %s
+msg: %s обновена до версия %s
+
+id: User interface extensions
+msg: Разширения на потребителския интерфейс
+
+id: Version %s is no longer compatible with M7
+msg: Версия %s вече не е съвместима с M7
+
+id: Video streaming
+msg: Видео
+
+#
+# ./src/prop/prop_proxy.c
+#
+id: Remote exited
+msg: Дистанционното управление спря
+
+#
+# ./src/runcontrol.c
+#
+id: Automatic standby
+msg: Автоматичен режим на готовност
+
+id: Enable SSH server
+msg: Активиране на SSH сървър
+
+id: Logout
+msg: Изход от профила
+
+id: Open shell
+msg: Отваряне на шел
+
+id: Power off system
+msg: Изключване на системата
+
+id: Quit
+msg: Изход
+
+id: SSH server
+msg: SSH сървър
+
+#
+# ./src/sd/sd.c
+#
+id: Enabled on home screen
+msg: Активиран на началната страница
+
+id: Name
+msg: Име
+
+#
+# ./src/service.c
+#
+id: Local network
+msg: Мрежа
+
+id: Remove from homepage
+msg: Премахване от началната страница
+
+#
+# ./src/settings.c
+#
+id: About
+msg: За програмата
+
+id: Applications and installed plugins
+msg: Инсталирани добавки
+
+id: Configure communications with your TV
+msg: Конфигуриране на комуникация с ТВ
+
+id: Developer settings
+msg: Настройки за програмисти
+
+id: Discovered media sources
+msg: Медийни източници
+
+id: File browsing
+msg: Преглед на файлове
+
+id: Fonts and user interface styling
+msg: Шрифтове и потребителски интерфейс
+
+id: General
+msg: Общи
+
+id: Global settings
+msg: Настройки
+
+id: Look and feel
+msg: Външен вид
+
+id: Network services, etc
+msg: Мрежови услуги и други
+
+id: Reset
+msg: Почистване
+
+id: Settings useful for developers
+msg: Полезни настройки за разработчици
+
+id: M7 upgrade
+msg: Обновяване на M7
+
+id: Starting and stopping
+msg: Стартиране и спиране
+
+id: System name
+msg: Име на системата
+
+id: System related settings
+msg: Системни настройки
+
+id: TV Control
+msg: ТВ контрол
+
+#
+# ./src/subtitles/subtitles.c
+#
+id: Any subtitle in central folder
+msg: Всички субтитри от основна папка
+
+id: Any subtitle in same folder as video
+msg: Всички субтитри от видео папка
+
+id: Auto
+msg: Автоматично
+
+id: Automatically select from this source
+msg: Автоматично избиране от този източник
+
+id: Central subtitle folder
+msg: Основна папка за субтитри
+
+id: Color
+msg: Цвят на субтитри
+
+id: External file
+msg: Външен файл
+
+id: Force subtitles to reside on video frame
+msg: Позициониране в кадър
+
+id: Generic settings for video subtitles
+msg: Общи настройки за видео субтитри
+
+id: Ignore embedded styling
+msg: Игнориране на вграденото оформление
+
+id: Left
+msg: Ляво
+
+id: Outline color
+msg: Цвят на контур
+
+id: Outline size
+msg: Размер на контур
+
+id: Path to central folder
+msg: Път до основна папка
+
+id: Providers for Subtitles
+msg: Доставчици на субтитри
+
+id: Right
+msg: Дясно
+
+id: Shadow color
+msg: Цвят на сенки
+
+id: Shadow offset
+msg: Отместване на сенки
+
+id: Subtitle horizontal displacement
+msg: Хоризонтално отместване
+
+id: Subtitle position
+msg: Позиция
+
+id: Subtitle size
+msg: Размер
+
+id: Subtitle size (DRM7)
+msg: Размер в DRM7
+
+id: Subtitle size and positioning
+msg: Размер и позиция на субтитрите
+
+id: Subtitle vertical displacement
+msg: Вертикално отместване
+
+id: Subtitles embedded in video file
+msg: Вградени във видео файл
+
+id: Subtitles with matching filename in central folder
+msg: Съвпадащи с тези от основната папка
+
+id: Subtitles with matching filename in same folder as video
+msg: Съвпадащи с тези от папката на видеото
+
+#
+# ./src/text/fontstash.c
+#
+id: Defaults
+msg: По подразбиране
+
+id: Fonts
+msg: Шрифт
+
+id: Installed fonts
+msg: Инсталирани шрифтове
+
+id: Narrow text
+msg: Тесен шрифт
+
+id: Reset main font to default
+msg: Възстановяване на основния шрифт по подразбиране
+
+id: Reset narrow font to default
+msg: Възстановяване на тесния шрифт по подразбиране
+
+id: Reset subtitle font to default
+msg: Възстановяване на шрифта на субтитрите по подразбиране
+
+id: Unable to install font: %s
+msg: %s шрифт не може да се инсталира
+
+id: Use font %s for
+msg: Използване на %s шрифт за
+
+#
+# ./src/ui/clipboard.c
+#
+id: Copy failed: %s
+msg: Копирането е неуспешно: %s
+
+id: Target folder
+msg: Целева папка
+
+#
+# ./src/ui/glw/glw_ps3.c
+#
+id: Dual-Shock Remote
+msg: Dual-Shock дистанционно
+
+id: No
+msg: Не
+
+id: Seek using L2 and R2 button
+msg: Търсете с помощта на бутоните L2 и R2
+
+id: Yes with Select button
+msg: Да с бутон Select
+
+#
+# ./src/ui/glw/glw_settings.c
+#
+id: Background image
+msg: Фон
+
+id: Custom background image
+msg: Персонализиран фон
+
+id: Emulate Up/Down buttons with mouse wheel
+msg: Емулиране бутоните Нагоре/Надолу с колелото на мишката
+
+id: Folder for screensaver images
+msg: Папка с изображения
+
+id: Font and icon size
+msg: Размер на шрифтове и икони
+
+id: Interface horizontal shrink
+msg: Хоризонтално свиване
+
+id: Interface vertical shrink
+msg: Вертикално свиване
+
+id: Screensaver
+msg: Скрийнсейвър
+
+id: Screensaver delay
+msg: Активиране след
+
+id: Seconds per image
+msg: Времетраене на изображение
+
+id: Use Bing images of the day
+msg: Използване на Bing изображения
+
+id: Wrap when reaching beginning/end of lists
+msg: Преход при начало/край на списъците
+
+#
+# ./src/ui/glw/glw_view_eval.c
+#
+id: %d days ago
+msg: преди %d дни
+
+id: %d hours ago
+msg: преди %d часа
+
+id: %d minutes ago
+msg: преди %d минути
+
+id: %d months ago
+msg: преди %d месеца
+
+id: %d weeks ago
+msg: преди %d седмици
+
+id: %d years ago
+msg: преди %d години
+
+id: Just now
+msg: току що
+
+id: One day ago
+msg: преди ден
+
+id: One hour ago
+msg: преди час
+
+id: One minute ago
+msg: преди мунута
+
+id: One month ago
+msg: преди месец
+
+#
+# ./src/ui/linux/nvidia.c
+#
+id: Auto-switch to this mode
+msg: Автоматично преминаване към този режим
+
+id: DVI-Video color range
+msg: Цветова гама на DVI-Видео
+
+id: Switch to this mode now
+msg: Преминете към този режим сега
+
+id: Video modes
+msg: Видео режими
+
+#
+# ./src/upgrade.c
+#
+id: %s version %s is available
+msg: %s %s е наличен
+
+id: DRM7 version %s is available for download
+msg: DRM7 %s е наличен
+
+id: Notify about upgrades
+msg: Известие при нова версия на M7
+
+id: Open download page
+msg: Отворете страницата за изтегляне
+
+id: System
+msg: Система
+
+id: Upgrade to releases from
+msg: Обновления от
+
+#
+# ./src/upnp/upnp_browse.c
+#
+id: Date (newest first)
+msg: Дата (най-нови)
+
+id: Date (oldest first)
+msg: Дата (най-стари)
+
+id: Device not found
+msg: Устройството не е намерено
+
+id: Malformed URI after device
+msg: Неправилен URI (устройство)
+
+id: Malformed URI after service
+msg: Неправилен URI (услуга)
+
+id: Service not found
+msg: Услугата не е намерена
+
+#
+# ./src/video/video_settings.c
+#
+id: CSD Config
+msg: CSD Конфигуриране
+
+id: Always
+msg: Винаги
+
+id: Ask
+msg: Питай
+
+id: Tunnel Mode
+msg: Тунелен режим
+
+id: Automatically play next video in list
+msg: Авт. възпроизвеждане на следващо видео
+
+id: Count video as played when reaching
+msg: Считано за гледано при достигане на
+
+id: Enable VDPAU
+msg: Включване на VDPAU
+
+id: Hardware accelerated decoding
+msg: Декодиране с хардуерно ускорение
+
+id: Maximum resolution for deinterlacer
+msg: Максимална разделителна способност при деинтерлейс
+
+id: Never
+msg: Никога
+
+id: No limit
+msg: Без ограничение
+
+id: Per-file volume
+msg: Сила на звука за файл
+
+id: Preferred VDPAU deinterlacer method
+msg: Предпочитан метод за дейнтерлейс VDPAU
+
+id: Resume video playback
+msg: Възобновяване на възпроизвеждане
+
+id: Show clock during playback
+msg: Показване на часовник
+
+id: Step when seeking backward
+msg: Превъртане назад
+
+id: Step when seeking forward
+msg: Превъртане напред
+
+id: Temporal
+msg: Временни
+
+id: Temporal/Spatial
+msg: Времеви/Пространствени
+
+id: Up / Down during video playback controls
+msg: Нагоре/Надолу по време на възпроизвеждане
+
+id: Video acceleration and display behaviour
+msg: Видео ускорение и поведение на дисплея
+
+id: Buffer Size
+msg: Памет за видео/аудио буфер
+
+id: Bounding box opacity
+msg: Плътност на фон
+
+id: Buffer & Adaptive Playback
+msg: Буфериране и Видео Формат
+
+id: HLS Live Playback Mode
+msg: HLS режим (на живо)
+
+id: Adaptive Format
+msg: Максимален формат
+
+id: No Limit
+msg: Без ограничения
+
+id: AVC Only
+msg: Само AVC
+
+id: Pre-buffer
+msg: Начален видео/аудио буфер
+
+id: Standard
+msg: Стандартен
+
+id: Large Pre-Buffer
+msg: Голям буфер
+
+id: From Start
+msg: От начало
+
+id: Info Banner
+msg: Информационнa лента
+
+id: Duration
+msg: Продължителност
+
+id: Description
+msg: Описание
+
+id: Audio & Subtitles
+msg: Звук и субтитри
+
+id: Max number of connections
+msg: Максимален брой връзки
+
+id: Accelerated Decoding
+msg: Видео ускорение
+
+id: Visuals & Actions
+msg: Изглед и действия
+
+id: Home Screen
+msg: Начален екран
+
+id: [BACK] Button
+msg: Бутон [НАЗАД]
+
+id: Exit M7
+msg: Изход от M7
+
+id: USB Drives
+msg: USB устройства
+
+id: USB Drive
+msg: USB
+
+id: Android Storage
+msg: Андроид файлове
+
+id: M7 Data
+msg: M7 Данни
+
+id: Settings
+msg: Настройки
+
+id: [MENU] RC Button Opens Device Settings
+msg: Бутон [Меню] отваря Настройки на устройството
+
+id: Local Network
+msg: Мрежа
+
+id: Launch plugin on M7 start (bgTV, skyF1)
+msg: Автоматично стартиране на добавка (пр. bgTV, pluginsBG)
+
+id: Clock offset
+msg: Часова зона
+
+id: Deinterlace 480i/576i (sw)
+msg: Деинтерлейс при 480i/576i
+
+id: DRM7 upgrade
+msg: Обновяване на DRM7
+
+id: Upgrade DRM7 to releases from
+msg: Oбновяване на DRM7 от
+
+id: Notify about DRM7 upgrades
+msg: Известие при нова версия на DRM7
+
+id: Check for DRM7 updates now
+msg: Проверка за обновление на DRM7
+
+id: Source priority
+msg: Приоритет
+
+id: Remove SDH commentary
+msg: Премахване на коментари за глухонеми
+
+id: Current DRM7 version:
+msg: Инсталирана версия на DRM7:
+
+id: Available DRM7 version:
+msg: Налична версия на DRM7:
+
+id: DRM7 version %s is available
+msg: DRM7 %s е налична за изтегляне
+
+id: Download DRM7 and Re/Install
+msg: Инсталирай отново
+
+id: Downloading DRM7
+msg: Изтегляне на DRM7
+
+id: Changelog for %s DRM7 releases
+msg: Последни промени в DRM7:
+
+id: Restart required after 'Source priority' change
+msg: Необходим е рестарт след смяна на 'Приоритет'
+
+id: Err-Permissions: Storage/Install from unknown source
+msg: Грешка: Права до Хранилище/Инсталация от неизвестен източник
+
+id: Reset to default
+msg: Възстановяване по подразбиране
+
+id: Debug Log
+msg: Системен лог
+
+id: Landscape Mode
+msg: Хоризонтален режим
+
+id: Channel +/-
+msg: Смяна на ТВ канал
+
+id: Seek +/- 1 minute
+msg: Превъртане +/- 1 минута
+
+id: Permissions
+msg: Разрешения
+
+id: Media access (image, photo, video)
+msg: Достъп до снимки и видео
+
+id: Storage access (all files)
+msg: Достъп до всички файлове
+
+id: Tracker protocols
+msg: Тракер протоколи
+
+id: TV Video (RU)
+msg: ТВ Видео (RU)
+
+id: TV Settings
+msg: TV/Box Настройки
+
+id: DRM7 is up to date
+msg: DRM7 е актуален
+
+id: Keyboard
+msg: Клавиатура
+
+id: Hardware
+msg: Външна
+
+id: Download and install
+msg: Изтегляне и инсталиране
+
+id: New bookmark
+msg: Нова отметка
+
+id: No handler for URL
+msg: Адресът не се поддържа
+
+id: Connection refused
+msg: Връзката е отказана
+
+id: Connection attempt timed out
+msg: Времето за изчакване изтече
+
+id: Authentication required
+msg: Изисква се удостоверяване
+
+id: Authentication rejected by user
+msg: Удостоверяването е отхвърлено
+
+id: Socket read error during setup
+msg: Грешка при четене на сокет
+
+id: Unable to resolve %s -- Unknown host
+msg: Адресът %s не е достъпен
+
+id: Show 'Search'
+msg: Показване на лента за Търсене
+
+id: Minimize
+msg: Минимизиране
+
+id: Auto upgrade
+msg: Автоматично актуализиране на M7
+
+id: Audio Transcode
+msg: Прекодиране и формат
+
+id: Stereo Upmix
+msg: Стерео към многоканален звук
+
+id: Resample
+msg: Промяна на честота
+
+id: Look
+msg: Изглед
+
+id: Feel
+msg: Поведение
+
+id: Background Playback
+msg: Възпроизвеждане във фонов режим
+
+id: Resume Playback After Wake/Unlock
+msg: Възпроизвеждане след събуждане/отключване
+
+id: Pass-through
+msg: Хардуерно поддържани формати
+
+id: Conversion
+msg: Прекодиране
+
+id: Device
+msg: Устройство
+
+id: PCM | Pass-through
+msg: PCM или Хардуерно поддържан
+
+id: DD | Source
+msg: DD или Оригинален
+
+id: DD+ | Source
+msg: DD+ или Оригинален
+
+id: DTS | Source
+msg: DTS или Оригинален
+
+id: Loading Indicator
+msg: Индикатор за зареждане
+
+id: Colors
+msg: Цветове
+
+id: Blue
+msg: Син
+
+id: White
+msg: Бял
+
+id: Max memory for active transfers
+msg: Памет за активни трансфери на данни
+
+id: Max cache size per torrent
+msg: Максимален размер на кеширани данни за торент
+
+id: Inject additional trackers
+msg: Допълнителни тракер-сървъри
+
+id: Best
+msg: Най-надеждни
+
+id: Best (IP)
+msg: Най-надеждни (IP)
+
+id: All
+msg: Всички
+
+id: All (IP)
+msg: Всички (IP)
+
+id: Max concurrent requests per peer
+msg: Заявки към пиър
+
+id: Plugin Uninstall
+msg: Деинсталиране на добавки
+
+id: Long Press Action (OK/[*] Button)
+msg: Задържане на бутон [OK]
+
+id: Pause
+msg: Пауза
+
+id: Context Menu
+msg: Меню
+
+id: Pause | Context Menu
+msg: Пауза | Меню
+
+id: Reload
+msg: Опресняване
+
+id: No Action
+msg: Изключен
+
+id: Lost A/V Synchronization
+msg: Няма синхронизация, рестартирайте видеото / ТВ-канала
+
+id: Upscale
+msg: Мащабиране до 1080p/4K
+
+id: Color saturation
+msg: Цветова корекция
+
+id: Audio output
+msg: Аудио изход
+
+id: Downmix Profile
+msg: Звуков профил (5.1 в стерео)
+
+id: Surround
+msg: Ефекти
+
+id: Bass
+msg: Бас
+
+id: Speech
+msg: Говор
+
+id: Transfer speed
+msg: Скорост
+
+id: IPv6 Protocol
+msg: IPv6 Протокол
+
+id: IPv6 Support
+msg: IPv6 Поддръжка
+
+id: Prefer
+msg: Предпочитан
+
+id: PCM Latency
+msg: PCM Хардуерно забавяне
+
+id: Speed-up & Slow-down
+msg: Ускоряване и забавяне на скоростта
+
+id: Playback speed
+msg: Скорост на възпроизвеждане
+
+id: Pitch correction
+msg: Корекция на звука
+
+id: Zoom & Scale
+msg: Размер и мащабиране
+
+id: PCM Multi-channel
+msg: PCM 5.1/7.1
+
+id: UI Animation Speed
+msg: Скорост на графичен интерфейс
+
+id: SOCKS/HTTP Proxy
+msg: SOCKS/HTTP Прокси
+
+id: HTTP Proxy
+msg: HTTP Прокси
+
+id: Proxy Host
+msg: Адрес
+
+id: Proxy Port
+msg: Порт
+
+id: Store M7 cache on USB
+msg: М7 кеш-файлове на USB
+
+id: SMB Large Buffer
+msg: SMB Голям буфер
+
+id: Developer
+msg: За разработчици
+
+id: DLNA/UPNP Probe for Metadata
+msg: DLNA/UPNP Извличане на мета-данни 
+
+id: SMB Extended Attributes
+msg: SMB Разширени атрибути

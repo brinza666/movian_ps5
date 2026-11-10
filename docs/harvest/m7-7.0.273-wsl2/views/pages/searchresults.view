@@ -1,0 +1,81 @@
+#import "skin://theme.view"
+#import "skin://styles/style_grid.view"
+
+widget(container_z, {
+
+  widget(list_y, {
+    id: "scrollable";
+
+    $view.width = getWidth();
+
+    clipOffsetTop: 3em;
+    scrollThresholdTop: 5em;
+
+    scrollThresholdBottom: $ui.universeBottomHeight + 2em;
+    clipOffsetBottom: $ui.universeBottomHeight;
+    clipAlpha: 0.2;
+    clipBlur: 1;
+    spacing: 1em;
+    cloner($self.model.nodes, container_y, {
+
+      widget(label, {
+        padding: [1em, 0];
+        caption: fmt('%s <font size="2" color="#aaaaaa">- %s',
+                     $self.metadata.title,
+                     fmt(_pl("%d hits", "%d hit", $self.entires), $self.entries));
+        size: 1.5em;
+      });
+
+      widget(container_x, {
+        padding: [2em, 0];
+        spacing: $view.width / 30;
+
+        cloner(propWindow($self.nodes, 0, 3), loader, {
+          width: $view.width / 6;
+          alt: "skin://items/rect/default.view";
+          source: "skin://items/rect/" + $self.type + ".view";
+        });
+
+        widget(container_z, {
+          hidden: $self.entries < 4;
+          width: $view.width / 6;
+          GridItemBevel();
+          GridItemHighlight();
+
+          focusable: true;
+          onEvent(activate, navOpen($self.url));
+
+          widget(container_y, {
+            align: bottom;
+
+            widget(container_z, {
+
+              widget(quad, {
+                color: 0;
+                alpha: 0.5;
+              });
+
+              widget(container_y, {
+                padding: [0.25em, 0.25em];
+                widget(label, {
+                  
+                  caption: _("Show more");
+                  align: center;
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+
+  ScrollBar("scrollable", 3em, $ui.universeBottomHeight);
+
+
+  widget(container_y, {
+    align: top;
+    PageHeader($self.model.metadata.title);
+  });
+
+});

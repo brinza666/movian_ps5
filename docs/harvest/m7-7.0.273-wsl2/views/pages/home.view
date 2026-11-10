@@ -1,0 +1,209 @@
+#include "skin://theme.view"
+
+onEvent(homeInfo, {
+  $clone.itemData := currentEvent("prop");
+  $clone.popupScreenX = currentEvent("screenX");
+  $clone.popupScreenY = currentEvent("screenY");
+  $clone.itemMenu = "home";
+});
+
+style(sidebarBackdrop, {
+  color: 0;
+  alpha: 0.3;
+});
+
+
+#define NEWSSTAND() {
+  cloner($core.news, container_x, {
+    height: 2em;
+    divider: true;
+    spacing: 1em;
+    padding: [2em, 0em];
+
+    widget(icon, {
+      source: "skin://icons/ic_info_outline_48px.svg";
+    });
+
+    widget(label, {
+      caption: $self.message;
+    });
+
+    space(1);
+
+    widget(container_z, {
+      onEvent(activate, select(isVoid($self.location),
+                               deliverEvent($self.eventSink, $self.action),
+                               navOpen($self.location)));
+      focusable: 0.1;
+      GridItemHighlight();
+
+      widget(label, {
+        padding: [1em, 0];
+        caption: $self.caption;
+      });
+    });
+
+    widget(container_z, {
+      onEvent(activate, deliverEvent($self.eventSink, "dismiss"));
+      focusable: 0.05;
+
+      focusable: 0.1;
+      GridItemHighlight();
+
+      widget(label, {
+        padding: [1em, 0];
+        caption: _("Dismiss");
+      });
+    });
+  });
+}
+
+
+onEvent(itemMenu, { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(back,     { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(cancel,   { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(menu,     { toggle($clone.showSidebar); },
+       isVoid($clone.itemMenu));
+
+widget(container_z, {
+
+  widget(layer, {
+
+    onEvent(right, {
+      $clone.showSidebar = true;
+    }, true, false);
+
+    widget(clip, {
+
+      rightPx: select($clone.showSidebar, 22em, 0);
+      blurOutside: 1;
+      alphaOutside: 0.05;
+
+      widget(container_z, {
+
+        alpha: iir(select($clone.itemMenu, 0.4, 1), 4);
+
+        widget(array, {
+          id: "main";
+
+          clipOffsetTop: 3em;
+          scrollThresholdTop: 3em;
+
+          scrollThresholdBottom: $ui.universeBottomHeight;
+          clipOffsetBottom: $ui.universeBottomHeight;
+          clipAlpha: 0.2;
+          clipBlur: 1;
+
+          alpha: iir(select($clone.showSidebar, 0.3, 1), 4);
+
+          margin: [$ui.xmargin, 0em];
+
+          childTilesX: $ui.aspect > 1 ? 5 : 2;
+          childTilesY: 4;
+
+          style(ListItem, {
+            padding: [0, 1em];
+          });
+
+          NEWSSTAND();
+          SearchBar("search:");
+
+          cloner($core.services.stable, container_z, {
+
+            focusable: true;
+            GridItemHighlight();
+            onEvent(activate, navOpen($self.url, void, $self));
+
+            onEvent(itemMenu, eventWithProp(homeInfo, $self));
+
+            widget(container_y, {
+
+              spacing: 0.5em;
+              padding: 0.5em;
+
+              widget(displacement, {
+                //scaling: [1,1,1] - [0.11,0.1,0] * iir(isPressed(), 4, true)
+			    scaling: [1.1 - iir((isNavFocused() || isHovered()) < 1, 5) * 0.1, 1.1 - iir((isNavFocused() || isHovered()) < 1, 5) * 0.1, 1] - [0.11,0.11,0] * iir(isPressed(), 4, true)
+                widget(image, {
+                  source: $self.icon ??
+	            "skin://icons/" +
+	            translate($self.type, "ic_folder_48px",
+		              "tv",       "ic_tv_48px",
+		              "usb",      "ic_usb_48px",
+		              "cd",       "ic_album_48px",
+		              "dvd",      "ic_album_48px",
+		              "bluray",   "ic_album_48px",
+		              "network",  "ic_device_hub_24px",
+		              "setting",  "ic_settings_48px",
+                              "storage",  "ic_sd_storage_48px",
+		              "plugin",   "ic_extension_48px",
+		              "movian",    "movian"
+                             ) + ".svg";
+
+                  saturation: iir(isPressed(), 4, true) * 0.66;
+                });
+              });
+			  
+              widget(displacement, {
+			    scaling: [1.1 - iir((isNavFocused() || isHovered()) < 1, 5) * 0.1, 1.1 - iir((isNavFocused() || isHovered()) < 1, 5) * 0.1, 1]
+				  widget(label, {
+					align: center;
+					caption: $self.title;
+					size: 1.2em;
+				  });
+			  });
+            });
+          });
+        });
+      });
+    });
+    widget(loader, {
+      hidden: !$clone.showSidebar;
+      filterConstraintX: true;
+      time: 0.05;
+      source: "skin://menu/sidebar.view";
+    });
+
+    widget(loader, {
+      args: $clone.itemData;
+      // Hide if itemMenu is 0 or if we shouldn't show it at all
+      hidden: isVoid($clone.itemMenu);
+      time: 0;
+      noInitialTransform: true;
+      source: "skin://ctxmenu/" + $clone.itemMenu + "_details.view";
+    });
+  });
+
+  widget(container_y, {
+    align: top;
+    PageHeader(select($clone.showSidebar, "", _("Home")));
+  });
+
+	widget(underscan, {
+	widget(container_y, {
+
+	alpha: $ui.showTopIcons;
+	padding: [0, 0, ($core.clock.timeFormat=="1" ? 2.5em : 3.5em), 0];
+	widget(container_x, {
+		space(1);
+		height: 3em;
+		widget(container_y, {
+		align: center;
+		width: 4em;
+		clickable: true;
+		onEvent(activate, {
+			toggle($clone.showSidebar);
+		});
+		navFocusable: false;
+		widget(icon, {
+			angle: iir($clone.showSidebar, 4) * -90;
+			color: 0.5 + iir(isHovered(), 4);
+			size: 2em;
+			source: "skin://icons/ic_menu_48px.svg";
+		});
+		});
+	});
+	});
+	});
+
+});

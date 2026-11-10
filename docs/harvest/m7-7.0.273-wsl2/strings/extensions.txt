@@ -1,0 +1,7 @@
+.dts
+.m2ts
+.m3u
+.mpeg
+.nfo
+.pls
+.wav

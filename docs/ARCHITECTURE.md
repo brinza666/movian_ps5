@@ -74,8 +74,8 @@ payload path, and titles do not use it.
 ## Layering (target)
 
 ```text
-ui.cpp            four places, pad, settings
-plugin_host       Movian API v2 (js)     ← Phase 4, from movian-go PLUGINS.md
+ui.cpp            four places, pad, settings  ← look: docs/M7_CAPABILITIES.md
+plugin_host       Movian API v2 (js)     ← Phase 4, M7 Duktape + movian-go PLUGINS.md
 player            play/pause/seek/osd    ← Phase 2
   ffmpeg_sw       software decode
   hwdec           libSceVideodec2        ← Phase 2b, splicer/VLC reference

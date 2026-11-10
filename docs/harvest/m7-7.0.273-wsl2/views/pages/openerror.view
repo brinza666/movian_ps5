@@ -1,0 +1,45 @@
+#import "skin://theme.view"
+
+widget(container_z, {
+
+  widget(container_y, {
+    align: top;
+    PageHeader($self.model.metadata.title);
+  });
+
+  widget(image, {
+    margin: 3em;
+    source: "skin://icons/ic_error_48px.svg";
+    alpha: 0.1;
+  });
+
+  widget(container_y, {
+    spacing: 10;
+
+    space(1);
+
+    widget(label, {
+      align: center;
+      caption: _("Unable to open resource");
+      size: 1.5em;
+      font: "skin://fonts/RobotoCondensed-Bold.ttf";
+      shadow: true;
+    });
+
+    widget(label, {
+      align: center;
+      caption: $self.url;
+      maxlines: 10;
+      shadow: true;
+    });
+
+    widget(label, {
+      align: center;
+      caption: $self.model.error;
+      maxlines: 10;
+      font: "skin://fonts/RobotoCondensed-Bold.ttf";
+      shadow: true;
+    });
+    space(1);
+  });
+});

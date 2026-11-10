@@ -1,0 +1,1018 @@
+                       Intended for plugin development
+   --disable-upnp    - Disable UPNP/DLNA stack.
+   --libav-log       - Print libav log messages.
+   --plugin-repo     - URL to plugin repository
+   -p                - Path to plugin directory to load
+ is not implemented. Update your FFmpeg version to the newest one from Git. If the problem still occurs, it means that your file has a feature which has not been implemented.
+ libavcodec license: LGPL version 2.1 or later
+"urn:schemas-upnp-org:service:%s:%d#%s"
+#7@Qhq\1@NWgyxeH\_bpdgcsrc/libavcodec/vp3dsp.c
+%s is not a recognized subtitle format
+%s subtitle scan for %s (imdbid:%s) year:%d season:%d episode:%d duration:%d opensubhash:%016lx
+%s%s%s%sLOCATION: http://%d.%d.%d.%d:%d%s
+%s/bittorrentcache
+%s/installedplugins
+%s/plugins/%s
+%s:%d malformed packet smbhdrlen %d
+%sSERVER: Movian,%s,UPnP/1.0,Movian,%s
+(Psrc/libavcodec/h264pred.c
+(function(d,a){function b(a,b,c){Object.defineProperty(a,b,{value:c,writable:!0,enumerable:!1,configurable:!0})}b(a.Logger,"clog",new a.Logger("C"));b(a,"modLoaded",Object.create(null))})(this,Duktape);
+--disable-upnp
+--disable-vdpau --enable-pthreads --disable-logging --disable-debug --enable-small --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages --enable-static --disable-shared --pkg-config-flags=--static --enable-static --disable-shared --disable-avdevice --disable-network --disable-pixelutils --disable-protocols --disable-bsfs --enable-bsf=h264_mp4toannexb --enable-bsf=hevc_mp4toannexb --enable-avresample --disable-encoders --disable-decoders --disable-filters --enable-filter=bwdif --disable-muxers --disable-demuxers --disable-devices --disable-programs --disable-protocol=rtp --disable-protocol=ftp --disable-protocol=http --disable-protocol=https --disable-protocol=icecast --disable-protocol=rtmp --disable-protocol=rtmpt --disable-protocol=pipe --disable-protocol=gopher --disable-protocol=ffrtmphttp --disable-protocol=cache --disable-protocol=prompeg --disable-protocol=tee --disable-protocol=mmsh --disable-protocol=mmst --disable-protocol=unix --disable-protocol=udplite --disable-bzlib --enable-encoder=mjpeg --enable-encoder=png --enable-encoder=ac3 --enable-encoder=eac3 --enable-encoder=dca --enable-encoder=ffvhuff --enable-encoder=flac --enable-demuxer=aac --enable-demuxer=ac3 --enable-demuxer=amr --enable-demuxer=asf --enable-demuxer=ass --enable-demuxer=av1 --enable-demuxer=avi --enable-demuxer=dts --enable-demuxer=eac3 --enable-demuxer=ffmetadata --enable-demuxer=flac --enable-demuxer=flv --enable-demuxer=h261 --enable-demuxer=h263 --enable-demuxer=h264 --enable-demuxer=hevc --enable-demuxer=image2 --enable-demuxer=image2pipe --enable-demuxer=m4v --enable-demuxer=matroska --enable-demuxer=mjpeg --enable-demuxer=mlp --enable-demuxer=mov --enable-demuxer=mp3 --enable-demuxer=mpegps --enable-demuxer=mpegts --enable-demuxer=mpegtsraw --enable-demuxer=mpegvideo --enable-demuxer=mpjpeg --enable-demuxer=ogg --enable-demuxer=pcm_f32be --enable-demuxer=pcm_f32le --enable-demuxer=pcm_s16be --enable-demuxer=pcm_s16le --enable-demuxer=pcm_s24be --enable-demuxer=pcm_s24le --enable-demuxer=pcm_s32be --enable-demuxer=pcm_s32le --enable-demuxer=pcm_s8 --enable-demuxer=pcm_u16be --enable-demuxer=pcm_u16le --enable-demuxer=pcm_u24be --enable-demuxer=pcm_u24le --enable-demuxer=pcm_u32be --enable-demuxer=pcm_u32le --enable-demuxer=pcm_u8 --enable-demuxer=srt --enable-demuxer=swf --enable-demuxer=truehd --enable-demuxer=vc1 --enable-demuxer=wav --enable-demuxer=wc3 --enable-decoder=aac --enable-decoder=aac_latm --enable-decoder=ac3 --enable-decoder=eac3 --enable-decoder=ass --enable-decoder=atrac1 --enable-decoder=atrac3 --enable-decoder=atrac3p --enable-decoder=av1 --enable-decoder=bmp --enable-decoder=dca --enable-decoder=dvbsub --enable-decoder=dvdsub --enable-decoder=ffvhuff --enable-decoder=flac --enable-decoder=flv --enable-decoder=gif --enable-decoder=h263 --enable-decoder=h263i --enable-decoder=h264 --enable-decoder=hevc --enable-decoder=huffyuv --enable-decoder=jpeg2000 --enable-decoder=jpegls --enable-decoder=mlp --enable-decoder=mp1 --enable-decoder=mp1float --enable-decoder=mp2 --enable-decoder=mp2float --enable-decoder=mp3 --enable-decoder=mp3adu --enable-decoder=mp3adufloat --enable-decoder=mp3float --enable-decoder=mp3on4 --enable-decoder=mp3on4float --enable-decoder=mpeg1video --enable-decoder=mpeg2video --enable-decoder=mpeg4 --enable-decoder=msmpeg4v1 --enable-decoder=msmpeg4v2 --enable-decoder=msmpeg4v3 --enable-decoder=msvideo1 --enable-decoder=mts2 --enable-decoder=opus --enable-decoder=pcm_bluray --enable-decoder=pcm_dvd --enable-decoder=pcm_s16be --enable-decoder=pcm_s16be_planar --enable-decoder=pcm_s16le --enable-decoder=pcm_s16le_planar --enable-decoder=pcm_s24be --enable-decoder=pcm_s24daud --enable-decoder=pcm_s24le --enable-decoder=pcm_s24le_planar --enable-decoder=pcm_s32be --enable-decoder=pcm_s32le --enable-decoder=pcm_s32le_planar --enable-decoder=pcm_s8 --enable-decoder=pcm_s8_planar --enable-decoder=pcm_u16be --enable-decoder=pcm_u16le --enable-decoder=pcm_u24be --enable-decoder=pcm_u24le --enable-decoder=pcm_u32be --enable-decoder=pcm_u32le --enable-decoder=pcm_u8 --enable-decoder=pcx --enable-decoder=pgm --enable-decoder=pgmyuv --enable-decoder=pgssub --enable-decoder=png --enable-decoder=webp --enable-decoder=rawvideo --enable-decoder=srt --enable-decoder=tiff --enable-decoder=truehd --enable-decoder=vc1 --enable-decoder=vcr1 --enable-decoder=vorbis --enable-decoder=vp3 --enable-decoder=vp5 --enable-decoder=vp6 --enable-decoder=vp6a --enable-decoder=vp6f --enable-decoder=vp7 --enable-decoder=vp8 --enable-decoder=vp9 --enable-decoder=webp --enable-decoder=wmalossless --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2 --enable-decoder=wmavoice --enable-decoder=wmv1 --enable-decoder=wmv2 --enable-decoder=wmv3 --enable-decoder=xsub --enable-decoder=zlib --prefix=/home/dean/movian_linux/build.x86_64-linux-gnu/inst --extra-cflags=' ' --extra-ldflags=' ' --cc='ccache cc'
+--libav-log
+--plugin-repo
+/api/torrents
+/home/dean/movian_linux/src/backend/bittorrent/magnet.c
+/home/dean/movian_linux/src/backend/bittorrent/tracker.c
+/home/dean/movian_linux/src/ecmascript/es_subtitles.c
+/home/dean/movian_linux/src/fileaccess/smb/fa_nativesmb.c
+/home/dean/movian_linux/src/fileaccess/smb2/fa_libsmb2_pool.c
+/home/dean/movian_linux/src/plugins.c
+/home/dean/movian_linux/src/upnp/upnp_event.c
+/upnp/AVTransport/control
+/upnp/AVTransport/scpd.xml
+/upnp/AVTransport/subscribe
+/upnp/ConnectionManager/control
+/upnp/ConnectionManager/scpd.xml
+/upnp/ConnectionManager/subscribe
+/upnp/RenderingControl/control
+/upnp/RenderingControl/scpd.xml
+/upnp/RenderingControl/subscribe
+/upnp/description.xml
+::upnp:rootdevice
+::urn:schemas-upnp-org:device:MediaRenderer:2
+::urn:schemas-upnp-org:service:AVTransport:2
+::urn:schemas-upnp-org:service:ConnectionManager:2
+::urn:schemas-upnp-org:service:RenderingControl:2
+:icecast
+:src/libavcodec/opus_rc.c
+; Script generated by FFmpeg/Lavc%s
+</upnp:album>
+</upnp:albumArtURI>
+</upnp:artist>
+<?xml version="1.0" encoding="utf-8"?> <scpd xmlns="urn:schemas-upnp-org:service-1-0"> <specVersion> <major>1</major> <minor>0</minor> </specVersion> <actionList> <action> <name>GetCurrentConnectionInfo</name> <argumentList> <argument> <name>ConnectionID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_ConnectionID</relatedStateVariable> </argument> <argument> <name>RcsID</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_RcsID</relatedStateVariable> </argument> <argument> <name>AVTransportID</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_AVTransportID</relatedStateVariable> </argument> <argument> <name>ProtocolInfo</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_ProtocolInfo</relatedStateVariable> </argument> <argument> <name>PeerConnectionManager</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_ConnectionManager</relatedStateVariable> </argument> <argument> <name>PeerConnectionID</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_ConnectionID</relatedStateVariable> </argument> <argument> <name>Direction</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_Direction</relatedStateVariable> </argument> <argument> <name>Status</name> <direction>out</direction> <relatedStateVariable>A_ARG_TYPE_ConnectionStatus</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetProtocolInfo</name> <argumentList> <argument> <name>Source</name> <direction>out</direction> <relatedStateVariable>SourceProtocolInfo</relatedStateVariable> </argument> <argument> <name>Sink</name> <direction>out</direction> <relatedStateVariable>SinkProtocolInfo</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetCurrentConnectionIDs</name> <argumentList> <argument> <name>ConnectionIDs</name> <direction>out</direction> <relatedStateVariable>CurrentConnectionIDs</relatedStateVariable> </argument> </argumentList> </action> </actionList> <serviceStateTable> <stateVariable sendEvents="yes"> <name>SinkProtocolInfo</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_RcsID</name> <dataType>i4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ConnectionManager</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="yes"> <name>CurrentConnectionIDs</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ProtocolInfo</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_AVTransportID</name> <dataType>i4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_Direction</name> <dataType>string</dataType> <allowedValueList> <allowedValue>Input</allowedValue> <allowedValue>Output</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ConnectionStatus</name> <dataType>string</dataType> <allowedValueList> <allowedValue>OK</allowedValue> <allowedValue>ContentFormatMismatch</allowedValue> <allowedValue>InsufficientBandwidth</allowedValue> <allowedValue>UnreliableChannel</allowedValue> <allowedValue>Unknown</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ConnectionID</name> <dataType>i4</dataType> </stateVariable> <stateVariable sendEvents="yes"> <name>SourceProtocolInfo</name> <dataType>string</dataType> </stateVariable> </serviceStateTable> </scpd>
+<?xml version="1.0" encoding="utf-8"?> <scpd xmlns="urn:schemas-upnp-org:service-1-0"> <specVersion> <major>1</major> <minor>0</minor> </specVersion> <actionList> <action> <name>GetMediaInfo_Ext</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>CurrentType</name> <direction>out</direction> <relatedStateVariable>CurrentMediaCategory</relatedStateVariable> </argument> <argument> <name>NrTracks</name> <direction>out</direction> <relatedStateVariable>NumberOfTracks</relatedStateVariable> </argument> <argument> <name>MediaDuration</name> <direction>out</direction> <relatedStateVariable>CurrentMediaDuration</relatedStateVariable> </argument> <argument> <name>CurrentURI</name> <direction>out</direction> <relatedStateVariable>AVTransportURI</relatedStateVariable> </argument> <argument> <name>CurrentURIMetaData</name> <direction>out</direction> <relatedStateVariable>AVTransportURIMetaData</relatedStateVariable> </argument> <argument> <name>NextURI</name> <direction>out</direction> <relatedStateVariable>NextAVTransportURI</relatedStateVariable> </argument> <argument> <name>NextURIMetaData</name> <direction>out</direction> <relatedStateVariable>NextAVTransportURIMetaData</relatedStateVariable> </argument> <argument> <name>PlayMedium</name> <direction>out</direction> <relatedStateVariable>PlaybackStorageMedium</relatedStateVariable> </argument> <argument> <name>RecordMedium</name> <direction>out</direction> <relatedStateVariable>RecordStorageMedium</relatedStateVariable> </argument> <argument> <name>WriteStatus</name> <direction>out</direction> <relatedStateVariable>RecordMediumWriteStatus</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Play</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Speed</name> <direction>in</direction> <relatedStateVariable>TransportPlaySpeed</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Pause</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetPositionInfo</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Track</name> <direction>out</direction> <relatedStateVariable>CurrentTrack</relatedStateVariable> </argument> <argument> <name>TrackDuration</name> <direction>out</direction> <relatedStateVariable>CurrentTrackDuration</relatedStateVariable> </argument> <argument> <name>TrackMetaData</name> <direction>out</direction> <relatedStateVariable>CurrentTrackMetaData</relatedStateVariable> </argument> <argument> <name>TrackURI</name> <direction>out</direction> <relatedStateVariable>CurrentTrackURI</relatedStateVariable> </argument> <argument> <name>RelTime</name> <direction>out</direction> <relatedStateVariable>RelativeTimePosition</relatedStateVariable> </argument> <argument> <name>AbsTime</name> <direction>out</direction> <relatedStateVariable>AbsoluteTimePosition</relatedStateVariable> </argument> <argument> <name>RelCount</name> <direction>out</direction> <relatedStateVariable>RelativeCounterPosition</relatedStateVariable> </argument> <argument> <name>AbsCount</name> <direction>out</direction> <relatedStateVariable>AbsoluteCounterPosition</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetMediaInfo</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>NrTracks</name> <direction>out</direction> <relatedStateVariable>NumberOfTracks</relatedStateVariable> </argument> <argument> <name>MediaDuration</name> <direction>out</direction> <relatedStateVariable>CurrentMediaDuration</relatedStateVariable> </argument> <argument> <name>CurrentURI</name> <direction>out</direction> <relatedStateVariable>AVTransportURI</relatedStateVariable> </argument> <argument> <name>CurrentURIMetaData</name> <direction>out</direction> <relatedStateVariable>AVTransportURIMetaData</relatedStateVariable> </argument> <argument> <name>NextURI</name> <direction>out</direction> <relatedStateVariable>NextAVTransportURI</relatedStateVariable> </argument> <argument> <name>NextURIMetaData</name> <direction>out</direction> <relatedStateVariable>NextAVTransportURIMetaData</relatedStateVariable> </argument> <argument> <name>PlayMedium</name> <direction>out</direction> <relatedStateVariable>PlaybackStorageMedium</relatedStateVariable> </argument> <argument> <name>RecordMedium</name> <direction>out</direction> <relatedStateVariable>RecordStorageMedium</relatedStateVariable> </argument> <argument> <name>WriteStatus</name> <direction>out</direction> <relatedStateVariable>RecordMediumWriteStatus</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetTransportInfo</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>CurrentTransportState</name> <direction>out</direction> <relatedStateVariable>TransportState</relatedStateVariable> </argument> <argument> <name>CurrentTransportStatus</name> <direction>out</direction> <relatedStateVariable>TransportStatus</relatedStateVariable> </argument> <argument> <name>CurrentSpeed</name> <direction>out</direction> <relatedStateVariable>TransportPlaySpeed</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Stop</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetDeviceCapabilities</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>PlayMedia</name> <direction>out</direction> <relatedStateVariable>PossiblePlaybackStorageMedia</relatedStateVariable> </argument> <argument> <name>RecMedia</name> <direction>out</direction> <relatedStateVariable>PossibleRecordStorageMedia</relatedStateVariable> </argument> <argument> <name>RecQualityModes</name> <direction>out</direction> <relatedStateVariable>PossibleRecordQualityModes</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Next</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> </argumentList> </action> <action> <name>SetAVTransportURI</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>CurrentURI</name> <direction>in</direction> <relatedStateVariable>AVTransportURI</relatedStateVariable> </argument> <argument> <name>CurrentURIMetaData</name> <direction>in</direction> <relatedStateVariable>AVTransportURIMetaData</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetTransportSettings</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>PlayMode</name> <direction>out</direction> <relatedStateVariable>CurrentPlayMode</relatedStateVariable> </argument> <argument> <name>RecQualityMode</name> <direction>out</direction> <relatedStateVariable>CurrentRecordQualityMode</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Seek</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Unit</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_SeekMode</relatedStateVariable> </argument> <argument> <name>Target</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_SeekTarget</relatedStateVariable> </argument> </argumentList> </action> <action> <name>GetCurrentTransportActions</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Actions</name> <direction>out</direction> <relatedStateVariable>CurrentTransportActions</relatedStateVariable> </argument> </argumentList> </action> <action> <name>Previous</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> </argumentList> </action> </actionList> <serviceStateTable> <stateVariable sendEvents="no"> <name>CurrentTransportActions</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>PossibleRecordQualityModes</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>PlaybackStorageMedium</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>AbsoluteCounterPosition</name> <dataType>i4</dataType> <allowedValueRange> <minimum>0</minimum> <maximum>2147483647</maximum> </allowedValueRange> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_SeekTarget</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentMediaCategory</name> <dataType>string</dataType> <allowedValueList> <allowedValue>NO_MEDIA</allowedValue> <allowedValue>TRACK_AWARE</allowedValue> <allowedValue>TRACK_UNAWARE</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentTrackMetaData</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>AVTransportURIMetaData</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>AbsoluteTimePosition</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>TransportStatus</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_SeekMode</name> <dataType>string</dataType> <allowedValueList> <allowedValue>ABS_TIME</allowedValue> <allowedValue>REL_TIME</allowedValue> <allowedValue>TRACK_NR</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>DRMState</name> <dataType>string</dataType> <allowedValueList> <allowedValue>OK</allowedValue> <allowedValue>UNKNOWN</allowedValue> <allowedValue>PROCESSING_CONTENT_KEY</allowedValue> <allowedValue>CONTENT_KEY_FAILURE</allowedValue> <allowedValue>ATTEMPTING_AUTHENTICATION</allowedValue> <allowedValue>FAILED_AUTHENTICATION</allowedValue> <allowedValue>NOT_AUTHENTICATED</allowedValue> <allowedValue>DEVICE_REVOCATION</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>RelativeTimePosition</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentTrackDuration</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="yes"> <name>LastChange</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_StateVariableList</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ServiceID</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>RecordMediumWriteStatus</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentMediaDuration</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>RecordStorageMedium</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>PossibleRecordStorageMedia</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_InstanceID</name> <dataType>ui4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>NextAVTransportURI</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>NextAVTransportURIMetaData</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentPlayMode</name> <dataType>string</dataType> <allowedValueList> <allowedValue>NORMAL</allowedValue> <allowedValue>SHUFFLE</allowedValue> <allowedValue>REPEAT_ONE</allowedValue> <allowedValue>REPEAT_ALL</allowedValue> <allowedValue>RANDOM</allowedValue> <allowedValue>DIRECT_1</allowedValue> <allowedValue>INTRO</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>NumberOfTracks</name> <dataType>ui4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentRecordQualityMode</name> <dataType>string</dataType> <allowedValueList> <allowedValue>WRITABLE</allowedValue> <allowedValue>PROTECTED</allowedValue> <allowedValue>NOT_WRITABLE</allowedValue> <allowedValue>UNKNOWN</allowedValue> <allowedValue>NOT_IMPLEMENTED</allowedValue> </allowedValueList> </stateVariable> <stateVariable sendEvents="no"> <name>PossiblePlaybackStorageMedia</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentTrack</name> <dataType>ui4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>TransportState</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>AVTransportURI</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>CurrentTrackURI</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>RelativeCounterPosition</name> <dataType>i4</dataType> <allowedValueRange> <minimum>-2147483646</minimum> <maximum>2147483647</maximum> </allowedValueRange> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_StateVariableValuePairs</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>TransportPlaySpeed</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ServiceType</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_DeviceUDN</name> <dataType>string</dataType> </stateVariable> </serviceStateTable> </scpd>
+<?xml version="1.0" encoding="utf-8"?> <scpd xmlns="urn:schemas-upnp-org:service-1-0"> <specVersion> <major>1</major> <minor>0</minor> </specVersion> <actionList> <action> <name>SelectPreset</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>PresetName</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_PresetName</relatedStateVariable> </argument> </argumentList> </action> <action> <name>SetVolume</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Channel</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_Channel</relatedStateVariable> </argument> <argument> <name>DesiredVolume</name> <direction>in</direction> <relatedStateVariable>Volume</relatedStateVariable> </argument> </argumentList> </action> <action> <name>SetMute</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>Channel</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_Channel</relatedStateVariable> </argument> <argument> <name>DesiredMute</name> <direction>in</direction> <relatedStateVariable>Mute</relatedStateVariable> </argument> </argumentList> </action> <action> <name>ListPresets</name> <argumentList> <argument> <name>InstanceID</name> <direction>in</direction> <relatedStateVariable>A_ARG_TYPE_InstanceID</relatedStateVariable> </argument> <argument> <name>CurrentPresetNameList</name> <direction>out</direction> <relatedStateVariable>PresetNameList</relatedStateVariable> </argument> </argumentList> </action> </actionList> <serviceStateTable> <stateVariable sendEvents="no"> <name>VerticalKeystone</name> <dataType>i2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>PresetNameList</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>BlueVideoBlackLevel</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Contrast</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Volume</name> <dataType>ui2</dataType> <allowedValueRange> <step>1</step> <minimum>0</minimum> <maximum>100</maximum> </allowedValueRange> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_StateVariableList</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ServiceID</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>RedVideoBlackLevel</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>HorizontalKeystone</name> <dataType>i2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>GreenVideoBlackLevel</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_InstanceID</name> <dataType>ui4</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>ColorTemperature</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Brightness</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_Channel</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>RedVideoGain</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>GreenVideoGain</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Loudness</name> <dataType>boolean</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_PresetName</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Mute</name> <dataType>boolean</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_StateVariableValuePairs</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>Sharpness</name> <dataType>ui2</dataType> </stateVariable> <stateVariable sendEvents="yes"> <name>LastChange</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>VolumeDB</name> <dataType>i2</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_ServiceType</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>A_ARG_TYPE_DeviceUDN</name> <dataType>string</dataType> </stateVariable> <stateVariable sendEvents="no"> <name>BlueVideoGain</name> <dataType>ui2</dataType> </stateVariable> </serviceStateTable> </scpd>
+<?xml version="1.0" encoding="utf-8"?><e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
+<?xml version="1.0" encoding="utf-8"?><root xmlns="urn:schemas-upnp-org:device-1-0"><specVersion><major>1</major><minor>0</minor></specVersion><device><dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">DMR-1.50</dlna:X_DLNADOC><dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">M-DMR-1.50</dlna:X_DLNADOC><deviceType>urn:schemas-upnp-org:device:MediaRenderer:2</deviceType><friendlyName>%s</friendlyName><manufacturer>Lonelycoder AB</manufacturer><modelDescription>Movian Media Center</modelDescription><modelName>Movian Media Center</modelName><modelNumber>%s</modelNumber><manufacturerURL>https://movian.tv/</manufacturerURL><modelURL>https://movian.tv/</modelURL><UDN>uuid:%s</UDN><UPC/><presentationURL>/</presentationURL><serviceList>
+<?xml version="1.0" encoding="utf-8"?><s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><ns0:%s xmlns:ns0="urn:schemas-upnp-org:service:%s:%d">
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:wsd="http://schemas.xmlsoap.org/ws/2005/04/discovery"><soap:Header><wsa:To>urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To><wsa:Action>http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action><wsa:MessageID>urn:uuid:%s</wsa:MessageID></soap:Header><soap:Body><wsd:Probe><wsd:Types xmlns:pub="http://schemas.microsoft.com/windows/pub/2005/07">pub:Computer</wsd:Types></wsd:Probe></soap:Body></soap:Envelope>
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"><soap:Header><wsa:To>%s</wsa:To><wsa:Action>http://schemas.xmlsoap.org/ws/2004/09/transfer/Get</wsa:Action><wsa:MessageID>urn:uuid:%s</wsa:MessageID><wsa:ReplyTo><wsa:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</wsa:Address></wsa:ReplyTo></soap:Header><soap:Body/></soap:Envelope>
+<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>
+<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0" xmlns:pv="http://www.pv.com/pvns/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="101" parentID="100" restricted="0"><upnp:class xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">object.item.audioItem.musicTrack</upnp:class>
+<Event xmlns="urn:schemas-upnp-org:metadata-1-0/RCS/"><InstanceID val="0">
+<dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">
+<service><serviceType>urn:schemas-upnp-org:service:%s:%d</serviceType><serviceId>urn:upnp-org:serviceId:%s</serviceId><SCPDURL>/upnp/%s/scpd.xml</SCPDURL><controlURL>/upnp/%s/control</controlURL><eventSubURL>/upnp/%s/subscribe</eventSubURL></service>
+<u:%sResponse xmlns:u="urn:schemas-upnp-org:service:%s:%d">
+<upnp:album xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+<upnp:albumArtURI xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+<upnp:artist xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+>src/libavcodec/atrac3plus.c
+?https://www.thetvdb.com/api/
+?src/libavcodec/dca_parser.c
+@@@@@@@@@@@@@@@@src/libavcodec/mpeg12.c
+@C(knNsrc/libavutil/avstring.c
+@src/libavcodec/pnm_parser.c
+AVSubtitleRect
+Alternate plugin Repository URL
+Any subtitle in central folder
+Any subtitle in same folder as video
+Applications and installed plugins
+Audio & Subtitles
+Auto installed plugin %s (Version %s)
+Auto-start plugin: %s
+Available plugins
+BITTORRENT
+Bad torrent URL
+BitTorrent
+BitTorrent protocol
+Browse available plugins
+Cached torrents use %d MB out of allowed %d MB. Total free space on volume: %d MB
+Can only use seal with SMB3
+Cant handle upnp:class %s (%s)
+Central subtitle folder
+Character encoding is only supported with subtitles codecs
+Codec '%s' is bitmap-based, subtitles character encoding will be ignored
+Corrupt plugin bundle
+Cross-share SMB2 rename not supported
+D D"D$D&D(D*D,D.D0D2D4D6D8D:D<D>D@DBDDDFDQDSDUDWDYD^D`DbDdDfDhDjDlDnDpDrDtDvDxDzD
+DLNA.ORG_PN=JPEG_TN
+DVB subtitles with multiple languages
+DVD playback is not supported
+DVDSCR
+DVDSCREENER
+DVDVIDEO-VTS
+D_WEBVTT/SUBTITLES
+Debug Bittorrent disk I/O
+Debug Bittorrent general events
+Debug Bittorrent peer connections
+Debug Bittorrent peer downloading
+Debug Bittorrent peer uploading
+Debug Bittorrent tracker communication
+Debug HLS
+Debug SMB/CIFS (Windows File Sharing)
+Debug UPNP
+Debug icecast streaming
+Disabling use_variable_block_len, if this fails contact the ffmpeg developers and send us the file
+Downloading plugin %s from %s
+Dropping %d duplicated subtitle events
+Duktape
+FFmpeg v%d.%d.%d / libavcodec build: %d
+FFmpeg version 4.4.4
+Failed to allocate smb2_url
+Failed to allocate smb2dir.
+Failed to allocate smbfh
+Failed to decode smb2 header: %s
+Failed to download plugin %s from %s -- %s
+Failed to open smb2 socket. Errno:%s(%d).
+Field "id" not found in plugin.json
+Files in torrent
+First vector is not same size as smb2 header
+Force primary stream to resynchronize due to subtitle switch
+Force subtitles to reside on video frame
+GIF89aGIF87asrc/libavcodec/gsm_parser.c
+Generic settings for video subtitles
+Got announce reply for unknown torrent, ignoring
+HDDVDRIP
+HLS %s %s
+HLS SD width limit
+HLS master playlist detected
+HLS player done
+HLS%s %s
+HLS%s %s%dx%d
+HLS%s %s%dx%d (%d kb/s)
+If you want to help, upload a sample of this file to https://streams.videolan.org/upload/ and contact the ffmpeg-devel mailing list. (ffmpeg-devel@ffmpeg.org)
+Installed plugin at %s has unknown type %s but keeping anyway, since it might be upgraded
+Installed plugins
+Insufficient RLE data for subtitle
+Invalid DVB subtitles stream extradata!
+Invalid SMB2 URL
+Invalid SMB2 URL: %s
+Invalid UTF-8 in decoded subtitles text; maybe missing -sub_charenc option
+Invalid media type for subtitles
+Invalid torrent link
+Launch plugin on M7 start (bgTV, skyF1)
+Loaded dev plugin %s
+MAGNET
+Max cache size per torrent
+Max usage of free space for caching torrents
+MiniDLNA
+NGINX RTMP
+No 'xt' in magnet link
+No files in torrent
+Not yet implemented in FFmpeg, patches welcome
+Only show forced subtitles
+Opening magnet for hash %s -- %s
+Out of memory while enumerating SMB2 shares
+Out of memory while opening SMB2 file
+Out of memory while opening SMB2 session
+Out of memory while parsing SMB2 URL
+Out of memory while preparing SMB2 login
+Out of memory while scanning SMB2 directory
+PCM DVD unsupported sample depth %i
+PGS subtitle decoder
+Plugin
+Plugin "%s" already loaded
+Plugin %s %s has been uninstalled because it may cause problems.
+Plugin %s from %s -- not a valid bundle
+Plugin %s has been uninstalled - %s
+Plugin %s valid ZIP archive %d bytes
+Plugin cannot be blacklisted: %s
+Plugin categories
+Plugin main:      Compile:%dms Exec:%dms
+Plugins
+Plugins %s
+Pre-resolve failed for dot-less name '%s' (DNS: %s; NBT: no answer) -- falling back to libsmb2's own resolution
+Preferred views from plugins
+Primary subtitle language code
+Providers for Subtitles
+Reached max peers: Torrent: %i | Global: %i
+Registered %s (%s) via SMB2 probe
+Reloaded dev plugin %s
+Reset subtitle font to default
+Restricted plugin [%s] -- Repository not authorized
+Restricted plugin [%s] -- Repository not authorized [%s]
+Restricted plugin [%s] -- Server not authorized
+Restricted plugin [%s] -- Server not authorized [%s]
+SMB Error 0x%08x
+SMB Extended Attributes
+SMB Large Buffer
+SMB2 %s timed out
+SMB2 URL does not identify a file
+SMB2 URL does not identify a path
+SMB2 operation timed out
+SMB2 probe of %s failed -- %s
+SMB2 probe of %s: negotiated dialect 0x%04x but anonymous session refused (%s) -- confirming via negotiate only
+SMB2 server '%s'
+SMB2 session closed
+SMB2 session is disconnected
+SMB2 socket poll failed
+SMB2 transport is dead
+SMB2AESCCM
+SMB2AESCMAC
+SMB2_STATUS_ABIOS_INVALID_COMMAND
+SMB2_STATUS_ABIOS_INVALID_LID
+SMB2_STATUS_ABIOS_INVALID_SELECTOR
+SMB2_STATUS_ABIOS_LID_ALREADY_OWNED
+SMB2_STATUS_ABIOS_LID_NOT_EXIST
+SMB2_STATUS_ABIOS_NOT_LID_OWNER
+SMB2_STATUS_ABIOS_NOT_PRESENT
+SMB2_STATUS_ABIOS_SELECTOR_NOT_AVAILABLE
+SMB2_STATUS_ACCESS_VIOLATION
+SMB2_STATUS_ACCOUNT_EXPIRED
+SMB2_STATUS_ACCOUNT_LOCKED_OUT
+SMB2_STATUS_ADAPTER_HARDWARE_ERROR
+SMB2_STATUS_ADDRESS_ALREADY_ASSOCIATED
+SMB2_STATUS_ADDRESS_ALREADY_EXISTS
+SMB2_STATUS_ADDRESS_CLOSED
+SMB2_STATUS_ADDRESS_NOT_ASSOCIATED
+SMB2_STATUS_AGENTS_EXHAUSTED
+SMB2_STATUS_ALIAS_EXISTS
+SMB2_STATUS_ALLOCATE_BUCKET
+SMB2_STATUS_ALLOTTED_SPACE_EXCEEDED
+SMB2_STATUS_APP_INIT_FAILURE
+SMB2_STATUS_ARRAY_BOUNDS_EXCEEDED
+SMB2_STATUS_AUDIT_FAILED
+SMB2_STATUS_BACKUP_CONTROLLER
+SMB2_STATUS_BAD_COMPRESSION_BUFFER
+SMB2_STATUS_BAD_DESCRIPTOR_FORMAT
+SMB2_STATUS_BAD_DEVICE_TYPE
+SMB2_STATUS_BAD_DLL_ENTRYPOINT
+SMB2_STATUS_BAD_FUNCTION_TABLE
+SMB2_STATUS_BAD_IMPERSONATION_LEVEL
+SMB2_STATUS_BAD_INHERITANCE_ACL
+SMB2_STATUS_BAD_INITIAL_PC
+SMB2_STATUS_BAD_INITIAL_STACK
+SMB2_STATUS_BAD_LOGON_SESSION_STATE
+SMB2_STATUS_BAD_MASTER_BOOT_RECORD
+SMB2_STATUS_BAD_NETWORK_PATH
+SMB2_STATUS_BAD_REMOTE_ADAPTER
+SMB2_STATUS_BAD_SERVICE_ENTRYPOINT
+SMB2_STATUS_BAD_STACK
+SMB2_STATUS_BAD_TOKEN_TYPE
+SMB2_STATUS_BAD_VALIDATION_CLASS
+SMB2_STATUS_BAD_WORKING_SET_LIMIT
+SMB2_STATUS_BUFFER_TOO_SMALL
+SMB2_STATUS_CANNOT_IMPERSONATE
+SMB2_STATUS_CANNOT_LOAD_REGISTRY_FILE
+SMB2_STATUS_CANT_ACCESS_DOMAIN_INFO
+SMB2_STATUS_CANT_DISABLE_MANDATORY
+SMB2_STATUS_CANT_OPEN_ANONYMOUS
+SMB2_STATUS_CANT_TERMINATE_SELF
+SMB2_STATUS_CANT_WAIT
+SMB2_STATUS_CHILD_MUST_BE_VOLATILE
+SMB2_STATUS_CLIENT_SERVER_PARAMETERS_INVALID
+SMB2_STATUS_COMMITMENT_LIMIT
+SMB2_STATUS_CONFLICTING_ADDRESSES
+SMB2_STATUS_CONNECTION_ABORTED
+SMB2_STATUS_CONNECTION_ACTIVE
+SMB2_STATUS_CONNECTION_COUNT_LIMIT
+SMB2_STATUS_CONNECTION_DISCONNECTED
+SMB2_STATUS_CONNECTION_INVALID
+SMB2_STATUS_CONNECTION_IN_USE
+SMB2_STATUS_CONNECTION_REFUSED
+SMB2_STATUS_CONNECTION_RESET
+SMB2_STATUS_CONTROL_C_EXIT
+SMB2_STATUS_CONVERT_TO_LARGE
+SMB2_STATUS_COULD_NOT_INTERPRET
+SMB2_STATUS_CTL_FILE_NOT_SUPPORTED
+SMB2_STATUS_DATA_LATE_ERROR
+SMB2_STATUS_DATA_NOT_ACCEPTED
+SMB2_STATUS_DATA_OVERRUN
+SMB2_STATUS_DEBUG_ATTACH_FAILED
+SMB2_STATUS_DEVICE_ALREADY_ATTACHED
+SMB2_STATUS_DEVICE_CONFIGURATION_ERROR
+SMB2_STATUS_DEVICE_DOES_NOT_EXIST
+SMB2_STATUS_DEVICE_NOT_CONNECTED
+SMB2_STATUS_DEVICE_NOT_PARTITIONED
+SMB2_STATUS_DEVICE_NOT_READY
+SMB2_STATUS_DEVICE_POWER_FAILURE
+SMB2_STATUS_DEVICE_PROTOCOL_ERROR
+SMB2_STATUS_DISK_CORRUPT_ERROR
+SMB2_STATUS_DISK_OPERATION_FAILED
+SMB2_STATUS_DISK_RECALIBRATE_FAILED
+SMB2_STATUS_DISK_RESET_FAILED
+SMB2_STATUS_DLL_INIT_FAILED
+SMB2_STATUS_DLL_NOT_FOUND
+SMB2_STATUS_DOMAIN_CONTROLLER_NOT_FOUND
+SMB2_STATUS_DOMAIN_CTRLR_CONFIG_ERROR
+SMB2_STATUS_DOMAIN_EXISTS
+SMB2_STATUS_DOMAIN_LIMIT_EXCEEDED
+SMB2_STATUS_DOMAIN_TRUST_INCONSISTENT
+SMB2_STATUS_DRIVER_CANCEL_TIMEOUT
+SMB2_STATUS_DRIVER_ENTRYPOINT_NOT_FOUND
+SMB2_STATUS_DRIVER_INTERNAL_ERROR
+SMB2_STATUS_DRIVER_ORDINAL_NOT_FOUND
+SMB2_STATUS_DUPLICATE_NAME
+SMB2_STATUS_DUPLICATE_OBJECTID
+SMB2_STATUS_EAS_NOT_SUPPORTED
+SMB2_STATUS_EA_CORRUPT_ERROR
+SMB2_STATUS_EA_TOO_LARGE
+SMB2_STATUS_ENTRYPOINT_NOT_FOUND
+SMB2_STATUS_EOM_OVERFLOW
+SMB2_STATUS_EVENTLOG_CANT_START
+SMB2_STATUS_EVENTLOG_FILE_CHANGED
+SMB2_STATUS_EVENTLOG_FILE_CORRUPT
+SMB2_STATUS_FAIL_CHECK
+SMB2_STATUS_FILES_OPEN
+SMB2_STATUS_FILE_CORRUPT_ERROR
+SMB2_STATUS_FILE_FORCED_CLOSED
+SMB2_STATUS_FILE_INVALID
+SMB2_STATUS_FILE_IS_OFFLINE
+SMB2_STATUS_FLOAT_DENORMAL_OPERAND
+SMB2_STATUS_FLOAT_DIVIDE_BY_ZERO
+SMB2_STATUS_FLOAT_INEXACT_RESULT
+SMB2_STATUS_FLOAT_INVALID_OPERATION
+SMB2_STATUS_FLOAT_OVERFLOW
+SMB2_STATUS_FLOAT_STACK_CHECK
+SMB2_STATUS_FLOAT_UNDERFLOW
+SMB2_STATUS_FLOPPY_BAD_REGISTERS
+SMB2_STATUS_FLOPPY_ID_MARK_NOT_FOUND
+SMB2_STATUS_FLOPPY_UNKNOWN_ERROR
+SMB2_STATUS_FLOPPY_VOLUME
+SMB2_STATUS_FLOPPY_WRONG_CYLINDER
+SMB2_STATUS_FOUND_OUT_OF_SCOPE
+SMB2_STATUS_FREE_VM_NOT_AT_BASE
+SMB2_STATUS_FS_DRIVER_REQUIRED
+SMB2_STATUS_FT_MISSING_MEMBER
+SMB2_STATUS_FT_ORPHANING
+SMB2_STATUS_FULLSCREEN_MODE
+SMB2_STATUS_GENERIC_NOT_MAPPED
+SMB2_STATUS_GRACEFUL_DISCONNECT
+SMB2_STATUS_GROUP_EXISTS
+SMB2_STATUS_GUIDS_EXHAUSTED
+SMB2_STATUS_HANDLE_NOT_WAITABLE
+SMB2_STATUS_HOST_UNREACHABLE
+SMB2_STATUS_ILLEGAL_CHARACTER
+SMB2_STATUS_ILLEGAL_FLOAT_CONTEXT
+SMB2_STATUS_ILLEGAL_INSTRUCTION
+SMB2_STATUS_ILL_FORMED_PASSWORD
+SMB2_STATUS_ILL_FORMED_SERVICE_ENTRY
+SMB2_STATUS_IMAGE_ALREADY_LOADED
+SMB2_STATUS_IMAGE_CHECKSUM_MISMATCH
+SMB2_STATUS_IMAGE_MP_UP_MISMATCH
+SMB2_STATUS_INCOMPATIBLE_FILE_MAP
+SMB2_STATUS_INFO_LENGTH_MISMATCH
+SMB2_STATUS_INSTANCE_NOT_AVAILABLE
+SMB2_STATUS_INSTRUCTION_MISALIGNMENT
+SMB2_STATUS_INSUFFICIENT_LOGON_INFO
+SMB2_STATUS_INSUFFICIENT_RESOURCES
+SMB2_STATUS_INTEGER_DIVIDE_BY_ZERO
+SMB2_STATUS_INTEGER_OVERFLOW
+SMB2_STATUS_INTERNAL_DB_CORRUPTION
+SMB2_STATUS_INTERNAL_DB_ERROR
+SMB2_STATUS_INTERNAL_ERROR
+SMB2_STATUS_INVALID_ACCOUNT_NAME
+SMB2_STATUS_INVALID_ACL
+SMB2_STATUS_INVALID_ADDRESS
+SMB2_STATUS_INVALID_ADDRESS_COMPONENT
+SMB2_STATUS_INVALID_ADDRESS_WILDCARD
+SMB2_STATUS_INVALID_BLOCK_LENGTH
+SMB2_STATUS_INVALID_BUFFER_SIZE
+SMB2_STATUS_INVALID_CID
+SMB2_STATUS_INVALID_COMPUTER_NAME
+SMB2_STATUS_INVALID_CONNECTION
+SMB2_STATUS_INVALID_DEVICE_STATE
+SMB2_STATUS_INVALID_DISPOSITION
+SMB2_STATUS_INVALID_DOMAIN_ROLE
+SMB2_STATUS_INVALID_DOMAIN_STATE
+SMB2_STATUS_INVALID_FILE_FOR_SECTION
+SMB2_STATUS_INVALID_GROUP_ATTRIBUTES
+SMB2_STATUS_INVALID_HW_PROFILE
+SMB2_STATUS_INVALID_ID_AUTHORITY
+SMB2_STATUS_INVALID_IMAGE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_LE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_NE_FORMAT
+SMB2_STATUS_INVALID_IMAGE_NOT_MZ
+SMB2_STATUS_INVALID_IMAGE_PROTECT
+SMB2_STATUS_INVALID_IMAGE_WIN_16
+SMB2_STATUS_INVALID_INFO_CLASS
+SMB2_STATUS_INVALID_LDT_DESCRIPTOR
+SMB2_STATUS_INVALID_LDT_OFFSET
+SMB2_STATUS_INVALID_LDT_SIZE
+SMB2_STATUS_INVALID_LEVEL
+SMB2_STATUS_INVALID_LOGON_TYPE
+SMB2_STATUS_INVALID_MEMBER
+SMB2_STATUS_INVALID_NETWORK_RESPONSE
+SMB2_STATUS_INVALID_OPLOCK_PROTOCOL
+SMB2_STATUS_INVALID_OWNER
+SMB2_STATUS_INVALID_PAGE_PROTECTION
+SMB2_STATUS_INVALID_PARAMETER_1
+SMB2_STATUS_INVALID_PARAMETER_10
+SMB2_STATUS_INVALID_PARAMETER_11
+SMB2_STATUS_INVALID_PARAMETER_12
+SMB2_STATUS_INVALID_PARAMETER_2
+SMB2_STATUS_INVALID_PARAMETER_3
+SMB2_STATUS_INVALID_PARAMETER_4
+SMB2_STATUS_INVALID_PARAMETER_5
+SMB2_STATUS_INVALID_PARAMETER_6
+SMB2_STATUS_INVALID_PARAMETER_7
+SMB2_STATUS_INVALID_PARAMETER_8
+SMB2_STATUS_INVALID_PARAMETER_9
+SMB2_STATUS_INVALID_PARAMETER_MIX
+SMB2_STATUS_INVALID_PIPE_STATE
+SMB2_STATUS_INVALID_PLUGPLAY_DEVICE_PATH
+SMB2_STATUS_INVALID_PORT_ATTRIBUTES
+SMB2_STATUS_INVALID_PRIMARY_GROUP
+SMB2_STATUS_INVALID_QUOTA_LOWER
+SMB2_STATUS_INVALID_READ_MODE
+SMB2_STATUS_INVALID_SECURITY_DESCR
+SMB2_STATUS_INVALID_SERVER_STATE
+SMB2_STATUS_INVALID_SID
+SMB2_STATUS_INVALID_SUB_AUTHORITY
+SMB2_STATUS_INVALID_SYSTEM_SERVICE
+SMB2_STATUS_INVALID_UNWIND_TARGET
+SMB2_STATUS_INVALID_USER_BUFFER
+SMB2_STATUS_INVALID_VARIANT
+SMB2_STATUS_INVALID_VOLUME_LABEL
+SMB2_STATUS_INVALID_WORKSTATION
+SMB2_STATUS_IN_PAGE_ERROR
+SMB2_STATUS_IO_DEVICE_ERROR
+SMB2_STATUS_IO_PRIVILEGE_FAILED
+SMB2_STATUS_IO_TIMEOUT
+SMB2_STATUS_IP_ADDRESS_CONFLICT1
+SMB2_STATUS_IP_ADDRESS_CONFLICT2
+SMB2_STATUS_KEY_DELETED
+SMB2_STATUS_KEY_HAS_CHILDREN
+SMB2_STATUS_LAST_ADMIN
+SMB2_STATUS_LICENSE_QUOTA_EXCEEDED
+SMB2_STATUS_LINK_FAILED
+SMB2_STATUS_LINK_TIMEOUT
+SMB2_STATUS_LM_CROSS_ENCRYPTION_REQUIRED
+SMB2_STATUS_LOCAL_DISCONNECT
+SMB2_STATUS_LOGIN_TIME_RESTRICTION
+SMB2_STATUS_LOGIN_WKSTA_RESTRICTION
+SMB2_STATUS_LOGON_NOT_GRANTED
+SMB2_STATUS_LOGON_SERVER_CONFLICT
+SMB2_STATUS_LOGON_SESSION_COLLISION
+SMB2_STATUS_LOGON_SESSION_EXISTS
+SMB2_STATUS_LOGON_TYPE_NOT_GRANTED
+SMB2_STATUS_LOG_FILE_FULL
+SMB2_STATUS_LOST_WRITEBEHIND_DATA
+SMB2_STATUS_LPC_REPLY_LOST
+SMB2_STATUS_LUIDS_EXHAUSTED
+SMB2_STATUS_MAPPED_ALIGNMENT
+SMB2_STATUS_MAPPED_FILE_SIZE_ZERO
+SMB2_STATUS_MARSHALL_OVERFLOW
+SMB2_STATUS_MEMBERS_PRIMARY_GROUP
+SMB2_STATUS_MEMBER_IN_ALIAS
+SMB2_STATUS_MEMBER_IN_GROUP
+SMB2_STATUS_MEMBER_NOT_IN_ALIAS
+SMB2_STATUS_MEMBER_NOT_IN_GROUP
+SMB2_STATUS_MEMORY_NOT_ALLOCATED
+SMB2_STATUS_MESSAGE_NOT_FOUND
+SMB2_STATUS_MISSING_SYSTEMFILE
+SMB2_STATUS_MUTANT_LIMIT_EXCEEDED
+SMB2_STATUS_MUTANT_NOT_OWNED
+SMB2_STATUS_NAME_TOO_LONG
+SMB2_STATUS_NETLOGON_NOT_STARTED
+SMB2_STATUS_NETWORK_BUSY
+SMB2_STATUS_NETWORK_CREDENTIAL_CONFLICT
+SMB2_STATUS_NETWORK_NAME_DELETED
+SMB2_STATUS_NETWORK_UNREACHABLE
+SMB2_STATUS_NET_WRITE_FAULT
+SMB2_STATUS_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT
+SMB2_STATUS_NOLOGON_SERVER_TRUST_ACCOUNT
+SMB2_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT
+SMB2_STATUS_NONCONTINUABLE_EXCEPTION
+SMB2_STATUS_NONEXISTENT_EA_ENTRY
+SMB2_STATUS_NONEXISTENT_SECTOR
+SMB2_STATUS_NONE_MAPPED
+SMB2_STATUS_NOT_CLIENT_SESSION
+SMB2_STATUS_NOT_COMMITTED
+SMB2_STATUS_NOT_FOUND
+SMB2_STATUS_NOT_LOCKED
+SMB2_STATUS_NOT_LOGON_PROCESS
+SMB2_STATUS_NOT_MAPPED_DATA
+SMB2_STATUS_NOT_MAPPED_VIEW
+SMB2_STATUS_NOT_REGISTRY_FILE
+SMB2_STATUS_NOT_SERVER_SESSION
+SMB2_STATUS_NOT_SUPPORTED
+SMB2_STATUS_NOT_TINY_STREAM
+SMB2_STATUS_NO_BROWSER_SERVERS_FOUND
+SMB2_STATUS_NO_CALLBACK_ACTIVE
+SMB2_STATUS_NO_EAS_ON_FILE
+SMB2_STATUS_NO_EVENT_PAIR
+SMB2_STATUS_NO_GUID_TRANSLATION
+SMB2_STATUS_NO_IMPERSONATION_TOKEN
+SMB2_STATUS_NO_LDT
+SMB2_STATUS_NO_LOGON_SERVERS
+SMB2_STATUS_NO_LOG_SPACE
+SMB2_STATUS_NO_MEDIA
+SMB2_STATUS_NO_MEMORY
+SMB2_STATUS_NO_PAGEFILE
+SMB2_STATUS_NO_SECURITY_ON_OBJECT
+SMB2_STATUS_NO_SPOOL_SPACE
+SMB2_STATUS_NO_SUCH_ALIAS
+SMB2_STATUS_NO_SUCH_DOMAIN
+SMB2_STATUS_NO_SUCH_GROUP
+SMB2_STATUS_NO_SUCH_LOGON_SESSION
+SMB2_STATUS_NO_SUCH_MEMBER
+SMB2_STATUS_NO_SUCH_PACKAGE
+SMB2_STATUS_NO_SUCH_PRIVILEGE
+SMB2_STATUS_NO_SUCH_USER
+SMB2_STATUS_NO_TOKEN
+SMB2_STATUS_NO_TRUST_LSA_SECRET
+SMB2_STATUS_NO_TRUST_SAM_ACCOUNT
+SMB2_STATUS_NO_USER_SESSION_KEY
+SMB2_STATUS_NT_CROSS_ENCRYPTION_REQUIRED
+SMB2_STATUS_OBJECTID_EXISTS
+SMB2_STATUS_OPEN_FAILED
+SMB2_STATUS_OPLOCK_NOT_GRANTED
+SMB2_STATUS_ORDINAL_NOT_FOUND
+SMB2_STATUS_PAGEFILE_CREATE_FAILED
+SMB2_STATUS_PAGEFILE_QUOTA
+SMB2_STATUS_PAGEFILE_QUOTA_EXCEEDED
+SMB2_STATUS_PARITY_ERROR
+SMB2_STATUS_PARTITION_FAILURE
+SMB2_STATUS_PASSWORD_MUST_CHANGE
+SMB2_STATUS_PASSWORD_RESTRICTION
+SMB2_STATUS_PATH_NOT_COVERED
+SMB2_STATUS_PIPE_BROKEN
+SMB2_STATUS_PIPE_BUSY
+SMB2_STATUS_PIPE_CLOSING
+SMB2_STATUS_PIPE_CONNECTED
+SMB2_STATUS_PIPE_EMPTY
+SMB2_STATUS_PIPE_LISTENING
+SMB2_STATUS_PIPE_NOT_AVAILABLE
+SMB2_STATUS_PLUGPLAY_NO_DEVICE
+SMB2_STATUS_PORT_ALREADY_SET
+SMB2_STATUS_PORT_MESSAGE_TOO_LONG
+SMB2_STATUS_PORT_UNREACHABLE
+SMB2_STATUS_POSSIBLE_DEADLOCK
+SMB2_STATUS_PRINT_CANCELLED
+SMB2_STATUS_PRINT_QUEUE_FULL
+SMB2_STATUS_PRIVILEGED_INSTRUCTION
+SMB2_STATUS_PROCEDURE_NOT_FOUND
+SMB2_STATUS_PROFILING_AT_LIMIT
+SMB2_STATUS_PROFILING_NOT_STARTED
+SMB2_STATUS_PROFILING_NOT_STOPPED
+SMB2_STATUS_PROPSET_NOT_FOUND
+SMB2_STATUS_PROTOCOL_UNREACHABLE
+SMB2_STATUS_PWD_HISTORY_CONFLICT
+SMB2_STATUS_PWD_TOO_RECENT
+SMB2_STATUS_PWD_TOO_SHORT
+SMB2_STATUS_QUOTA_EXCEEDED
+SMB2_STATUS_QUOTA_LIST_INCONSISTENT
+SMB2_STATUS_RANGE_NOT_LOCKED
+SMB2_STATUS_RECOVERY_FAILURE
+SMB2_STATUS_REDIRECTOR_PAUSED
+SMB2_STATUS_REDIRECTOR_STARTED
+SMB2_STATUS_REGISTRY_CORRUPT
+SMB2_STATUS_REGISTRY_IO_FAILED
+SMB2_STATUS_REGISTRY_QUOTA_LIMIT
+SMB2_STATUS_REMOTE_DISCONNECT
+SMB2_STATUS_REMOTE_NOT_LISTENING
+SMB2_STATUS_REMOTE_RESOURCES
+SMB2_STATUS_REMOTE_SESSION_LIMIT
+SMB2_STATUS_REPLY_MESSAGE_MISMATCH
+SMB2_STATUS_REQUEST_ABORTED
+SMB2_STATUS_REQUEST_NOT_ACCEPTED
+SMB2_STATUS_RESOURCE_DATA_NOT_FOUND
+SMB2_STATUS_RESOURCE_LANG_NOT_FOUND
+SMB2_STATUS_RESOURCE_NAME_NOT_FOUND
+SMB2_STATUS_RESOURCE_NOT_OWNED
+SMB2_STATUS_RESOURCE_TYPE_NOT_FOUND
+SMB2_STATUS_RETRY
+SMB2_STATUS_REVISION_MISMATCH
+SMB2_STATUS_RXACT_COMMIT_FAILURE
+SMB2_STATUS_RXACT_INVALID_STATE
+SMB2_STATUS_SECRET_TOO_LONG
+SMB2_STATUS_SECTION_NOT_EXTENDED
+SMB2_STATUS_SECTION_NOT_IMAGE
+SMB2_STATUS_SECTION_PROTECTION
+SMB2_STATUS_SEMAPHORE_LIMIT_EXCEEDED
+SMB2_STATUS_SERIAL_NO_DEVICE_INITED
+SMB2_STATUS_SERVER_DISABLED
+SMB2_STATUS_SERVER_NOT_DISABLED
+SMB2_STATUS_SHARED_IRQ_BUSY
+SMB2_STATUS_SHARING_PAUSED
+SMB2_STATUS_SPECIAL_ACCOUNT
+SMB2_STATUS_SPECIAL_GROUP
+SMB2_STATUS_SPECIAL_USER
+SMB2_STATUS_STACK_OVERFLOW
+SMB2_STATUS_STACK_OVERFLOW_READ
+SMB2_STATUS_STOPPED_ON_SYMLINK
+SMB2_STATUS_SUSPEND_COUNT_EXCEEDED
+SMB2_STATUS_SYNCHRONIZATION_REQUIRED
+SMB2_STATUS_SYSTEM_PROCESS_TERMINATED
+SMB2_STATUS_THREAD_NOT_IN_PROCESS
+SMB2_STATUS_TIMER_NOT_CANCELED
+SMB2_STATUS_TIMER_RESOLUTION_NOT_SET
+SMB2_STATUS_TIME_DIFFERENCE_AT_DC
+SMB2_STATUS_TOKEN_ALREADY_IN_USE
+SMB2_STATUS_TOO_LATE
+SMB2_STATUS_TOO_MANY_ADDRESSES
+SMB2_STATUS_TOO_MANY_COMMANDS
+SMB2_STATUS_TOO_MANY_CONTEXT_IDS
+SMB2_STATUS_TOO_MANY_GUIDS_REQUESTED
+SMB2_STATUS_TOO_MANY_LINKS
+SMB2_STATUS_TOO_MANY_LUIDS_REQUESTED
+SMB2_STATUS_TOO_MANY_NAMES
+SMB2_STATUS_TOO_MANY_NODES
+SMB2_STATUS_TOO_MANY_SECRETS
+SMB2_STATUS_TOO_MANY_SESSIONS
+SMB2_STATUS_TOO_MANY_SIDS
+SMB2_STATUS_TOO_MANY_THREADS
+SMB2_STATUS_TRANSACTION_ABORTED
+SMB2_STATUS_TRANSACTION_INVALID_ID
+SMB2_STATUS_TRANSACTION_INVALID_TYPE
+SMB2_STATUS_TRANSACTION_NO_MATCH
+SMB2_STATUS_TRANSACTION_NO_RELEASE
+SMB2_STATUS_TRANSACTION_RESPONDED
+SMB2_STATUS_TRANSACTION_TIMED_OUT
+SMB2_STATUS_TRUSTED_DOMAIN_FAILURE
+SMB2_STATUS_TRUSTED_RELATIONSHIP_FAILURE
+SMB2_STATUS_TRUST_FAILURE
+SMB2_STATUS_UNABLE_TO_DECOMMIT_VM
+SMB2_STATUS_UNABLE_TO_DELETE_SECTION
+SMB2_STATUS_UNABLE_TO_FREE_VM
+SMB2_STATUS_UNABLE_TO_LOCK_MEDIA
+SMB2_STATUS_UNABLE_TO_UNLOAD_MEDIA
+SMB2_STATUS_UNDEFINED_CHARACTER
+SMB2_STATUS_UNEXPECTED_IO_ERROR
+SMB2_STATUS_UNEXPECTED_MM_CREATE_ERR
+SMB2_STATUS_UNEXPECTED_MM_EXTEND_ERR
+SMB2_STATUS_UNEXPECTED_MM_MAP_ERROR
+SMB2_STATUS_UNEXPECTED_NETWORK_ERROR
+SMB2_STATUS_UNHANDLED_EXCEPTION
+SMB2_STATUS_UNKNOWN_REVISION
+SMB2_STATUS_UNMAPPABLE_CHARACTER
+SMB2_STATUS_UNRECOGNIZED_MEDIA
+SMB2_STATUS_UNRECOGNIZED_VOLUME
+SMB2_STATUS_UNSUCCESSFUL
+SMB2_STATUS_UNSUPPORTED_COMPRESSION
+SMB2_STATUS_UNWIND
+SMB2_STATUS_USER_EXISTS
+SMB2_STATUS_USER_MAPPED_FILE
+SMB2_STATUS_USER_SESSION_DELETED
+SMB2_STATUS_VDM_HARD_ERROR
+SMB2_STATUS_VIRTUAL_CIRCUIT_CLOSED
+SMB2_STATUS_VOLUME_DISMOUNTED
+SMB2_STATUS_WORKING_SET_QUOTA
+SMB2_STATUS_WRONG_PASSWORD
+SMB2_STATUS_WRONG_PASSWORD_CORE
+SMB2_STATUS_WRONG_VOLUME
+SMBC2SCipherKey
+SMBFailed to allocate buffer for signature calculation
+SMBI9
+SMBS2CCipherKey
+SMBSigningKey
+SMBv1
+SMBv2
+ST: urn:schemas-upnp-org:service:ContentDirectory:1
+SUBTITLES
+Secondary subtitle language code
+Selected DVB subtitles sub-stream %d is not available
+Selecting view %s in plugin %s
+Server does not support NTSMB
+SmbSign
+Subtitle
+Subtitle Position
+Subtitle demuxer checking stream switch to streamid: %d -> %s
+Subtitle horizontal displacement
+Subtitle out of video bounds. x = %d, y = %d, video width = %d, video height = %d.
+Subtitle position
+Subtitle queue merge started
+Subtitle size
+Subtitle size and positioning
+Subtitle time!
+Subtitle vertical displacement
+Subtitles embedded in video file
+Subtitles packet is too big for recoding
+Subtitles with matching filename in central folder
+Subtitles with matching filename in same folder as video
+Switching to subtitle track %s
+Tertiary subtitle language code
+Too many I/O vectors when adding SMB2 header
+Torrent cache path
+Torrent destroyed
+Torrent initialized from disk cache
+Trying to initialize torrent from disk cache
+UPNP Video playback: No playable URL
+UPnP content directory
+URL does not start with 'smb://'
+Unable to connect to SMB2 share: %s
+Unable to enumerate SMB2 shares: %s
+Unable to initialize SMB2
+Unable to initialize SMB2 context
+Unable to load development plugin: %s
+Unable to load plugin.json: %s
+Unable to load plugin.json: Malformed JSON
+Unable to open SMB2 directory: %s
+Unable to open SMB2 file: %s
+Unable to open torrent: %s
+Unable to probe subtitle contents?
+Unable to recode subtitle event "%s" from %s to UTF-8
+Unable to reload development plugin: %s
+Unable to rename SMB2 path: %s
+Unable to rename SMB2 path: out of memory
+Unable to scan %s for subtitles: %s
+Unable to set up SMB2 session
+Unable to stat SMB2 file: %s
+Unable to stat SMB2 path: %s
+Unknown subtitle codec
+Unknown subtitle segment type 0x%x, length %d
+Upgraded plugin %s to version %s
+WebM DASH Manifest demuxer
+ataTaza[aea;ajaaaVa)b'b+b+dMd[d]dtdvdrdsd}dudfd
+bad SMB signature in header
+bandwidth of this stream to be specified in the DASH manifest.
+bittorrent udp tracker
+create SMB2 directory
+dVdXdkdmdodqdsdudwdyd{d}d
+delete SMB2 file
+dest->subtitle_header_size == src->subtitle_header_size
+dvb_subtitle
+dvd_nav_packet
+dvd_subtitle
+dvdsub
+dvdsubdec
+ecmascript_plugin_load
+ffmpeg
+ftp://
+ftp://%s
+ftp://%s:%d
+general:plugins
+hdmv_pgs_subtitle
+hdmv_text_subtitle
+hls:%d
+hls:%s
+hls_limit_avc_227
+hls_limit_sd
+hlsdebug
+hlsv:
+hlsv:%i
+htsp://%s:%d
+http://
+http://%s:%d/api/image/%s
+http://schemas.xmlsoap.org/soap/envelope/Body
+http://schemas.xmlsoap.org/soap/envelope/Envelope
+http://ws.audioscrobbler.com/2.0/
+http://www.bing.com
+http://www.bing.com/HPImageArchive.aspx?format=js&n=8
+http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd
+http://www.imdb.com/title/tt
+http://www.w3.org/1998/Math/MathML
+http://www.w3.org/1999/xhtml
+http://www.w3.org/1999/xlink
+http://www.w3.org/2000/svg
+http://www.w3.org/2006/10/ttaf1
+http://www.w3.org/TR/REC-html40/strict.dtd
+http://www.w3.org/TR/html4/strict.dtd
+http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd
+http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd
+https protocol not found, recompile FFmpeg with openssl, gnutls or securetransport enabled.
+https://
+https://api.deanbg.com/
+https://api.imgur.com/3/upload
+https://api.themoviedb.org/3/configuration
+https://api.themoviedb.org/3/movie/%s
+https://api.themoviedb.org/3/movie/%s/casts
+https://api.themoviedb.org/3/search/movie
+https://api2.deanbg.com/
+https://api4.thetvdb.com/web/search/queries
+https://ifconfig.co/json
+https://movian.eu/
+https://movian.tv/
+https://newtrackon.com/api
+https://raw.githubusercontent.com/ngosang/trackerslist/refs/heads/master
+https://repo.movian.eu/
+https://repo.movian.eu/plugins-v1.json
+https://www.thetvdb.com/banners/%s
+i@src/libavcodec/dcahuff.c
+icecast:
+icecastdebug
+libav
+libav error %d
+libav:
+libav:%d
+libavfilter license: LGPL version 2.1 or later
+libavformat license: LGPL version 2.1 or later
+libavresample license: LGPL version 2.1 or later
+libavutil license: LGPL version 2.1 or later
+libsmb2-%d
+libsmb2-H
+magnet
+magnet:
+maxcachepertorrent_107
+mdash
+microdvd
+ndash
+no_subtitle_scan
+not handling SMBv1 request
+open fstat rejected url=%s path='%s' smb2_type=%d reason=%s
+pBSUBTITLE
+pcm_dvd
+pcm_dvd_parse_header: header = %02x%02x%02x
+plugin-%s%s%s
+plugin:
+plugin:repo
+plugin:repo:
+plugin:repo:%s
+plugin:repo:categories
+plugin:start
+pluginconf
+pluginsBG
+qBittorrent/5.0.2
+qBittorrent/5.1.6
+remove SMB2 directory
+selectSubtitleTrack
+set decoded text subtitle format
+set input text subtitles character encoding
+set input text subtitles character encoding mode
+settings:
+settings:audio
+settings:bittorrent
+settings:bookmarks
+settings:dev
+settings:general
+settings:i18n
+settings:lookandfeel
+settings:metadata
+settings:network
+settings:search
+settings:subtitles
+settings:tv
+settings:video
+showtime:plugin
+smb2->user is NULL
+smb2://
+smb2://%s
+smb2:connection:%s
+smb2:connection:%s%s%s@%s
+smb2_notify_change failed
+smb2_open failed. %s
+smb2_open_async failed
+smb2_opendir_async failed
+smb2_service (in) failed with : %s
+smb2_service (out) failed with : %s
+smb2_service failed with : %s
+smb2_service: POLLERR, Unknown socket error.
+smb2_service: POLLHUP, socket error.
+smb2_service: socket error %s(%d) while connecting.
+smb2_service: socket error %s(%d).
+smb2io
+smb://
+smb://%s
+smb:connection:%s:%d
+smb:share:%s:%d:share
+smb_NetServerEnum2
+smb_get_xattr
+smb_large_read
+smb_open
+smb_set_xattr
+smb_tree_connect_andX
+smb_xattr
+smbdebug
+src/libavcodec/aacsbr.c
+src/libavcodec/aacsbr_template.c
+src/libavcodec/ac3dec.c
+src/libavcodec/acelp_vectors.c
+src/libavcodec/avcodec.c
+src/libavcodec/avpacket.c
+src/libavcodec/bitstream.c
+src/libavcodec/bytestream.h
+src/libavcodec/cbs.c
+src/libavcodec/cbs_av1.c
+src/libavcodec/cbs_av1_syntax_template.c
+src/libavcodec/dca_lbr.c
+src/libavcodec/dcadec.c
+src/libavcodec/dcaenc.c
+src/libavcodec/decode.c
+src/libavcodec/dolby_e_parse.c
+src/libavcodec/dvbsubdec.c
+src/libavcodec/dvdsubdec.c
+src/libavcodec/encode.c
+src/libavcodec/error_resilience.c
+src/libavcodec/flacdec.c
+src/libavcodec/flacenc.c
+src/libavcodec/frame_thread_encoder.c
+src/libavcodec/h2645_parse.c
+src/libavcodec/h264_cavlc.c
+src/libavcodec/h264_direct.c
+src/libavcodec/h264_picture.c
+src/libavcodec/h264_refs.c
+src/libavcodec/h264_slice.c
+src/libavcodec/h264dec.c
+src/libavcodec/h264dsp.c
+src/libavcodec/hevc_ps.c
+src/libavcodec/hevc_refs.c
+src/libavcodec/htmlsubtitles.c
+src/libavcodec/huffyuvdec.c
+src/libavcodec/huffyuvenc.c
+src/libavcodec/jpeg2000.c
+src/libavcodec/jpeg2000dec.c
+src/libavcodec/jpeglsdec.c
+src/libavcodec/kbdwin.c
+src/libavcodec/lpc.c
+src/libavcodec/mjpegdec.c
+src/libavcodec/mjpegenc.c
+src/libavcodec/mjpegenc_common.c
+src/libavcodec/mjpegenc_huffman.c
+src/libavcodec/motion_est.c
+src/libavcodec/mpeg12dec.c
+src/libavcodec/mpegaudiodec_common.c
+src/libavcodec/mpegaudiodec_template.c
+src/libavcodec/mpegpicture.c
+src/libavcodec/mpegvideo.c
+src/libavcodec/mpegvideo_enc.c
+src/libavcodec/options.c
+src/libavcodec/parser.c
+src/libavcodec/pngdec.c
+src/libavcodec/pngenc.c
+src/libavcodec/pnm.c
+src/libavcodec/pthread_frame.c
+src/libavcodec/pthread_slice.c
+src/libavcodec/put_bits.h
+src/libavcodec/ratecontrol.c
+src/libavcodec/rawdec.c
+src/libavcodec/rl.c
+src/libavcodec/tiff.c
+src/libavcodec/utils.c
+src/libavcodec/vc1.c
+src/libavcodec/vc1_block.c
+src/libavcodec/vc1_pred.c
+src/libavcodec/vc1dec.c
+src/libavcodec/vcr1.c
+src/libavcodec/vorbisdec.c
+src/libavcodec/vp9.c
+src/libavcodec/vp9dsp.c
+src/libavcodec/webp.c
+src/libavcodec/wmalosslessdec.c
+src/libavcodec/wmaprodec.c
+src/libavcodec/wmavoice.c
+src/libavcodec/x86/mpegvideoenc_template.c
+src/libavfilter/audio.c
+src/libavfilter/avfilter.c
+src/libavfilter/avfiltergraph.c
+src/libavfilter/buffersink.c
+src/libavfilter/formats.c
+src/libavfilter/framepool.c
+src/libavfilter/yadif_common.c
+src/libavformat/ac3dec.c
+src/libavformat/asfdec_f.c
+src/libavformat/avidec.c
+src/libavformat/avio.c
+src/libavformat/aviobuf.c
+src/libavformat/flvdec.c
+src/libavformat/matroskadec.c
+src/libavformat/mov.c
+src/libavformat/mpegts.c
+src/libavformat/mux.c
+src/libavformat/oggdec.c
+src/libavformat/options.c
+src/libavformat/pcmdec.c
+src/libavformat/swfdec.c
+src/libavformat/utils.c
+src/libavutil/buffer.c
+src/libavutil/crc.c
+src/libavutil/imgutils.c
+src/libavutil/lzo.c
+src/libavutil/mathematics.c
+src/libavutil/mem_internal.h
+src/libavutil/pixdesc.c
+src/libavutil/random_seed.c
+src/libavutil/slicethread.c
+src/libavutil/utils.c
+src/libavutil/video_enc_params.h
+stat ok url=%s path='%s' smb2_type=%d type=%d size=%ld
+subtitle1
+subtitle2
+subtitle3
+subtitleTrack
+subtitlefolder
+subtitleloader
+subtitleprovider
+subtitleprovider %s
+subtitleproviders
+subtitlestreams
+torrent:
+torrent:browse:
+torrent:video:
+torrentfile
+torrentfile://
+torrentfile://%s/
+torrentfile://%s/%s
+upnp/upnp:%s:%s:0
+upnp:
+upnp:event
+upnp:propchange
+urn:schemas-upnp-org:service:
+urn:schemas-upnp-org:service:ContentDirectory:1
+urn:schemas-upnp-org:service:ContentDirectory:2
+video/vnd.dlna.mpeg-tts
+webm_dash_manifest
+webm_dash_manifest_bandwidth
+webm_dash_manifest_cluster_keyframe
+webm_dash_manifest_cue_timestamps
+webm_dash_manifest_cues_end
+webm_dash_manifest_cues_start
+webm_dash_manifest_duration
+webm_dash_manifest_file_name
+webm_dash_manifest_initialization_range
+webm_dash_manifest_track_number
+zip://%s/installedplugins/%s.zip
+zip://%s/plugin.json
+|RtmpSampleAccess
+~dASH

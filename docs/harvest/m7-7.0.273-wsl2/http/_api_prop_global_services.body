@@ -1,0 +1,5 @@
+services (ref:2 xref:1) is a directory
+  all
+  enabled
+  stable
+  discovered

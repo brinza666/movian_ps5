@@ -1,0 +1,171 @@
+
+onEvent(videoInfo, {
+	$clone.itemData := currentEvent("prop");
+	$clone.itemMenu = "video";
+});
+
+onEvent(pluginInfo, {
+	$clone.itemData := currentEvent("prop");
+	$clone.itemMenu = "plugin";
+});
+
+onEvent(defaultInfo, {
+	$clone.itemData := currentEvent("prop");
+	$clone.popupScreenX = currentEvent("screenX");
+	$clone.popupScreenY = currentEvent("screenY");
+	$clone.itemMenu = "default";
+});
+
+onEvent(customInfo, {
+	$clone.itemData := currentEvent("prop");
+	$clone.popupScreenX = currentEvent("screenX");
+	$clone.popupScreenY = currentEvent("screenY");
+	$clone.itemMenu = "custom";
+});
+
+
+style(sidebarBackdrop, {
+	color: 0;
+	alpha: 0.3;
+});
+
+onEvent(itemMenu, { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(back,	 { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(cancel,	 { $clone.itemMenu = void; }, $clone.itemMenu);
+onEvent(menu,	 { toggle($clone.showSidebar); },
+	 isVoid($clone.itemMenu));
+
+onEvent(ChangeView, deliverEvent($clone.settings.options, "Cycle"));
+
+onEvent(Paste, deliverRef($core.clipboard.pasteToModel, $self));
+
+multiopt($view.path,
+	 $clone.settings,
+	 _("Page layout"),
+	 $self.persistent.glwUserView,
+	 // List of view follows
+	 // First custom view set by model
+	 makeUri(_("Custom"), $self.model.metadata.glwview),
+
+	 // Optionally a list of custom views set by model
+	 vectorize($self.model.metadata.glwviews),
+
+	 // Then comes external views selected based on content
+	 translate($self.model.contents, void,
+	 "tracks",	 vectorize($core.glw.views.standard.tracks),
+	 "album",	vectorize($core.glw.views.standard.album),
+	 "albums",	 vectorize($core.glw.views.standard.albums),
+	 "artist",	 vectorize($core.glw.views.standard.artist),
+//	 "tvchannels", vectorize($core.glw.views.standard.tvchannels),
+	 "images",	 vectorize($core.glw.views.standard.images),
+	 "movies",	 vectorize($core.glw.views.standard.movies)
+	),
+
+	 // Then comes internal views selected based on content
+	 translate($self.model.contents, void,
+	 "album",	makeUri(_("Album"),	 "album.view"),
+	 "artist",	 makeUri(_("Artist"),	"artist.view"),
+	 "images",	 makeUri(_("Grid"),	"grid.view"),
+	 "grid",	 makeUri(_("Grid"),	"grid.view"),
+	 "tvseason",	 makeUri(_("TV Season"), "tvseason.view"),
+	 "searchresults", makeUri(_("Search results"), "searchresults.view")),
+
+	 select($self.model.safeui || $self.model.type == "settings", void,
+	vectorize($core.glw.views.standard.directory)),
+	 makeUri(_("List"), "list.view"),
+	 select($self.model.type == "settings", void, makeUri(_("Grid"), "grid.view"))
+	);
+
+$view.overlay = translate($clone.itemMenu,
+				select($clone.showSidebar, "sidebar", void),
+				"video", "fullscreen",
+				"default", "popup",
+		"custom", "popup",
+				"plugin", "fullscreen");
+
+
+widget(container_z, {
+
+	widget(layer, {
+
+	style: "PageContainer";
+
+	widget(clip, {
+
+	rightPx: select($clone.showSidebar, 22em, 0);
+	blurOutside: 1;
+	alphaOutside: 0.05;
+
+	widget(container_x, {
+
+#import "skin://menu/navbar.view"
+
+	widget(loader, {
+
+		alpha: iir(translate($view.overlay, 1,
+				 "sidebar", 0.3,
+				 "popup", 0.3,
+				 "fullscreen", 0), 4);
+
+		onEvent(right, {
+		$clone.showSidebar = true;
+		}, true, false);
+
+		onEvent(left, {
+		$view.showNavbar = true;
+		focus("navbardot");
+		}, true, false);
+
+		id: "main";
+		filterConstraintX: true;
+		noInitialTransform: true;
+		time: 0.05;
+		source: $view.path;
+	});
+	});
+	});
+
+	widget(loader, {
+	hidden: !$clone.showSidebar;
+	filterConstraintX: true;
+	source: "skin://menu/sidebar.view";
+	});
+
+	widget(loader, {
+	args: $clone.itemData;
+	// Hide if itemMenu is 0 or if we shouldn't show it at all
+	hidden: isVoid($clone.itemMenu);
+	time: 0;
+	noInitialTransform: true;
+	source: "skin://ctxmenu/" + $clone.itemMenu + "_details.view";
+	});
+	});
+
+	widget(underscan, {
+	widget(container_y, {
+
+	alpha: iir($ui.showTopIcons, 4); 
+	padding: [0, 0, ($core.clock.timeFormat=="1" ? 2.5em : 3.5em), 0];
+	
+	widget(container_x, {
+	space(1);
+	height: 3em;
+	widget(container_y, {
+	align: center;
+	width: 4em;
+	clickable: true;
+	onEvent(activate, {
+		toggle($clone.showSidebar);
+	});
+	navFocusable: false;
+	widget(icon, {
+		angle: iir($clone.showSidebar, 4) * -90;
+		color: 0.5 + iir(isHovered(), 4);
+		size: 2em;
+		source: "skin://icons/ic_menu_48px.svg";
+	});
+	});
+	});
+	});
+	});
+});

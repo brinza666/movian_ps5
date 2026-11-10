@@ -1,7 +1,9 @@
 # Capabilities
 
-Canonical table: [STATUS.md](STATUS.md). Product intent: [PRODUCT.md](PRODUCT.md).
+- PS5 title (honest): [STATUS.md](STATUS.md)
+- What official M7 *is*: [M7_CAPABILITIES.md](M7_CAPABILITIES.md)
+- Product feel: [PRODUCT.md](PRODUCT.md)
 
-M7 7.0.273 from [apps.movian.eu](https://apps.movian.eu/) is the player
-this port follows. [movian-go](https://github.com/czz/movian-go) is the
-modern source map of the same features. Neither binary runs on PS5 as-is.
+M7 7.0.273 is installed on this workstation’s WSL Ubuntu-24.04
+(`showtime`). Android 7.0.288 was inspected as an APK only. Neither
+binary runs on PS5; we reimplement in `app/`.

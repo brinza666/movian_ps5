@@ -1,0 +1,7 @@
+enabled (ref:2 xref:2) is a directory
+  showtime:plugin
+  showtime:discovered
+  showtime:settings
+  xdg-user-dir-MUSIC
+  xdg-user-dir-PICTURES
+  xdg-user-dir-VIDEOS

@@ -99,8 +99,13 @@ Vulkan UI if CPU blit becomes the bottleneck.
 
 ## Explicit non-goals (until the phases above exist)
 
-- Widevine / DRM
+- Widevine / DRM7 / Google Cast / PiP / WebKit (Android-only M7)
+- Paid plugins (bgTV, F1, pluginsBG keys) — host the API, do not vendor content
 - Stock Go runtime
 - Sony proprietary SDK / retail PKG signing
 - Replacing VLC
 - Claiming 4K HDR before HW decode works
+- HTTP Control :42000 / STPP remote as a shipping feature
+
+Reference behaviour: [M7_CAPABILITIES.md](M7_CAPABILITIES.md). Live
+desktop copy: `wsl -d Ubuntu-24.04 -- showtime`.

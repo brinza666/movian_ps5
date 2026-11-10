@@ -1,0 +1,7 @@
+metadata (ref:2 xref:1) is a directory
+  title
+  logo
+  background
+  glwview
+  glwviews
+  icon

@@ -11,6 +11,7 @@ description: Port Movian to PS5 as a native ShadowMountPlus title (PPSA99455) fo
 2. `docs/ARCHITECTURE.md` — native title, not Go, not 9021
 3. `docs/PORTING_PLAN.md` — current phase and done-when
 4. `docs/STATUS.md` — do not contradict this table
+5. `docs/M7_CAPABILITIES.md` — official M7 (live WSL 7.0.273 + Android 7.0.288)
 
 Repo: `C:\Users\brinza\Documents\deep\movian_ps5`
 Remote: https://github.com/brinza666/movian_ps5

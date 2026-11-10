@@ -38,3 +38,9 @@ __pycache__/
 # Temporary
 scoped_dir*/
 .env
+
+# Official M7 harvest binaries (re-download from movian.eu; see docs/harvest/README.md)
+docs/harvest/**/*.apk
+docs/harvest/**/*.elf
+docs/harvest/**/*.deb
+docs/harvest/**/strings/all.txt

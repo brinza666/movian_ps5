@@ -1,0 +1,99 @@
+widget(dummy, {
+	height: 0.5em;
+});
+
+SIDEBAR_INTEGER(_("Master volume"),
+	"skin://icons/ic_speaker_48px.svg",
+	-75, 12, 1,
+	$core.audio.mastervolume, _("dB")); //, $core.audio.passthrough);
+
+widget(dummy, {
+	height: 1em;
+});
+
+SIDEBAR_ACTION(select($ui.mediainfo,
+		_("Hide media info"),
+		_("Show media info")),
+	 select($ui.mediainfo,
+		"skin://icons/ic_info_48px.svg",
+		"skin://icons/ic_info_outline_48px.svg"),
+	 {
+	 toggle($ui.mediainfo);
+	 });
+
+SIDEBAR_ACTION(select($ui.sysinfo,
+		_("Hide system info"),
+		_("Show system info")),
+	 select($ui.sysinfo,
+		"skin://icons/ic_info_48px.svg",
+		"skin://icons/ic_info_outline_48px.svg"),
+	 {
+	 toggle($ui.sysinfo);
+	 });
+
+SIDEBAR_ACTION(_("View log"),
+	 "skin://icons/ic_my_library_books_48px.svg",{
+	 $ui.logwindow = true;
+	 });
+
+
+widget(dummy, {
+	height: 1em;
+});
+
+SIDEBAR_INTEGER(_("Time until sleep"),
+	void,
+	0,
+	$core.runcontrol.sleepTimeMax,
+	$core.runcontrol.sleepTimeStep,
+	$core.runcontrol.sleepTime,
+	_("min"),
+	!$core.runcontrol.sleepTimer);
+
+SIDEBAR_ACTION(select($core.runcontrol.sleepTimer,
+		_("Disable sleep timer"),
+		_("Activate sleep timer")),
+	 select($core.runcontrol.sleepTimer,
+		"skin://icons/ic_alarm_off_48px.svg",
+		"skin://icons/ic_alarm_add_48px.svg"),
+	 {
+	 toggle($core.runcontrol.sleepTimer);
+	 }, !$core.runcontrol.canStandby);
+
+SIDEBAR_ACTION(_("Home"),
+		 "skin://icons/ic_home_48px.svg",
+		 navOpen("page:home"),
+		 $self.url == "page:home");
+
+SIDEBAR_ACTION(_("Settings"),
+		 "skin://icons/ic_settings_48px.svg",
+		 navOpen("settings:"),
+		 $self.url == "settings:");
+
+SIDEBAR_ACTION(_("TV Settings"),
+	 "skin://icons/ic_tv_48px.svg",
+	 deliverEvent($core.eventSink, "MenuTV"),
+	 !$core.androidTV.isAndroidTV
+	 );
+
+SIDEBAR_ACTION(_("Screensaver"),
+	 "skin://icons/ic_now_wallpaper_48px.svg",
+	 event("EnableScreenSaver"));
+/*
+SIDEBAR_ACTION(_("Enter PiP"),
+	 "skin://icons/ic_fullscreen_48px.svg",
+	 deliverEvent($nav.eventSink, "PIP"),
+	 !$core.supportsPIP.hasSupport
+	 );
+*/	 
+
+SIDEBAR_ACTION(_("Suspend"),
+	 "skin://icons/ic_power_settings_new_48px.svg",
+	 deliverEvent($core.eventSink, "Standby"),
+	 !$core.runcontrol.canStandby);
+
+SIDEBAR_ACTION(_("Exit"),
+	 "skin://icons/ic_exit_to_app_48px.svg",
+	 deliverEvent($core.eventSink, "Quit"),
+	 !$core.runcontrol.canExit);
+

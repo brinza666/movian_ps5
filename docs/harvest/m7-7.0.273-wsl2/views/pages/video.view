@@ -1,0 +1,807 @@
+#import "skin://theme.view"
+#import "skin://styles/style_list.view"
+
+
+#define PLAYDECK_BUTTON(ICON, TITLE, EVENT, ENABLED, ID, ROTATED = 0, VISIBLE = 1, FOCUS_LEFT = "", FOCUS_RIGHT = "") {
+
+	widget(container_z, {
+	id: ID;
+	hidden: !VISIBLE;	
+	onEvent(activate, EVENT);
+	onEvent(left, {focus(FOCUS_LEFT);}, true, false);
+	onEvent(right, {focus(FOCUS_RIGHT);}, true, false);
+	focusable: 1;
+
+	widget(quad, {
+	margin: select($ui.aspect < 1.33, [0, 0.15em, 0.1em, 0.15em], [0.2em, 0.15em, 0.2em, 0.15em]);
+		additive: true;
+		alpha: 0.1 * isHovered() + 0.6 * isNavFocused();
+	});
+	widget(icon, {
+	margin: select($ui.aspect < 1.33, [0, 0.25em, 0.1em, 0.25em], [0.4em, 0.25em, 0.4em, 0.25em]);
+		angle: iir(ROTATED, 4) * -90;
+		size: select($ui.aspect < 1.33, 1.5em, 2em);
+		source: ICON;
+		color: select(isNavFocused(), 0, 1);
+		alpha: 0.7 * iir(ENABLED, 8) + 0.3;
+	});
+	});
+}
+
+#define PLAYDECK_BUTTON_S(ICON, TITLE, EVENT, ENABLED, ID, ROTATED = 0, VISIBLE = 1, FOCUS_LEFT = "", FOCUS_RIGHT = "") {
+
+	widget(container_z, {
+	id: ID;
+	hidden: !VISIBLE;	
+	onEvent(activate, EVENT);
+	onEvent(left, {focus(FOCUS_LEFT);}, true, false);
+	onEvent(right, {focus(FOCUS_RIGHT);}, true, false);
+	focusable: 1;
+
+	widget(quad, {
+	margin: select($ui.aspect < 1.33, [0, 0.15em, 0.1em, 0.15em], [0.2em, 0.15em, 0.2em, 0.15em]);
+		additive: true;
+		alpha: 0.1 * isHovered() + 0.6 * isNavFocused();
+	});
+	widget(icon, {
+	margin: select($ui.aspect < 1.33, [0, 0.25em, 0.1em, 0.25em], [0.4em, 0.25em, 0.4em, 0.25em]);
+		angle: iir(ROTATED, 4) * -90;
+		size: select($ui.aspect < 1.33, 1.0em, 1em);
+		source: ICON;
+		color: select(isNavFocused(), 0, 1);
+		alpha: 0.5 * iir(ENABLED, 8) + 0.3;
+	});
+	});
+}
+
+delta($ui.fullwindow, isVisible());
+delta($ui.disableScreensaver, $self.media.playstatus == "play");
+delta($ui.hideClock, isVisible() && !$core.clock.showDuringVideo);
+$self.directClose = 1;
+$self.close = $self.media.playstatus == "stop";
+$self.model.loading = ($self.media.loading==1);
+$self.model.io <- $self.media.io;
+
+$clone.osdpage = 0;
+
+$view.iconPad = select($ui.aspect < 1.33 ||
+						 isVoid($self.media.metadata.icon), 0, 3em);
+
+onEvent(back, {
+	$clone.showPlaydeck = 0;
+	$view.showSeekBar = 0;
+}, $clone.showPlaydeck && !$clone.osdpage);
+
+onEvent(back, {
+	$clone.osdpage = 0;
+	focus("menu-btn");
+}, $clone.osdpage);
+
+onEvent(back,	deliverEvent($core.media.eventSink, "Stop"), !$clone.showPlaydeck && !$clone.osdpage && !$self.model.loading && ($self.media.playstatus == "play" || $self.media.playstatus == "pause"));
+
+onEvent(menu, {
+	$clone.osdpage = 1;
+	$clone.showPlaydeck = 1;
+	focus("osd_main");
+}, !$clone.osdpage);
+
+onEvent(menu, {
+	$clone.osdpage = 0;
+	$clone.showPlaydeck = 1;
+	focus("menu-btn");
+}, $clone.osdpage);
+
+
+onInactivity(select($clone.osdpage == 0, select($self.media.playstatus == "pause", 10, $core.osd.infoTimer), 0), {
+	$clone.showPlaydeck = 0;
+	$view.showSeekBar = 0;
+});
+
+$view.showSeekBar =
+	($ui.pointerVisible ||
+	changed($self.media.seektime, 3, true) ||
+	changed($self.url, 3, true)
+	) && !$clone.showPlaydeck;
+
+widget(container_z, {
+	clickable: true;
+	onEvent(activate, {
+	toggle($clone.showPlaydeck);
+	focus("pause-btn");
+	});
+
+	widget(layer, {
+	widget(video, {
+		id: "videowidget";
+		primary: true;
+
+		how: $self.how;
+		itemModel: $self.previous.itemModel;
+		parentModel: $self.previous.parentModel;
+
+		parentUrl: $self.parentUrl;
+		source: $self.source;
+
+		focusable: 0.1;
+		injectEventsFrom($self.control);
+
+		onEvent(left,	deliverEvent($self.media.eventSink, "SeekReverse"));
+		onEvent(right, deliverEvent($self.media.eventSink, "SeekForward"));
+
+		onEvent(up,	deliverEvent($self.media.eventSink, "VolumeUp"));
+		onEvent(down,	deliverEvent($self.media.eventSink, "VolumeDown"));
+
+		bottomOverlayDisplacement: iir($clone.showPlaydeck > 0, 4) * ($clone.bottomOsdHeight + 0.25em);
+
+	});
+
+	widget(container_y, {
+		hidden: !$clone.showPlaydeck;
+		widget(container_x, {
+		filterConstraintY: true;
+
+		widget(dummy, {
+			// A clickable zone that closes everything
+			clickable: true;
+			onEvent(activate, {
+			$clone.osdpage = 0;
+			$clone.showPlaydeck = 0;
+		$view.showSeekBar = 0;
+			});
+		});
+
+		widget(container_z, {
+		hidden: !$clone.osdpage;
+		zoffset: 1000;
+		width: $clone.osdpage==1?16em:20em;
+		
+			onEvent(left, {
+				$clone.osdpage = 0;
+			}, true, false);
+
+
+			widget(quad, {
+				color: 0;
+				alpha: 0.8;
+			});
+			widget(layer, {
+#import "skin://styles/style_sidebar.view"
+				widget(loader, {
+				time: 0.25;
+				effect: slideVertical;
+				autohide: true;
+		hidden: $clone.osdpage != 1;
+				source: select($clone.osdpage, "skin://osd/osd_main.view", "");
+				});
+
+
+				widget(loader, {
+				autohide: true;
+				source: translate($clone.osdpage, "",
+									2, "skin://osd/osd_settings_subs.view",
+									3, "skin://osd/osd_settings_audio.view",
+									4, "skin://osd/osd_settings_video.view",
+									100, "skin://osd/osd_subs.view",
+									101, "skin://osd/osd_audio.view"
+								 );
+				});
+			});
+			});
+		});
+
+
+		// OSD buttons row
+
+	widget(container_y, {
+	hidden: $ui.aspect < 1.33 || !$clone.showPlaydeck || $clone.osdpage;
+	padding: [1em, 0, 0.5em, $ui.universeBottomHeight + 0.5em];
+	align: bottom;
+	space(1);
+	widget(container_x, {
+	widget(image, {
+		alpha: iir($clone.showPlaydeck || changed($self.media.metadata.icon, 3, true), 3);
+		width: 4.5em;
+		//cornerRadius: 0.3em;
+		shadow: true;
+		source: $self.media.metadata.icon;
+	});
+	space(1);
+	});
+	});
+
+	widget(container_y, {
+	hidden: $clone.osdpage > 0 || !$clone.showPlaydeck || (!$core.osd.infoTitle && (!$core.osd.infoDescription || isVoid($self.media.metadata.description))); //  && !$core.osd.infoTracks
+	delta($clone.bottomOsdHeight, isVisible() * getHeight());
+	padding: [0em, 0em];
+	align: bottom;
+
+	widget(quad, {
+	hidden: !$core.osd.infoTracks && !$core.osd.infoTitle;
+	alpha: 0.6;
+	height: 1;
+	color: 1;
+	});	
+
+	widget(container_z, {
+
+		/*widget(quad, {
+			alpha: 0.8;
+			color: 0;
+		});*/
+
+		widget(backdrop, {
+			source: "pixmap:gradient:64,64,64:0,0,0";
+			alpha: 0.8;
+		});
+
+widget(container_y, {
+	padding: [0em, 0.25em, 0em, 0em];
+
+  widget(container_x, {
+  height: 1.5em;
+  hidden: !$core.osd.infoTitle;
+  padding: [1.0em, 0, 0, 0.25em];
+	widget(label, {
+		hidden: !$core.osd.infoTitle;
+		padding: [0em, 0, 0.5em, 0em];
+		caption: $self.media.metadata.title;
+		shadow: true;
+		outline: true;
+		size: 1.25em;
+		//font: isVoid($core.androidTV.isAndroidTV) ? select(isVoid($core.fonts.main), "skin://fonts/RobotoCondensed-Regular.ttf", $core.fonts.main) : select(isVoid($core.fonts.main), "RobotoMain.ttf", $core.fonts.main);
+		ellipsize: true;
+	});
+	
+widget(label, {
+    hidden: $ui.aspect < 1.33 || !isVoid($self.media.metadata.startts);
+	padding: [0.5em, 0.12em, 0.75em, 0];
+	align: right;
+	caption: select(($self.media.metadata.duration - $self.media.currenttime) > 3600, fmt("+ %d h %d min", ($self.media.metadata.duration - $self.media.currenttime)/3600, (($self.media.metadata.duration - $self.media.currenttime)%3600)/60), fmt("+ %d min", ($self.media.metadata.duration - $self.media.currenttime)/60));
+	shadow: true;
+	color: 0.5;
+	outline: true;
+});
+widget(label, {
+hidden: $core.clock.showDuringVideo;
+padding: [0.5em, 0.12em, 0.75em, 0];
+align: right;
+caption: $core.clock.localtimeofday;
+shadow: true;
+outline: true;
+});
+});
+
+	/*
+	widget(bar, {
+	hidden: isVoid($self.media.metadata.startts) || !$core.osd.infoTitle || (!$core.osd.infoTitle && (!$core.osd.infoDescription || isVoid($self.media.metadata.description))) || (!$core.osd.infoTracks && (!$core.osd.infoDescription || isVoid($self.media.metadata.description)));
+				height: 1;
+				color1: 1;
+				color2: 1;
+			fill: ($core.clock.unixtime - $self.media.metadata.startts) /
+            ($self.media.metadata.endts - $self.media.metadata.startts);
+		 });
+
+	widget(bar, {
+	hidden: (!isVoid($self.media.metadata.startts) || isVoid($self.media.metadata.duration) || $self.media.metadata.duration<1|| !$core.osd.infoTitle || (!$core.osd.infoTitle && (!$core.osd.infoDescription || isVoid($self.media.metadata.description))) || (!$core.osd.infoTracks && (!$core.osd.infoDescription || isVoid($self.media.metadata.description))));
+				height: 1;
+				color1: 1;
+				color2: 1;
+			fill: ($self.media.currenttime) / ($self.media.metadata.duration);
+		 });
+	*/
+
+	widget(quad, {
+	hidden: !$core.osd.infoTitle || (!$core.osd.infoTracks && (!$core.osd.infoDescription || isVoid($self.media.metadata.description))) ;
+		height: 1;
+		//alpha: 0.6;
+		color: 0.6;
+		});
+
+	 widget(container_x, {
+		hidden: isVoid($self.media.metadata.description) || $ui.height < 360 || (!$core.osd.infoDescription || isVoid($self.media.metadata.description));
+		padding: [1.0em, 0.25em, 0.5em, 0em];
+	spacing: 1.0em;
+	
+	/*widget(icon, {
+	hidden: !isVoid($self.media.metadata.image);
+	alpha: 0.7;
+		source:	"skin://icons/ic_info_outline_48px.svg";
+	});*/
+
+	widget(container_x, {
+	hidden: ($ui.aspect < 1 || $ui.height < 360 || isVoid($self.media.metadata.image));
+	widget(image, {
+		width: 4.5em;
+		cornerRadius: 0.3em;
+		source: $self.media.metadata.image;
+	});
+	space(1);
+	});
+	widget(label, {
+		alpha: 1;
+		color: 0.6;
+		outline: true;
+		shadow: true;
+		padding: [0.0em, 0.0em];
+		maxlines: 3;
+		caption: $self.media.metadata.description;
+		size: 0.9em;
+		ellipsize: true;
+	});
+	});
+
+	widget(container_y, {
+		padding: [0, 0.25em, 0, 0];
+		hidden: (isVoid($self.media.metadata.description) || ($self.media.metadata.trackinfo == 0) || (!$core.osd.infoDescription || isVoid($self.media.metadata.description)) || !$core.osd.infoTracks);
+		widget(quad, {
+			height: 1;
+			//alpha: 0.6;
+			color: 0.6;
+		});
+	});
+
+	style(notifications, {
+		shadow: true;
+		filterConstraintX: true;
+		size: 0.8em;
+	});
+
+
+	widget(container_y, {
+	hidden: ($self.media.metadata.trackinfo == 0) || !$core.osd.infoTracks;
+	padding: [1.0em, 0.25em, 0em, 0em];
+	
+	widget(container_x, {
+		spacing: 0.5em;
+		//alpha: select(isVoid($self.media.audio.active.url), 0, 0.6);
+		hidden: select(isVoid($self.media.audio.active.url), 1, 0);
+		widget(icon, {
+		source:	"skin://icons/ic_speaker_48px.svg";
+		});
+		widget(label, {
+		style: "notifications";
+	caption: join(" - ",
+						$self.media.audio.active.title,
+						$self.media.audio.active.language,
+						$self.media.audio.active.source,
+						$self.media.audio.active.longformat ??
+						$self.media.audio.active.format);
+		});
+	});
+
+	widget(container_x, {
+		spacing: 0.5em;
+		//alpha: select(isVoid($self.media.subtitle.active.url), 0, 0.6);
+		hidden: select(isVoid($self.media.subtitle.active.url), 1, 0);
+		widget(icon, {
+		source: "skin://icons/ic_subtitles_48px.svg";
+		});
+		widget(label, {
+		style: "notifications";
+	caption: join(" - ",
+						$self.media.subtitle.active.title,
+						$self.media.subtitle.active.language,
+						$self.media.subtitle.active.source,
+						$self.media.subtitle.active.longformat ??
+						$self.media.subtitle.active.format);
+		});
+	});
+
+	widget(container_x, {
+		hidden: !changed($self.media.ctrl.audiovolume, 2, true) ||
+		!$self.media.ctrl.audiovolume;
+		spacing: 0.5em;
+		widget(icon, {
+		});
+		widget(label, {
+		style: "notifications";
+		caption: fmt(_("Audio volume adjustment: %d dB"),
+					 $self.media.ctrl.audiovolume);
+		});
+	});	
+
+widget(container_x, {
+		spacing: 1.0em;
+		hidden: select($self.media.error, false, true);
+		widget(icon, {
+	source: "skin://icons/ic_error_48px.svg";
+		});
+		widget(label, {
+	caption: $self.media.error;
+		style: "notifications";
+		});
+	});
+
+	widget(container_x, {
+		spacing: 0.5em;
+		hidden: select($self.media.video.too_slow, false, true);
+		widget(icon, {
+	source: "skin://icons/ic_error_48px.svg";
+		});
+		widget(label, {
+	caption: _("CPU is too slow to decode this video");
+		style: "notifications";
+		});
+	});
+
+
+	cloner($self.media.notifications, container_x, {
+		spacing: 0.5em;
+		widget(icon, {
+	source: "skin://icons/ic_error_48px.svg";
+	color: translate($self.type, [1,1,1],
+		 "info", [0.5, 1, 0.5],
+		 "warning",	[1, 1, 0.5],
+		 "error", [1, 0.5, 0.5]);
+		});
+		widget(label, {
+	caption: $self.text;
+		style: "notifications";
+	color: translate($self.type, [1,1,1],
+		 "info", [0.5, 1, 0.5],
+		 "warning",	[1, 1, 0.5],
+		 "error", [1, 0.5, 0.5]);
+		});
+	});
+	
+	});
+
+	});
+
+});
+
+	});
+
+	widget(quad, {
+	hidden: !$clone.showPlaydeck || $self.media.canSeek || $clone.osdpage;
+	height: 1;
+			//alpha: 0.6;
+			color: 0.6;
+		});
+
+	widget(container_y, {
+	zoffset: 1000;
+	hidden: !$clone.showPlaydeck || !$self.media.canSeek || $clone.osdpage;
+	align: bottom;
+	padding: [0,0,0,0];
+	widget(container_z, {
+		height: 24;
+		delta($clone.bottomOsdHeight, isVisible() * getHeight());
+
+	widget(quad, {
+			//height: 6;
+			alpha: 0.8;
+			color: 0;
+		});
+		widget(container_x, {
+		//height: 24;
+		//spacing: 0.24em;
+		padding: [0, -12, 0, -12];
+
+		widget(container_z, {
+			widget(container_y, {
+			align: center;
+			widget(container_z, {
+				height: 4;
+				widget(container_y, {
+				padding: 1;
+				widget(quad, {
+					alpha: 0.3;
+					additive: true;
+				});
+				});
+			});
+			});
+
+			widget(slider_x, {
+		zoffset: 1100;
+			knobOverEdges: true;
+			tentative: $view.tentativeSeekPosition;
+			alwaysGrabKnob: true;
+			clickable: true;
+			bind($self.media.currenttime);
+			max: $self.media.metadata.duration;
+			secondBarValue: $core.media.current.buffer.delay;
+			widget(icon, {
+				source: "skin://icons/dot.png";
+			});
+			widget(container_y, {
+				space(1);
+				widget(quad, {
+				height: 4;
+				padding: 1;
+				alpha: 0.9;
+				additive: true;
+				});
+				space(1);
+			});
+			widget(container_y, {
+				space(1);
+				widget(quad, {
+				height: 4;
+				padding: [1, 0, 0, 0];
+				alpha: 0.5;
+				additive: true;
+				});
+				space(1);
+			});
+			});
+		});
+
+		});
+	});
+	});
+	
+		widget(container_z, {
+		hidden: $clone.osdpage;
+		height: $ui.touch ? 2.25em : 1.5em;
+	zoffset: 1000;
+		delta($clone.bottomOsdHeight, isVisible() * getHeight());
+
+		onEvent(down, {
+			$clone.showPlaydeck = 0;
+			$view.showSeekBar = 0;
+		}, $clone.osdpage == 0);
+
+		onEvent(up, {
+			$clone.showPlaydeck = 0;
+			$view.showSeekBar = 0;
+		}, $clone.osdpage == 0);
+
+	widget(quad, {
+			alpha: 0.8;
+			color: 0;
+		});
+
+		widget(container_z, {
+	
+		widget(container_x, {
+
+		padding: [0em, 0.0em, 0em, 0.1em];
+
+		align: left;
+
+		widget(label, {
+			hidden: !$self.media.canSeek;
+			padding: [1em, 0.0em, 0.5em, 0];
+			caption: value2duration($view.tentativeSeekPosition ?? $self.media.currenttime);
+			align: left;
+		});
+
+		widget(dummy, {
+			hidden: $self.media.canSeek;
+			width: 0.75em;
+		});
+
+		PLAYDECK_BUTTON_S("skin://icons/ic_speaker_group_48px.svg",
+				_("Audio tracks"),
+				{
+				$clone.osdpage = select($clone.osdpage == 101, 0, 101);
+				focus("osd_audio");
+				}, true, "audio-btn", 0, 1, 0, select($core.supportsPIP.hasSupport, "pip-btn", "prev-btn" ));
+
+		PLAYDECK_BUTTON_S("skin://icons/ic_fullscreen_48px.svg",
+				_("PiP"),
+				deliverEvent($nav.eventSink, "PIP"),
+				$core.supportsPIP.hasSupport,
+			 "pip-btn", 0, $core.supportsPIP.hasSupport, 0, "prev-btn");
+
+		widget(container_z, {
+			hidden: isVoid($self.media.video.user_video_q) || $ui.aspect < 1.32 || $ui.height < 360;
+			margin: [0.1em, 0em, 0em, 0em];
+			alpha: 1;
+			widget(quad, {
+			width: select(isVoid($self.media.audio.user_audio_q), 1.8em, select( ($self.media.audio.user_audio_q == "DTS-HD"), 3.4em, 2.6em));
+			margin: $ui.touch ? [0em, 0.4em, 0em, 0.4em] : [0em, 0.3em, 0em, 0.3em];
+			padding: $ui.touch ? [0.25em, 0.3em, 0.25em, 0.35em] : [0.25em, 0.02em, 0.25em, 0.05em];
+			color: 0.7;
+			//alpha: 0.7;
+			});
+
+			widget(label, {
+			width: select(isVoid($self.media.audio.user_audio_q), 2em, 3em);
+			caption: select(isVoid($self.media.audio.user_audio_q), $self.media.video.user_video_q, $self.media.video.user_video_q + " " + $self.media.audio.user_audio_q);
+			size: 0.65em;
+			shadow: true;
+			color: 0;
+			alpha: 1;
+			align: center;
+			});
+		});
+
+		});	
+	});
+
+		widget(container_x, {
+
+			padding: [0em, 0.0em, 0em, 0.1em];
+
+			align: center;
+
+			PLAYDECK_BUTTON("skin://icons/ic_skip_previous_48px.svg",
+							_("Previous"),
+							deliverEvent($self.control, PreviousTrack),
+							$self.media.canSkipBackward ||
+							$self.media.canSeek,
+						 "prev-btn", 0, select($ui.aspect > 1.32 && $ui.height > 360, 1, 0), "audio-btn", 0);
+
+			PLAYDECK_BUTTON("skin://icons/ic_fast_rewind_48px.svg",
+							_("Rewind"),
+							deliverEvent($self.control, SeekReverse),
+							$self.media.canSeek,
+						 "seekback-btn", 0, select($ui.aspect > 1.32 && $ui.height > 360, select($self.media.canSeek, 1, 0), 0));
+
+			PLAYDECK_BUTTON(translate($core.media.current.playstatus,
+									"skin://icons/ic_pause_48px.svg",
+									"pause",
+									"skin://icons/ic_play_arrow_48px.svg"),
+							_("Play/Pause"),
+							deliverEvent($self.control, PlayPause),
+							$self.media.canPause,
+						 "pause-btn");
+
+			PLAYDECK_BUTTON("skin://icons/ic_fast_forward_48px.svg",
+							_("Seek Forward"),
+							deliverEvent($self.control, SeekForward),
+							$self.media.canSeek,
+						 "seekfwd-btn", 0, select($ui.aspect > 1.32 && $ui.height > 360, select($self.media.canSeek, 1, 0), 0));
+
+			PLAYDECK_BUTTON("skin://icons/ic_skip_next_48px.svg",
+							_("Next"),
+							deliverEvent($self.control, NextTrack),
+							$self.media.canSkipForward,
+						 "next-btn", 0, select($ui.aspect > 1.32 && $ui.height > 360, 1, 0), 0, "subtitles-btn");
+
+		});
+
+	widget(container_z, {
+		widget(container_x, {
+
+		padding: [0em, 0.0em, 0em, 0.1em];
+
+		align: right;
+
+		PLAYDECK_BUTTON_S("skin://icons/ic_subtitles_48px.svg",
+				_("Subtitles"),
+				{
+				$clone.osdpage = select($clone.osdpage == 100, 0, 100);
+				focus("osd_subs");
+				}, true, "subtitles-btn", 0, 1, "next-btn", 0);
+
+		PLAYDECK_BUTTON_S("skin://icons/ic_menu_48px.svg",
+				_("Settings"),
+				{
+				toggle($clone.osdpage);
+				
+				focus("osd_main");
+				}, true, "menu-btn",
+				$clone.osdpage > 0 && $clone.osdpage < 100);		
+		
+		widget(label, {
+			hidden: !$self.media.canSeek;
+			padding: [0.5em, 0.0em, 0.75em, 0];
+			caption: value2duration($self.media.metadata.duration);
+			align: right;
+		});
+
+		widget(dummy, {
+			hidden: $self.media.canSeek;
+			width: 0.75em;
+		});
+		});
+	});
+		});
+
+	});
+	});
+	
+	
+	// Seekbar row
+
+	widget(container_y, {
+	zoffset: 1000;
+	hidden: !$view.showSeekBar || !$self.media.canSeek || $clone.osdpage || $clone.showPlaydeck;
+	align: bottom;
+	padding: [0,0,0,$ui.universeBottomHeight];
+	delta($clone.bottomOsdHeight, isVisible() * getHeight());
+
+	widget(container_z, {
+		height: 1.5em;
+		widget(quad, {
+		alpha: 0.8;
+		color: 0;
+		});
+
+		widget(container_x, {
+		spacing: 0.5em;
+		padding: [0, 0, 0, 0];
+
+		widget(label, {
+			width: 4em;
+			caption: value2duration($view.tentativeSeekPosition ?? $self.media.currenttime);
+		hidden: !$self.media.canSeek;
+			align: right;
+		});
+
+		widget(container_z, {
+			widget(container_y, {
+			align: center;
+			widget(container_z, {
+				height: 3;
+				widget(container_y, {
+				padding: 1;
+				widget(quad, {
+					alpha: 0.3;
+					additive: true;
+				});
+				});
+			});
+			});
+
+			widget(slider_x, {
+		zoffset: 1100;
+			knobOverEdges: true;
+			tentative: $view.tentativeSeekPosition;
+			alwaysGrabKnob: true;
+			clickable: true;
+			bind($self.media.currenttime);
+			max: $self.media.metadata.duration;
+			secondBarValue: $core.media.current.buffer.delay;
+			widget(icon, {
+				source: "skin://icons/dot.png";
+			});
+			widget(container_y, {
+				space(1);
+				widget(quad, {
+				height: 3;
+				alpha: 0.9;
+				additive: true;
+				});
+				space(1);
+			});
+			widget(container_y, {
+				space(1);
+				widget(quad, {
+				height: 3;
+				alpha: 0.5;
+				additive: true;
+				});
+				space(1);
+			});
+			});
+		});
+		widget(label, {
+			width: 4em;
+			caption: value2duration($self.media.metadata.duration);
+		});
+		});
+	});
+	});
+
+	widget(underscan, {
+	widget(container_y, {
+	align: top;
+	widget(container_x, {
+	space(7);
+	widget(throbber_fwd, {
+		height: 6em;
+		align: right;
+	hidden: iir($self.media.loading==2, 6) < 0.001;
+	zoffset: -999;
+	alpha: iir($self.media.loading==2, 6);
+	});
+	});
+	
+	});
+	});
+ 
+	widget(container_y, {
+	align: top;
+	widget(container_x, {
+		height: 3em;
+		BackButton($clone.showPlaydeck, {
+		$self.close = true;
+		});
+	});
+	});
+});

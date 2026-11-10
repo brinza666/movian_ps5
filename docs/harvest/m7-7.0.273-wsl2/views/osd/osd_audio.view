@@ -1,0 +1,85 @@
+#import "skin://theme.view"
+
+
+widget(container_y, {
+	id: "osd_audio";
+
+	widget(label, {
+	style: "osdsettingtitle";
+	height: 3em;
+	align: center;
+	caption: _("Audio")+" / "+_("Video");
+	size: 1.5em;
+	});
+
+	onEvent(back, {
+	$clone.osdpage = 0;
+	focus("audio-btn");
+	}, $clone.osdpage);
+
+	widget(container_x, {
+	widget(list_y, {
+		id: "list";
+
+		cloner($self.media.audio.sorted, container_z, {
+		height: 1.5em;
+		focusable: true;
+		ListItemHighlight();
+		ListItemBevel();
+		onEvent(activate, deliverEvent($parent.control,
+										 selectAudioTrack($self.url)));
+
+		widget(container_x, {
+			padding: [0.25em, 0];
+
+			widget(icon, {
+		source: "skin://icons/ic_favorite_48px.svg";
+		alpha: iir($self.url == $parent.media.audio.current &&
+						 $parent.media.audio.manual, 4);
+			style: "NavSelectedText";
+	});
+
+			widget(icon, {
+		source: ($self.url == $parent.media.video.current ? "skin://icons/ic_videocam_48px.svg" : "skin://icons/ic_check_48px.svg");
+		alpha: (iir(($self.url == $parent.media.video.current || $self.url == $parent.media.audio.current), 4));
+			style: "NavSelectedText";
+	});
+
+	widget(label, {
+			filterConstraintX: true;
+		weight: 1.75;
+		caption: $self.title ? $self.title : _("Audio");
+			style: "NavSelectedText";
+	});
+
+	widget(label, {
+			filterConstraintX: true;
+		weight: 1;
+		caption: $self.language;
+			style: "NavSelectedText";
+	});
+
+	widget(label, {
+			filterConstraintX: true;
+		weight: 0.75;
+		caption: $self.format;
+			style: "NavSelectedText";
+	});
+		});
+		});
+	});
+	widget(slider_y, {
+		bind("list");
+		width: 4;
+		focusable: canScroll();
+		alpha: iir(canScroll(), 16);
+		widget(quad, {
+	alpha: 1;
+		});
+	});
+	});
+});
+
+
+
+

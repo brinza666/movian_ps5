@@ -35,7 +35,8 @@ Read, in order:
 3. [STATUS.md](STATUS.md) — honest capability table
 4. [BUILDING.md](BUILDING.md) / [DEPLOY.md](DEPLOY.md)
 5. [PRODUCT.md](PRODUCT.md) — what Movian is supposed to feel like
-6. Skill: `.agents/skills/movian-ps5-port/SKILL.md`
+6. [M7_CAPABILITIES.md](M7_CAPABILITIES.md) — live WSL2 + Android harvest of official M7
+7. Skill: `.agents/skills/movian-ps5-port/SKILL.md`
 
 ## Workstation (verified 10 Nov 2026)
 
@@ -61,6 +62,8 @@ Read, in order:
 | DSH profile | `desktop`, GUI `http://127.0.0.1:64482` |
 | FTP script | `C:\Users\brinza\Documents\deep\tools\ps5-ftp.ps1` (`-Action ls/get/put`) |
 | klog monitor | `C:\Users\brinza\Documents\deep\tools\ps5-monitor.ps1` |
+| Official M7 (WSL) | `showtime` 7.0.273 in Ubuntu-24.04; HTTP control `http://127.0.0.1:42000/` |
+| M7 data | `\\wsl$\Ubuntu-24.04\home\brinza\.hts\showtime` |
 
 WSL build environment:
 
@@ -100,7 +103,9 @@ shell is **directory listing** of `/download0`, `/data/movian`, and
 drawn in the Videos place with the existing DualSense list pattern from
 the starter (`page_notes.cpp` is the reference).
 
-Keep the shell launching after every slice.
+Keep the shell launching after every slice. When a feature’s intended
+behaviour is unclear, run `wsl -d Ubuntu-24.04 -- showtime` and/or read
+[M7_CAPABILITIES.md](M7_CAPABILITIES.md) instead of guessing.
 
 ## GitHub Actions / Pages
 

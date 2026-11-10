@@ -1,0 +1,237 @@
+#import "skin://theme.view"
+#import "sidebar_include.view"
+
+widget(container_x, {
+	widget(dummy, {
+	// A clickable zone that closes sidebar
+	clickable: true;
+	onEvent(activate, {
+	$clone.showSidebar = false;
+	});
+	});
+
+	widget(container_z, {
+	width: 22em;
+	filterConstraintY: true;
+
+	onEvent(back, {
+	$clone.showSidebar = false;
+	});
+
+	onEvent(cancel, {
+	$clone.showSidebar = false;
+	});
+
+	onEvent(left, {
+	$clone.showSidebar = false;
+	}, true, false);
+
+	onEvent(LostFocus, {
+	$clone.showSidebar = false;
+	});
+
+#import "skin://styles/style_list.view"
+
+	widget(quad, {
+	style: "sidebarBackdrop";
+	});
+
+	/**
+	 * Style overrides
+	 */
+	style(ListItem, {
+	padding: 0;
+	spacing: 0;
+	});
+
+	newstyle(ListItemIcon, {
+	width: 2em;
+	align: center;
+	size: 1.5em;
+	});
+
+	style(ListItemValue, {
+	weight: 0.7;
+	padding: [1em, 0];
+	});
+
+	style(ListItemValueOn, {
+	weight: 0.7;
+	padding: [1em, 0];
+	});
+
+	style(ListItemValueOff, {
+	weight: 0.7;
+	padding: [1em, 0];
+	});
+
+	style(MultioptIcon, {
+	width: 1em;
+	size: 1em;
+	});
+
+	style(MultioptSelection, {
+	weight: 0.7;
+	});
+
+	style(MultioptItemIconSelected, {
+	width: 1em;
+	size: 1em;
+	});
+
+	style(MultioptItemIconUnselected, {
+	width: 1em;
+	size: 1em;
+	});
+
+
+	widget(list_y, {
+	navWrap: true;
+
+	id: "sidebar";
+
+	scrollThresholdTop: 3em;
+	clipOffsetTop: 3em;
+	scrollThresholdBottom: $ui.universeBottomHeight;
+	clipOffsetBottom: $ui.universeBottomHeight;
+	clipAlpha: 0.2;
+	clipBlur: 1;
+
+widget(container_z, {
+
+	height: 2em;
+	ListItemBevel();
+
+	hidden: translate($core.media.current.type, true,
+		"tracks", false,
+		"radio", false
+		 );
+
+	widget(container_x, {
+	align: center;
+
+	SIDEBAR_BUTTON("skin://icons/ic_stop_48px.svg",
+		deliverEvent($core.media.eventSink, "Stop"),
+		1);
+	
+	SIDEBAR_BUTTON("skin://icons/ic_skip_previous_48px.svg",
+		 deliverEvent($core.media.eventSink, "PreviousTrack"),
+		 $core.media.current.canSkipBackward);
+	 
+	SIDEBAR_BUTTON("skin://icons/ic_fast_rewind_48px.svg",
+		deliverEvent($core.media.eventSink, "SeekReverse"),
+		$core.media.current.canSeek);
+	
+	SIDEBAR_BUTTON(translate($core.media.current.playstatus,
+		 "skin://icons/ic_pause_48px.svg",
+		 "pause",
+		 "skin://icons/ic_play_arrow_48px.svg"),
+		 deliverEvent($core.media.eventSink, "PlayPause"),
+		 $core.media.current.canPause);
+
+	SIDEBAR_BUTTON("skin://icons/ic_fast_forward_48px.svg",
+		deliverEvent($core.media.eventSink, "SeekForward"),
+		$core.media.current.canSeek);
+	
+	SIDEBAR_BUTTON("skin://icons/ic_skip_next_48px.svg",
+		 deliverEvent($core.media.eventSink, "NextTrack"),
+		 $core.media.current.canSkipForward);
+
+	SIDEBAR_BUTTON("skin://icons/ic_list_48px.svg",
+		 navOpen("playqueue:"),
+		 $core.playqueue.active);
+
+	SIDEBAR_BUTTON_TOGGLE("dataroot://res/svg/Repeat.svg",
+		$core.media.current.repeat,
+		$core.media.current.canRepeat);
+
+	SIDEBAR_BUTTON_TOGGLE("dataroot://res/svg/Shuffle.svg",
+		$core.media.current.shuffle,
+		$core.media.current.canShuffle);
+	});
+});
+
+	// --------------------------------------
+	//
+	// --------------------------------------
+
+	widget(loader, {
+	hidden: count($clone.settings.options) < 2;
+		.self <- $clone.settings;
+	source: "skin://items/list/multiopt.view";
+	});
+
+	// --------------------------------------
+	// Items from page model
+	// --------------------------------------
+
+	cloner($self.model.options, loader, {
+	time: 0.1;
+	effect: blend;
+	alt: "skin://items/list/default.view";
+	source: "skin://items/list/" + $self.type + ".view";
+	});
+
+
+
+	// --------------------------------------
+	// Bookmark on/off
+	// --------------------------------------
+
+	SIDEBAR_ACTION(select($self.bookmarked,
+				_("Remove bookmark"),
+				_("Bookmark page")),
+			 select($self.bookmarked,
+				"skin://icons/ic_bookmark_48px.svg",
+				"skin://icons/ic_bookmark_border_48px.svg"),
+			 {
+		 toggle($self.bookmarked);
+			 },
+			 $self.url == "page:home");
+
+	SIDEBAR_ACTION(_("Paste"),
+			 void,
+			 event("Paste"),
+			 !($self.model.canPaste && $core.clipboard.contents == "path"));
+
+	SIDEBAR_ACTION(_("Reload page"),
+			 "skin://icons/ic_refresh_48px.svg",
+			 event("ReloadData"));
+
+	widget(dummy, {
+	height: 1em;
+	});
+
+	// --------------------------------------
+	// Generic items
+	// --------------------------------------
+/*
+	SIDEBAR_ACTION(_("Settings"),
+			 "skin://icons/ic_settings_48px.svg",
+			 navOpen("settings:"),
+			 $self.url == "settings:");
+
+SIDEBAR_ACTION(_("Home"),
+			 "skin://icons/ic_home_48px.svg",
+			 navOpen("page:home"),
+			 $self.url == "page:home");
+*/
+
+
+
+#import "skin://menu/sidebar_common.view"
+
+
+	});
+
+	widget(container_y, {
+	widget(label, {
+	height: 3em;
+	align: center;
+	caption: _("Page settings");
+	size: 1.5em;
+	});
+	space(1);
+	});
+	});
+});
