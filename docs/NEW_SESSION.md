@@ -104,10 +104,8 @@ Keep the shell launching after every slice.
 
 ## GitHub Actions / Pages
 
-The `gh` token on this PC does not have the `workflow` scope, so CI and
-Pages YAML cannot be pushed yet. Copies live at
-[`docs/ci.yml.example`](ci.yml.example) and
-[`docs/pages.yml.example`](pages.yml.example). After
-`gh auth refresh -s workflow,repo`, copy them to `.github/workflows/`
-and push. Until then the project page is
-[`website/index.html`](../website/index.html) in the repo.
+Workflows live in `.github/workflows/` (`ci.yml`, `pages.yml`). Example
+copies remain at [`docs/ci.yml.example`](ci.yml.example) and
+[`docs/pages.yml.example`](pages.yml.example). The project page source is
+[`website/index.html`](../website/index.html); Pages is deployed by the
+`pages` workflow once GitHub Pages is enabled for this repository.

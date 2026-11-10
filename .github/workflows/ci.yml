@@ -1,0 +1,46 @@
+name: docs-and-shell
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required files exist
+        run: |
+          set -e
+          test -f README.md
+          test -f app/src/main.cpp
+          test -f app/src/ui.cpp
+          test -f app/sce_sys/param.json
+          test -f app/sce_sys/icon0.png
+          test -f app/build.sh
+          test -f docs/NEW_SESSION.md
+          test -f docs/PORTING_PLAN.md
+          python3 - <<'PY'
+          import json, re
+          p = json.load(open("app/sce_sys/param.json", encoding="utf-8"))
+          assert re.fullmatch(r"PPSA\d{5}", p["titleId"])
+          assert p["titleId"] in p["contentId"]
+          assert re.fullmatch(r"[A-Z]{2}\d{4}-PPSA\d{5}_00-[A-Z0-9]{16}", p["contentId"])
+          assert p["applicationCategoryType"] == 65536
+          print("param.json ok", p["titleId"], p["contentId"])
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          icon = Path("app/sce_sys/icon0.png").read_bytes()
+          assert icon[:8] == b"\x89PNG\r\n\x1a\n"
+          assert struct.unpack(">II", icon[16:24]) == (512, 512)
+          print("icon0.png 512x512 ok")
+          PY
+      - name: No tracked binaries
+        run: |
+          if git ls-files | grep -E '\.(elf|bin|prx)$'; then
+            echo "binaries must not be tracked" >&2
+            exit 1
+          fi
