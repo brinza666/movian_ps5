@@ -101,3 +101,13 @@ drawn in the Videos place with the existing DualSense list pattern from
 the starter (`page_notes.cpp` is the reference).
 
 Keep the shell launching after every slice.
+
+## GitHub Actions / Pages
+
+The `gh` token on this PC does not have the `workflow` scope, so CI and
+Pages YAML cannot be pushed yet. Copies live at
+[`docs/ci.yml.example`](ci.yml.example) and
+[`docs/pages.yml.example`](pages.yml.example). After
+`gh auth refresh -s workflow,repo`, copy them to `.github/workflows/`
+and push. Until then the project page is
+[`website/index.html`](../website/index.html) in the repo.
