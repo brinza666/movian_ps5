@@ -1,7 +1,5 @@
 # Build outputs
 build/
-build_host/
-build_fpkg/
 dist/
 *.elf
 *.bin
@@ -9,10 +7,14 @@ dist/
 *.ffpfsc
 *.o
 *.a
+*.so
+*.prx
 
-# Dependency caches
+# Kit / SDK caches (live in ~/.ps5-starter, never in git)
 .deps/
 .native/
+.local/
+kit-work/
 
 # IDE and editor
 .vscode/
@@ -35,3 +37,4 @@ __pycache__/
 
 # Temporary
 scoped_dir*/
+.env

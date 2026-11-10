@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movian for PlayStation 5</title>
+  <meta name="description" content="Native PS5 port of the Movian media center. ShadowMountPlus title PPSA99455, following VLC for PS5.">
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --card: #1a1512;
+      --text: #f1ece9;
+      --muted: #a5968d;
+      --accent: #8ea2ff;
+      --line: #2e2620;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    header {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 72px 24px 24px;
+    }
+    header img { width: 96px; height: 96px; border-radius: 24px; }
+    h1 { font-size: 2.4rem; margin: 16px 0 8px; }
+    .lead { color: var(--muted); font-size: 1.15rem; max-width: 40rem; }
+    main { max-width: 880px; margin: 0 auto; padding: 0 24px 96px; }
+    section { margin: 48px 0; }
+    h2 { font-size: 1.35rem; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+    a { color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 1rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    code, pre {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.88rem;
+    }
+    pre {
+      background: var(--card);
+      padding: 16px 18px;
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+    footer { color: var(--muted); font-size: 0.85rem; }
+    .badge {
+      display: inline-block;
+      background: #211b17;
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icon0.png" alt="Movian icon">
+    <p>
+      <span class="badge">Phase 0 shell</span>
+      <span class="badge">PPSA99455</span>
+      <span class="badge">GPL-3.0-or-later</span>
+    </p>
+    <h1>Movian for PlayStation 5</h1>
+    <p class="lead">
+      A native home-screen port of the Movian media center. Same product as
+      M7 on PS3 and <a href="https://github.com/czz/movian-go">movian-go</a>
+      on the desktop; same packaging as
+      <a href="https://github.com/ZiZc3/VLC">VLC for PS5</a>.
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>Status</h2>
+      <p>
+        The live tree is an honest DualSense shell: Home, Videos, BitTorrent,
+        Plugins. Playback, torrents, and the plugin host are the next phases —
+        they are <strong>not</strong> in this binary. Earlier GitHub trees
+        over-claimed those features; that code is archived.
+      </p>
+    </section>
+    <section>
+      <h2>Get the source</h2>
+      <pre>git clone https://github.com/brinza666/movian_ps5.git
+cd movian_ps5
+# WSL2 Ubuntu 24.04
+bash scripts/doctor.sh
+bash app/build.sh</pre>
+      <p>
+        New contributors and AI sessions: read
+        <a href="https://github.com/brinza666/movian_ps5/blob/main/docs/NEW_SESSION.md">docs/NEW_SESSION.md</a>.
+      </p>
+    </section>
+    <section>
+      <h2>How it ships</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Native title</h3>
+          <p>Signed <code>eboot.bin</code> in <code>/data/homebrew/PPSA99455</code>, launched from the PS5 home screen via ShadowMountPlus.</p>
+        </div>
+        <div class="card">
+          <h3>Not a Go ELF</h3>
+          <p>Stock Go freebsd/amd64 dies before <code>main</code> on this userland. movian-go remains the behaviour reference.</p>
+        </div>
+        <div class="card">
+          <h3>Not port 9021</h3>
+          <p>Payloads are a different file. Do not send <code>eboot.bin</code> to elfldr.</p>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h2>Credits</h2>
+      <table>
+        <thead><tr><th>Project</th><th>People</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><a href="https://github.com/andoma/movian">Movian / Showtime</a></td><td>Andreas Öman</td><td>Original media center</td></tr>
+          <tr><td>M7</td><td>Dean Kasabow</td><td>PS3 reference</td></tr>
+          <tr><td><a href="https://github.com/czz/movian-go">movian-go</a></td><td>czz</td><td>Plugin API, backends, UX</td></tr>
+          <tr><td><a href="https://github.com/ZiZc3/VLC">VLC for PS5</a></td><td>ZiZc3</td><td>Native title recipe</td></tr>
+          <tr><td><a href="https://github.com/blackbearreloaded/ps5-native-app-boilerplate">ps5-native-app-boilerplate</a></td><td>BlackBearReloaded</td><td>FSELF, libc.prx</td></tr>
+          <tr><td><a href="https://github.com/MiladRTX/ps5-homebrew-starter">ps5-homebrew-starter</a> / <a href="https://github.com/MiladRTX/Breeze">Breeze</a></td><td>MiladRTX</td><td>Renderer, DualSense, kit</td></tr>
+          <tr><td><a href="https://github.com/ps5-payload-dev/sdk">ps5-payload-dev/sdk</a></td><td>John Törnblom</td><td>Public SDK</td></tr>
+          <tr><td><a href="https://github.com/drakmor/ShadowMountPlus">ShadowMountPlus</a></td><td>drakmor</td><td>Home-screen titles</td></tr>
+          <tr><td><a href="https://github.com/LightningMods/etaHEN">etaHEN</a> / <a href="https://github.com/EchoStretch/kstuff">kstuff</a></td><td>LightningMods, EchoStretch</td><td>Jailbreak runtime</td></tr>
+        </tbody>
+      </table>
+      <p>Full list: <a href="https://github.com/brinza666/movian_ps5/blob/main/docs/CREDITS.md">docs/CREDITS.md</a>.</p>
+    </section>
+    <footer>
+      <p>Independent homebrew. PlayStation and PS5 are trademarks of Sony Interactive Entertainment. Not affiliated with Sony.</p>
+    </footer>
+  </main>
+</body>
+</html>

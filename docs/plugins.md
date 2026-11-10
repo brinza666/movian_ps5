@@ -42,15 +42,15 @@ To use the official repository again, delete the address and leave the field emp
 
 ## On this PS5 title
 
-Plugins on the home screen opens that catalog. With no settings file yet, the address is already `https://bit.ly/mprepo`. A saved empty address is the official repository `https://repo.movian.eu/plugins-v1.json`.
+**Phase 0 does not run plugins.** The Plugins tab is a placeholder. The feed
+at [`plugins/repo.json`](../plugins/repo.json) (https://bit.ly/mprepo) is kept
+so Phase 4 can load the same catalog M7 uses.
 
-Right on the repository row cycles four values: empty (official), `https://bit.ly/mprepo`, the raw file on GitHub, and the official URL written out. The console HTTP client does not follow redirects. If the bit.ly preset fails to load, use the raw GitHub URL in that same cycle.
+Target behaviour (Phase 4), matching M7 / movian-go:
 
-- Cross on a string opens the pad keyboard. Triangle shifts letters. Square or L1 erases. R1 or done saves. Circle cancels.
-- **Browse available plugins** downloads the feed and installs the package you pick into a directory L2 already scans (`/data/movian/plugins`, `/mnt/usb0/plugins`, `/mnt/usb1/plugins`, `/user/movian/plugins`).
-- **Automatically upgrade plugins**, when on, upgrades an installed package after that fetch if the feed's version is newer. **Upgrade installed plugins** does that even when the switch is off.
-- **Auto install plugins on demand** installs a missing package when a page URL matches a `control.uriprefixes` entry from a feed that has already been fetched. This repository's `plugins/repo.json` does not publish those prefixes.
-- Beta passwords are sent as repeated `betapassword` query arguments, the same as M7.
-- Hold Options quits.
+- Settings store an alternate repository URL; empty means
+  `https://repo.movian.eu/plugins-v1.json`.
+- Install zips into `/download0/plugins` (and USB `plugins/` if visible).
+- `plugin.json` API v2: `createService`, `addURI`, `page.appendItem`.
 
-The loader ELF uses the same pages under Options → Repository. See [Loader ELF](payload.md).
+See [PRODUCT.md](PRODUCT.md) and [PORTING_PLAN.md](PORTING_PLAN.md).

@@ -1,101 +1,122 @@
-# Movian for PS5
+# Movian for PlayStation 5
 
-PS5 port of Movian. Movian on PS3 is Dean Kasabow's M7 (7.0.273) from [apps.movian.eu](https://apps.movian.eu/), continued from Andreas Öman's Movian. The flat skin is the one in [andoma/movian](https://github.com/andoma/movian).
+<p align="center">
+  <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
+</p>
 
-![Home](docs/images/home.jpg)
+<p align="center">
+  <b>A native PS5 port of the Movian media center.</b><br>
+  Built as a ShadowMountPlus home-screen title, the same way
+  <a href="https://github.com/ZiZc3/VLC">VLC for PS5</a> ships.
+</p>
 
-The picture above is the browser preview. The television build uses the same four places: Home, Videos, BitTorrent, Plugins.
+<p align="center">
+  <img alt="status" src="https://img.shields.io/badge/status-phase%200%20shell-yellow">
+  <img alt="title" src="https://img.shields.io/badge/title-PPSA99455-1f1f1f">
+  <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
+</p>
 
-## Download
+Movian (formerly Showtime) is Andreas Öman’s media center, continued as
+Dean Kasabow’s **M7** on PS3 and as [czz/movian-go](https://github.com/czz/movian-go)
+on desktop. This repository ports that product to a jailbroken PS5 as a
+**native C++20 application**, not as a Go binary and not as a one-shot ELF
+sent to port 9021.
 
-| Build | What it is | File |
-| --- | --- | --- |
-| Home screen | ShadowMountPlus title `PPSA99455`. Launch Movian from the console home screen. | [PPSA99455.zip](https://github.com/brinza666/movian_ps5/releases/download/shadowmount/PPSA99455.zip) |
-| Loader | `payload.elf` for a loader that is already running on port 9021. Not the home-screen title. | [pre-alpha](https://github.com/brinza666/movian_ps5/releases/tag/pre-alpha) |
+> **Honesty.** Earlier trees in this repository claimed FFmpeg, BitTorrent,
+> Duktape plugins, and SMB2 were already working. Those sources were stubs,
+> a Go overlay that dies before `main` on this userland, or a separate
+> loader experiment. They are kept under [`archive/`](archive/README.md) as
+> reference only. The live application is [`app/`](app/).
 
-Do not send `eboot.bin` to port 9021. Do not put videos inside the `PPSA99455` folder.
+## What works today (Phase 0)
 
-Install and the current zip checksum: [docs/install.md](docs/install.md).
-
-## Manuals
-
-- [Install the home-screen title](docs/install.md)
-- [Using Movian](docs/manual.md)
-- [USB, data, and where files go](docs/usb.md)
-- [Plugins](docs/plugins.md) — Russian and English
-- [Playback](docs/playback.md)
-- [Loader ELF (port 9021)](docs/payload.md)
-- [What M7 does, and what this port does](docs/capabilities.md)
-
-## Tree
-
-| Path | Contents |
+| Capability | Status |
 | --- | --- |
-| `docs/` | Manuals and screenshots |
-| `plugins/` | Alternative plugin feed. Address `https://bit.ly/mprepo` |
-| `ps5-splicer/` | Player sources, and the port-9021 ELF |
-| `movian-ps5-port/` | movian-go overlay. It does not boot yet |
-| `movian-ps5/` | Native C port (this project) — replaces Android JNI with native PS5 `main()` |
-| `ps5-boilerplate/` | ps5-native-app-boilerplate integration — ShadowMount-compatible builds |
+| ShadowMountPlus title `PPSA99455` (Media category) | In tree — build with `app/build.sh` |
+| DualSense navigation, 1080p CPU UI | Implemented |
+| Four Movian places: Home, Videos, BitTorrent, Plugins | Shell only |
+| Video / audio playback | **Not in this binary** (Phase 1–2) |
+| BitTorrent client | **Not in this binary** (Phase 3) |
+| Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |
+| Go `movian-go` ELF | Abandoned for PS5 (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |
 
-## Movian PS5 Native Port
+Product behaviour we are aiming at is documented from M7 and movian-go in
+[docs/PRODUCT.md](docs/PRODUCT.md). The engineering plan is
+[docs/PORTING_PLAN.md](docs/PORTING_PLAN.md).
 
-This is a native PS5 port of Movian built with [ps5-native-app-boilerplate](https://github.com/drakmor/ps5-native-app-boilerplate) — no proprietary Sony SDK required.
+## Why we copy VLC, not Go
 
-### Features (from M7 comparison)
+[VLC for PS5](https://github.com/ZiZc3/VLC) is a working native title:
 
-| Feature | Status | Implementation |
-|---------|--------|---------------|
-| Video: MPEG-1, H.264, HEVC, MPEG-4, MPEG-2, MJPEG, WMV, VC-1, VP8 | ✅ | FFmpeg software decode inside payload |
-| Audio: AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC, PCM | ✅ | FFmpeg software decode inside payload |
-| Containers: MP4, MKV, MPEG-TS, AVI, WMV, ASF, FLV, MPEG | ✅ | FFmpeg demuxing |
-| BitTorrent client (magnet, .torrent) | ✅ | Play-while-download |
-| Subtitles: SRT | ✅ | ASS/VOBSub planned |
-| Resume, seek, playback speed (0.5x–2x) | ✅ | Media player controls |
-| SMB2 network shares | ✅ | Via libm7.so exports |
-| Plugins (Duktape API v2) | ✅ | Repository, beta passwords, auto-upgrade |
-| On-screen keyboard (with shift) | ✅ | PS5 controller input |
+1. Cross-compile C/C++ with [ps5-payload-dev/sdk](https://github.com/ps5-payload-dev/sdk).
+2. Link a PIE ELF, convert + sign to `eboot.bin` with the
+   [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate)
+   toolchain (VLC uses the same converter via [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan)).
+3. Ship `dist/PPSA…/eboot.bin` + `sce_sys/` + `sce_module/libc.prx`.
+4. Copy the folder to `/data/homebrew/<TITLE_ID>/` and launch from the home screen.
 
-### REA Analysis
+A stock Go `freebsd/amd64` binary issues FreeBSD syscalls (`SYSCALL` with
+FreeBSD numbers). The PS5 title userland does not service that table, so
+the process dies before `main`. That is why
+[`archive/go-overlay/`](archive/go-overlay) is not the shipping path.
 
-The core library `libm7.so` was analyzed with [REA](https://github.com/morluto/rea) — **897 exports** identified:
-- Duktape JS Engine (`duk_*`) — JavaScript runtime
-- FreeType (`FT_*`) — Font rendering
-- SMB2 Network (`smb2_*`) — SMB shares
-- DCERPC/RPC — Network protocols
-- NTLMSSP Auth — Authentication
-- Crypto — MD4, MD5, AES128, HMAC
+Movian-go remains the **behaviour and plugin-API reference**. We reimplement
+its features in native code, the same way VLC reimplemented libvlc on this
+platform instead of running the desktop binary.
 
-### Build (WSL2 Ubuntu)
+## Build
+
+On **WSL2 Ubuntu 24.04** (this workstation is already provisioned):
 
 ```bash
-cd ps5-boilerplate
-
-make doctor          # Verify build environment
-make deps            # Fetch dependencies
-make                 # Build ShadowMount-compatible folder
-make packages        # Build folder + .ffpkg + .ffpfsc
+cd /mnt/c/Users/brinza/Documents/deep/movian_ps5
+bash scripts/doctor.sh
+bash app/build.sh                          # -> build/app/PPSA99455/
+bash app/build.sh deploy 192.168.10.238    # FTP to /data/homebrew
 ```
 
-### Deploy
+Details: [docs/BUILDING.md](docs/BUILDING.md) · [docs/DEPLOY.md](docs/DEPLOY.md).
 
-| Format | Output | ShadowMount Compatible |
-|--------|--------|----------------------|
-| Folder | `dist/PPSA99455/` | ✅ Yes |
-| `.ffpkg` | `dist/PPSA99455.ffpkg` | ✅ Yes |
-| `.ffpfsc` | `dist/PPSA99455.ffpfsc` | ✅ Yes |
+New contributors and new AI sessions should start at
+[docs/NEW_SESSION.md](docs/NEW_SESSION.md).
 
-**Folder method:**
-```
-Copy dist/PPSA99455/ → USB → PS5 /data/homebrew/PPSA99455/
-Launch from homebrew menu
+## Repository layout
+
+```text
+app/                  Live native title (sources, param.json, fonts, icon)
+scripts/              doctor, deploy, icon helper
+docs/                 Architecture, plan, manuals, new-session handoff
+website/              Project page (GitHub Pages)
+plugins/repo.json     Alternative Movian plugin feed (https://bit.ly/mprepo)
+archive/              Frozen experiments — do not build these for shipping
+.agents/skills/       Agent skill for this port
 ```
 
-**FTP method (etaHEN port 9021):**
-```bash
-make deploy PS5_HOST=192.168.1.100
-```
+## Credits
+
+This port stands on public homebrew work. Full attributions:
+[docs/CREDITS.md](docs/CREDITS.md).
+
+| Project | Authors | Role here |
+| --- | --- | --- |
+| [Movian / Showtime](https://github.com/andoma/movian) | Andreas Öman | Original media center |
+| M7 | Dean Kasabow / [apps.movian.eu](https://apps.movian.eu/) | PS3 reference |
+| [movian-go](https://github.com/czz/movian-go) | czz | Behaviour, plugin API v2, architecture reference |
+| [VLC for PS5](https://github.com/ZiZc3/VLC) | ZiZc3 | Native title recipe we follow |
+| [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | BlackBearReloaded | FSELF, `libc.prx`, folder packaging |
+| [ps5-homebrew-starter](https://github.com/MiladRTX/ps5-homebrew-starter) | MiladRTX | Verified VideoOut renderer, DualSense, fonts |
+| [ps5-payload-dev/sdk](https://github.com/ps5-payload-dev/sdk) | John Törnblom | Public headers, Clang target, libc++ |
+| [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) | drakmor | Home-screen titles from `/data/homebrew` |
+| [etaHEN](https://github.com/LightningMods/etaHEN) | LightningMods | Jailbreak runtime |
+| [kstuff](https://github.com/EchoStretch/kstuff) | EchoStretch | Kernel patches titles need |
+| [Breeze](https://github.com/MiladRTX/Breeze) | MiladRTX | Renderer lineage used by the starter |
+| stb | Sean Barrett | `stb_truetype`, `stb_image` |
+| Inter / JetBrains Mono | rsms / JetBrains | UI fonts |
+
+PlayStation and PS5 are trademarks of Sony Interactive Entertainment.
+This project is independent and is not affiliated with Sony.
 
 ## License
 
-[LICENSE](LICENSE). Payload sources are GPL-3.0-or-later.
+Repository-authored code is **GPL-3.0-or-later**. Upstream components keep
+their own licenses (see [NOTICE.md](NOTICE.md) and `app/fonts/`).

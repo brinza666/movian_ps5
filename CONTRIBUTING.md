@@ -1,35 +1,43 @@
-# Movian PS5 Port - Contributing Guidelines
+# Contributing
 
-## Getting Started
+## Scope
 
-1. Fork the repository
-2. Clone your fork
-3. Create a feature branch: `git checkout -b feature/your-feature`
-4. Make your changes
-5. Test on PS5 hardware (firmware 4.03)
-6. Submit a pull request
+This is a native PS5 title. Patches should move a **PORTING_PLAN.md phase**
+forward with something that builds and, when hardware is available, runs.
 
-## Build Environment
+Do not:
 
-- WSL2 Ubuntu or native Linux
-- clang-18, lld-18, make, python3
-- PS5 firmware 4.03 with homebrew support
-- ShadowMountPlus or similar loader
-- etaHEN on port 9021 (for FTP deploy)
+- Mark a feature complete unless it runs on a PS5 title (or a documented
+  host preview that shares the same sources).
+- Check in `.elf`, `.bin`, `.prx`, or SDK trees.
+- Revive `archive/go-overlay` as the shipping path without a libc-calling
+  Go runtime that has been shown to survive `_start`.
+- Point `PS5_SDK_SETUP.md`-style docs at Sony’s proprietary SDK. This
+  project uses the public [ps5-payload-dev/sdk](https://github.com/ps5-payload-dev/sdk).
 
-## Code Style
+## Development loop
 
-- C files: Follow the existing style (4-space indent, K&R braces)
-- C++20 files: Follow boilerplate conventions
-- Commit messages: Use conventional commits (feat:, fix:, docs:, etc.)
+1. WSL2 Ubuntu 24.04.
+2. `bash scripts/doctor.sh`
+3. Edit `app/src/`.
+4. `bash app/build.sh`
+5. Deploy with `bash app/build.sh deploy $PS5_HOST` (FTP 2121).
+6. Close the title on the console, wait for ShadowMountPlus to rescan
+   (~90 s, or `POST http://$PS5_HOST:10101/api/v1/scan`), relaunch.
+7. Watch klog on TCP 3232.
 
-## Testing
+## Code style
 
-- Build with `make doctor` to verify environment
-- Build with `make` to compile
-- Test on PS5 hardware
-- Report bugs with firmware version and error details
+- C++20, exceptions and RTTI off (boilerplate default).
+- 4-space indent.
+- Platform calls stay behind `movian::screen` / `movian::pad` / future
+  `movian::player` facades. UI code does not call `sce*` directly.
+- Logs: `fprintf(stderr, …)` shows up in klog; also append to
+  `/download0/movian-ps5.log` for anything a user might attach to a bug.
 
-## License
+## Commits
 
-GPL-3.0-or-later
+Conventional commits: `feat:`, `fix:`, `docs:`, `build:`, `chore:`.
+
+Every feature commit should update [docs/STATUS.md](docs/STATUS.md) if the
+truth table changed.
