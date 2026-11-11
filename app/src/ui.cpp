@@ -54,7 +54,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.6.0-repeat";
+constexpr const char *kVersion = "0.7.0-ffmpeg";
 constexpr const char *kTitleId = "PPSA99455";
 constexpr const char *kBookmarksUri = "bookmarks:";
 
@@ -233,7 +233,8 @@ void queue_add(const char *path, const char *title) noexcept
 {
     if (!path || !path[0] || g_queue_n >= max_entries)
         return;
-    if (player::classify(path) != player::Kind::mpeg1)
+    const player::Kind k = player::classify(path);
+    if (k != player::Kind::mpeg1 && k != player::Kind::ffmpeg)
         return;
     copy_text(g_queue[g_queue_n], sizeof g_queue[g_queue_n], path);
     copy_text(g_queue_title[g_queue_n], sizeof g_queue_title[g_queue_n],
@@ -352,11 +353,12 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
         return false;
     char why[128];
     const player::Kind pk = player::classify(path);
-    if (pk == player::Kind::mpeg1 && player::open(path, why, sizeof why, from_start))
+    if ((pk == player::Kind::mpeg1 || pk == player::Kind::ffmpeg) &&
+        player::open(path, why, sizeof why, from_start))
     {
         snprintf(g_status, sizeof g_status, "playing %s", title && title[0] ? title : path);
         append_log(g_status);
-        screen::notify(from_start ? "Play from start" : "MPEG-1");
+        screen::notify(from_start ? "Play from start" : (pk == player::Kind::ffmpeg ? "FFmpeg" : "MPEG-1"));
         g_overlay = Overlay::none;
         g_auto_advanced = false;
         ensure_queue(path);
@@ -552,7 +554,10 @@ bool item_action_enabled(int row) noexcept
     if (row == 0)
         return g_item_folder || g_item_file;
     if (row == 1)
-        return g_item_file && player::classify(g_item_path) == player::Kind::mpeg1;
+    {
+        const player::Kind k = player::classify(g_item_path);
+        return g_item_file && (k == player::Kind::mpeg1 || k == player::Kind::ffmpeg);
+    }
     if (row == 2 || row == 3)
         return g_item_path[0] != 0;
     return g_item_path[0] != 0;
@@ -638,6 +643,8 @@ void add_file_row(const fs::Entry &e) noexcept
     format_mtime(when, sizeof when, e.mtime);
     if (pk == player::Kind::mpeg1)
         snprintf(r.detail, sizeof r.detail, "MPEG-1  %s  %s", bytes, when);
+    else if (pk == player::Kind::ffmpeg)
+        snprintf(r.detail, sizeof r.detail, "H.264/AAC  %s  %s", bytes, when);
     else if (pk == player::Kind::later)
         snprintf(r.detail, sizeof r.detail, "%s — needs FFmpeg  %s  %s", kind_label(e.kind), bytes,
                  when);
@@ -917,7 +924,8 @@ void select_row() noexcept
         return;
     const Row &r = g_rows[g_stack[g_depth].selected];
     if (r.kind == RowKind::folder && r.path[0] && std::strcmp(r.path, kBookmarksUri) != 0 &&
-        !r.openable && player::classify(r.path) == player::Kind::mpeg1)
+        !r.openable && (player::classify(r.path) == player::Kind::mpeg1 ||
+                       player::classify(r.path) == player::Kind::ffmpeg))
     {
         play_path(r.path, r.title, false);
         return;

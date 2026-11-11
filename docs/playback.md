@@ -3,14 +3,16 @@
 **This binary plays MPEG-1 program streams** (`.mpg` / `.mpeg` / `.mpv` /
 `.m1v`) with pl_mpeg, CPU YUV→RGBA, and 48 kHz stereo AudioOut.
 Resume, seek step, volume/mute, and an OSD menu (Options) are in this
-binary. H.264 / MP4 / MKV are **not** decoded until FFmpeg is linked.
+binary. `v0.7.0` **links** a small static FFmpeg 6.1.2 (H.264, AAC, MP2,
+MP3, MPEG-1/2, file protocol, MP4/MKV/TS/AVI demux). That path is
+**linked, not TV-proven**. MPEG-1 via pl_mpeg remains the fallback.
 
 ## Target formats (Phase 2+)
 
 | Kind | Now | Goal |
 | --- | --- | --- |
 | MPEG-1 video + MP2 | **in `app/`** | keep |
-| H.264 / AAC / MP4 / MKV | no | small static FFmpeg |
+| H.264 / AAC / MP4 / MKV | **linked in `v0.7.0`** | TV unproven |
 | HEVC HW | no | `libSceVideodec2` |
 | Other containers | no | FFmpeg demux |
 | Subtitles | no | SRT first |

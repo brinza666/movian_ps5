@@ -65,9 +65,23 @@ PS5_PAYLOAD_SDK=$sdk sh "$kit/tooling/prospero-clang18" -O2 -Wall -Wextra -fPIC 
 "$sdk/bin/prospero-lld" --shared -soname libSceCommonDialog.sprx \
     -o "$kit/movian/stubs/libSceCommonDialog.so" "$kit/movian/stubs/common_dialog.o"
 
+ffmpeg_prefix=$repo/.deps/ffmpeg-ps5
 vars=(APP_SOURCE_DIR=movian/src APP_PARAM=movian/sce_sys/param.json
       APP_SCE_SYS=movian/sce_sys APP_ASSETS=movian/assets
       APP_IMPORT_STUBS=movian/stubs/libSceCommonDialog.so)
+if [[ -f $ffmpeg_prefix/lib/libavcodec.a && -f $ffmpeg_prefix/lib/libavformat.a && -f $ffmpeg_prefix/lib/libavutil.a ]]; then
+    echo "Linking static FFmpeg from $ffmpeg_prefix"
+    rm -rf "$kit/ffmpeg-ps5"
+    mkdir -p "$kit/ffmpeg-ps5"
+    cp -a "$ffmpeg_prefix/include" "$kit/ffmpeg-ps5/include"
+    mkdir -p "$kit/ffmpeg-ps5/lib"
+    cp -a "$ffmpeg_prefix/lib/"*.a "$kit/ffmpeg-ps5/lib/"
+    archives="ffmpeg-ps5/lib/libavformat.a ffmpeg-ps5/lib/libavcodec.a ffmpeg-ps5/lib/libavutil.a"
+    [[ -f $kit/ffmpeg-ps5/lib/libswresample.a ]] && archives+=" ffmpeg-ps5/lib/libswresample.a"
+    vars+=(APP_DEFINITIONS=MOVIAN_HAVE_FFMPEG
+           APP_INCLUDE_PATHS=ffmpeg-ps5/include
+           APP_STATIC_ARCHIVES="$archives")
+fi
 if [[ -n $deploy_host ]]; then
     make -C "$kit" "${vars[@]}" deploy PS5_HOST="$deploy_host"
 else

@@ -1,7 +1,7 @@
 /*
  * Movian for PS5 — software MPEG-1 player (pl_mpeg).
- * H.264/HEVC wait for a later FFmpeg slice. Honest: this binary plays
- * MPEG program streams (.mpg/.mpeg/.mpv/.m1v), not MP4/MKV.
+ * MPEG-1 always uses pl_mpeg. H.264/AAC play only when this binary was
+ * linked with static FFmpeg (MOVIAN_HAVE_FFMPEG).
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -16,7 +16,8 @@ enum class Kind
 {
     none,
     mpeg1,
-    later, // recognised video, no decoder in this binary
+    ffmpeg, // H.264/AAC when static FFmpeg is linked
+    later,  // recognised video, no decoder in this binary
 };
 
 [[nodiscard]] Kind classify(const char *path) noexcept;

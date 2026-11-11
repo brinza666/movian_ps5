@@ -67,7 +67,8 @@ to prove the pipeline.
 - [x] Continue watching + bookmarks + Square item menu
 - [x] Auto-next, L1/R1 prev/next, newest-first sort, file info
 - [x] Repeat (off / one / folder) and shuffle
-- [ ] H.264 + AAC via a small static FFmpeg
+- [x] Small static FFmpeg 6.1.2 linked (H.264 + AAC + MP4/MKV/TS demux) — TV unproven
+- [ ] H.264 + AAC observed playing on this console
 - [ ] Separate decode thread (decode currently on the UI tick)
 
 ## Phase 2b — Hardware decode

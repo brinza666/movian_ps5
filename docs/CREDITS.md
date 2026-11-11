@@ -21,7 +21,7 @@ keep GPL notices in the file header and a pointer here.
 | --- | --- | --- |
 | [ZiZc3/VLC](https://github.com/ZiZc3/VLC) | ZiZc3, with [ryancallstrom](https://github.com/ryancallstrom) and others | Working native title: `ps5/build-title.sh`, `platform_ps5.c`, static plugins, Media `param.json`, Helper.elf sandbox lift, hardware decode via `ps5vdec.c` |
 | [VideoLAN / VLC](https://www.videolan.org/) | VideoLAN contributors | Upstream player VLC-for-PS5 ports; we do **not** ship libvlc |
-| [FFmpeg](https://ffmpeg.org/) | FFmpeg developers | Decode stack for Phase 2 (not linked yet) |
+| [FFmpeg](https://ffmpeg.org/) | FFmpeg developers | Static 6.1.2 in `v0.7.0` (LGPL-2.1) |
 
 VLC sources are **not** vendored. We copy *process*: public SDK → signed
 `eboot.bin` → `/data/homebrew/<TITLE_ID>` → ShadowMountPlus.

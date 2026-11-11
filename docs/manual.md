@@ -5,7 +5,7 @@ The television UI has four places, switched with **L1 / R1**:
 | Place | Now | Later |
 | --- | --- | --- |
 | Home | Continue watching, Videos, Bookmarks, Settings | Live services and search OSK |
-| Videos | Lists folders; Cross plays MPEG-1 `.mpg` | H.264 / FFmpeg |
+| Videos | Lists folders; Cross plays MPEG-1; v0.7.0 tries MP4/MKV | TV-prove H.264 |
 | BitTorrent | Placeholder | Magnets and play-while-download |
 | Plugins | Placeholder | API v2 packages |
 

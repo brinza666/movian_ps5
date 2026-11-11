@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-11 (Phase 2 MPEG-1 `v0.6.0` repeat/shuffle, `eboot.bin` 280529 bytes).
+Last updated: 2026-11-11 (`v0.7.0` static FFmpeg linked, `eboot.bin` 3381807 bytes).
 
 Legend: **done** = observed on PS5 or in a shared-source host preview;
 **shell** = UI exists, backend does not; **no** = not in the live tree.
@@ -14,7 +14,7 @@ Official M7 column is from the live WSL2 7.0.273 install — see
 | Home tiles + search | **yes** (live) | **shell** | Continue / Videos / Bookmarks / Settings; no search OSK |
 | Local file browser | **yes** | **shell** | Videos lists `/download0` + `/data/movian` + bookmarks |
 | USB | **yes** | **shell** | `/mnt/usb0` is attempted; sandbox may hide it |
-| Software video | FFmpeg 4.4.4 | **shell** | MPEG-1 via pl_mpeg; resume/OSD; auto-next; H.264 waits for FFmpeg |
+| Software video | FFmpeg 4.4.4 | **shell** | MPEG-1 via pl_mpeg; H.264/AAC **linked** (FFmpeg 6.1.2 static), not yet TV-proven |
 | Hardware video | VDPAU / MediaCodec / … | **no** | Phase 2b, `libSceVideodec2` (toggle stored only) |
 | Audio | Pulse / AT / passthrough | **shell** | MPEG-1 MP2 → 48 kHz stereo, volume/mute |
 | Settings file | **yes** | **shell** | `/download0/settings.txt` DualSense toggles (auto-next, newest-first) |

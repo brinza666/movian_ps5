@@ -10,6 +10,7 @@
 #include "player.hpp"
 
 #include "audio.hpp"
+#include "avdec.hpp"
 #include "font.hpp"
 #include "image.hpp"
 #include "pad.hpp"
@@ -36,6 +37,7 @@ char g_path[384] = "";
 char g_title[96] = "";
 char g_error[128] = "";
 plm_t *g_plm = nullptr;
+bool g_use_ffmpeg = false;
 movian::image::Image g_picture{};
 std::uint64_t g_last_ms = 0;
 bool g_paused = false;
@@ -144,23 +146,42 @@ double seek_step() noexcept
 
 void persist_resume() noexcept
 {
-    if (!g_plm || !g_path[0])
+    if (!g_path[0])
         return;
-    settings::remember_resume(g_path, g_title, plm_get_time(g_plm), g_duration);
+    if (!g_plm && !g_use_ffmpeg)
+        return;
+    const double t = g_use_ffmpeg ? avdec::time() : (g_plm ? plm_get_time(g_plm) : 0);
+    settings::remember_resume(g_path, g_title, t, g_duration);
+}
+
+void on_ffmpeg_pcm(const float *interleaved, int frames, int rate) noexcept
+{
+    if (g_paused)
+        return;
+    g_src_rate = rate;
+    resample_push(interleaved, frames, rate);
 }
 
 void seek_by(double delta) noexcept
 {
-    if (!g_plm)
+    if (!g_plm && !g_use_ffmpeg)
         return;
-    double t = plm_get_time(g_plm) + delta;
+    double t = (g_use_ffmpeg ? avdec::time() : plm_get_time(g_plm)) + delta;
     if (t < 0)
         t = 0;
     if (g_duration > 0 && t > g_duration)
         t = g_duration;
     audio::clear();
-    plm_seek(g_plm, t, FALSE);
-    g_ended = plm_has_ended(g_plm) != 0;
+    if (g_use_ffmpeg)
+    {
+        avdec::seek(t);
+        g_ended = avdec::ended();
+    }
+    else
+    {
+        plm_seek(g_plm, t, FALSE);
+        g_ended = plm_has_ended(g_plm) != 0;
+    }
     persist_resume();
 }
 
@@ -269,7 +290,7 @@ Kind classify(const char *path) noexcept
     if (ends_with_ci(path, ".mp4") || ends_with_ci(path, ".m4v") || ends_with_ci(path, ".mov") ||
         ends_with_ci(path, ".mkv") || ends_with_ci(path, ".ts") || ends_with_ci(path, ".m2ts") ||
         ends_with_ci(path, ".avi") || ends_with_ci(path, ".webm") || ends_with_ci(path, ".m2v"))
-        return Kind::later;
+        return avdec::available() ? Kind::ffmpeg : Kind::later;
     return Kind::none;
 }
 
@@ -281,10 +302,43 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
         copy_text(why, why_cap, "empty path");
         return false;
     }
-    if (classify(path) != Kind::mpeg1)
+    const Kind kind = classify(path);
+    if (kind == Kind::later || kind == Kind::none)
     {
-        copy_text(why, why_cap, "this build plays MPEG-1 (.mpg) only; H.264 needs FFmpeg");
+        copy_text(why, why_cap, avdec::available()
+                                    ? "this file is not a supported video"
+                                    : "this build plays MPEG-1 (.mpg) only; H.264 needs FFmpeg");
         return false;
+    }
+
+    if (kind == Kind::ffmpeg)
+    {
+        if (!avdec::open(path, why, why_cap, on_ffmpeg_pcm))
+            return false;
+        g_use_ffmpeg = true;
+        g_src_w = avdec::width();
+        g_src_h = avdec::height();
+        g_duration = avdec::duration();
+        g_picture.w = g_src_w;
+        g_picture.h = g_src_h;
+        g_picture.pixels = const_cast<std::uint32_t *>(avdec::rgba());
+        copy_text(g_path, static_cast<int>(sizeof g_path), path);
+        copy_text(g_title, static_cast<int>(sizeof g_title), basename_of(path));
+        g_paused = false;
+        g_ended = false;
+        g_osd = false;
+        g_osd_row = 0;
+        g_last_ms = screen::now_ms();
+        g_saved_ms = g_last_ms;
+        g_error[0] = 0;
+        (void)audio::init();
+        audio::set_volume(settings::get().volume);
+        audio::clear();
+        double resume_at = 0;
+        if (!from_start && settings::get().resume && settings::resume_for(path, &resume_at, nullptr) &&
+            resume_at > 1.0)
+            avdec::seek(resume_at);
+        return true;
     }
 
     g_plm = plm_create_with_filename(path);
@@ -351,11 +405,18 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
 
 void close() noexcept
 {
+    if (g_plm || g_use_ffmpeg)
+        persist_resume();
     if (g_plm)
     {
-        persist_resume();
         plm_destroy(g_plm);
         g_plm = nullptr;
+    }
+    if (g_use_ffmpeg)
+    {
+        g_picture.pixels = nullptr;
+        avdec::close();
+        g_use_ffmpeg = false;
     }
     free_picture();
     audio::clear();
@@ -371,12 +432,12 @@ void close() noexcept
 
 bool active() noexcept
 {
-    return g_plm != nullptr;
+    return g_plm != nullptr || g_use_ffmpeg;
 }
 
 bool playing() noexcept
 {
-    return g_plm && !g_paused && !g_ended;
+    return (g_plm || g_use_ffmpeg) && !g_paused && !g_ended;
 }
 
 const char *path() noexcept
@@ -391,6 +452,8 @@ const char *title() noexcept
 
 double time() noexcept
 {
+    if (g_use_ffmpeg)
+        return avdec::time();
     return g_plm ? plm_get_time(g_plm) : 0;
 }
 
@@ -401,7 +464,7 @@ double duration() noexcept
 
 bool ended() noexcept
 {
-    return g_plm && g_ended;
+    return (g_plm || g_use_ffmpeg) && g_ended;
 }
 
 int width() noexcept
@@ -416,7 +479,7 @@ int height() noexcept
 
 bool handle(unsigned pressed) noexcept
 {
-    if (!g_plm)
+    if (!g_plm && !g_use_ffmpeg)
         return false;
     bool dirty = pressed != 0;
     if (pressed & pad::options)
@@ -507,7 +570,7 @@ bool handle(unsigned pressed) noexcept
 
 bool tick() noexcept
 {
-    if (!g_plm)
+    if (!g_plm && !g_use_ffmpeg)
         return false;
     const std::uint64_t now = screen::now_ms();
     double dt = 0;
@@ -522,15 +585,29 @@ bool tick() noexcept
         dt = 0.25;
     if (!g_paused && !g_ended)
     {
-        plm_decode(g_plm, dt);
-        if (plm_has_ended(g_plm))
+        if (g_use_ffmpeg)
         {
-            g_ended = true;
-            g_paused = true;
-            audio::clear();
-            settings::clear_resume();
+            avdec::tick(dt);
+            if (avdec::ended())
+            {
+                g_ended = true;
+                g_paused = true;
+                audio::clear();
+                settings::clear_resume();
+            }
         }
-        else if (now - g_saved_ms > 4000)
+        else
+        {
+            plm_decode(g_plm, dt);
+            if (plm_has_ended(g_plm))
+            {
+                g_ended = true;
+                g_paused = true;
+                audio::clear();
+                settings::clear_resume();
+            }
+        }
+        if (!g_ended && now - g_saved_ms > 4000)
         {
             persist_resume();
             g_saved_ms = now;
@@ -560,10 +637,11 @@ void draw(screen::Canvas &c) noexcept
     c.rect(0, 0, screen::width, 64, Color::surface, 180);
     c.text(48.f, 44.f, g_title[0] ? g_title : "MPEG-1", font::semibold, 24, Color::text);
     char badge[48];
-    std::snprintf(badge, sizeof badge, "SW MPEG-1  %dx%d", g_src_w, g_src_h);
+    std::snprintf(badge, sizeof badge, "%s  %dx%d", g_use_ffmpeg ? "SW FFmpeg" : "SW MPEG-1", g_src_w,
+                  g_src_h);
     c.text(1480.f, 44.f, badge, font::mono_medium, 16, Color::accent);
 
-    const double t = g_plm ? plm_get_time(g_plm) : 0;
+    const double t = time();
     const double d = g_duration > 0 ? g_duration : 1;
     char left[16], right[16];
     format_time(left, sizeof left, t);

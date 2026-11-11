@@ -37,7 +37,7 @@ sent to port 9021.
 | Videos file browser (`/download0`, `/data/movian`, USB) | Implemented |
 | MPEG-1 software playback (`.mpg`) | Implemented (pl_mpeg, CPU blit, stereo, resume) |
 | Settings / bookmarks / continue watching | Implemented (`/download0/*.txt`) |
-| H.264 / MP4 / MKV | **Not in this binary** (FFmpeg next) |
+| H.264 / AAC / MP4 / MKV | **Linked in v0.7.0** (static FFmpeg 6.1.2) — TV unproven |
 | Four Movian places: Home, Videos, BitTorrent, Plugins | Videos + MPEG-1 + Options; others shell |
 | BitTorrent client | **Not in this binary** (Phase 3) |
 | Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |
