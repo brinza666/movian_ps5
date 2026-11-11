@@ -32,6 +32,9 @@ void close() noexcept;
 [[nodiscard]] const char *title() noexcept;
 [[nodiscard]] double time() noexcept;
 [[nodiscard]] double duration() noexcept;
+[[nodiscard]] bool ended() noexcept;
+[[nodiscard]] int width() noexcept;
+[[nodiscard]] int height() noexcept;
 
 // DualSense while the player is up. Returns true if the scene should redraw.
 bool handle(unsigned pressed) noexcept;

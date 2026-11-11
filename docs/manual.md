@@ -18,7 +18,7 @@ but do not play yet.
 
 | Button | Library | Player |
 | --- | --- | --- |
-| L1 / R1 | Previous / next place | unused |
+| L1 / R1 | Previous / next place | previous / next MPEG-1 in the folder |
 | D-pad | Move Home tiles / Videos rows | seek / OSD row |
 | Cross | Open a folder, play MPEG-1, or toggle a setting | pause |
 | Circle | Back one folder, then Home; close a menu | stop |
@@ -32,12 +32,14 @@ but do not play yet.
 **Options** opens a DualSense list stored in `/download0/settings.txt`:
 
 - Resume playback
+- Play next when a file ends
 - Seek step (5 / 10 / 30 / 60 s)
 - Volume (50 / 75 / 100 %)
 - 24-hour clock
 - Debug log (`/download0/movian-ps5.log`)
 - Hardware decode (stored for Phase 2b; this binary stays software MPEG-1)
 - Show all files
+- Newest files first
 - Plugin repository URL (cycled, **not fetched** in this build)
 
 Continue watching is `/download0/resume.txt`. Bookmarks are

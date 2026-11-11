@@ -380,6 +380,21 @@ double duration() noexcept
     return g_duration;
 }
 
+bool ended() noexcept
+{
+    return g_plm && g_ended;
+}
+
+int width() noexcept
+{
+    return g_src_w;
+}
+
+int height() noexcept
+{
+    return g_src_h;
+}
+
 bool handle(unsigned pressed) noexcept
 {
     if (!g_plm)
@@ -434,6 +449,10 @@ bool handle(unsigned pressed) noexcept
         seek_by(-seek_step());
     if (pressed & pad::right)
         seek_by(seek_step());
+    if (pressed & pad::up)
+        seek_by(seek_step());
+    if (pressed & pad::down)
+        seek_by(-seek_step());
     if (pressed & pad::l2)
         seek_by(-60.0);
     if (pressed & pad::r2)
@@ -523,7 +542,8 @@ void draw(screen::Canvas &c) noexcept
     const char *state = g_ended ? "ended" : g_paused ? "paused" : "playing";
     c.text(900.f, 1040.f, state, font::medium, 18, Color::text);
     char hint[96];
-    std::snprintf(hint, sizeof hint, "Cross pause    Left/Right %ds    L2/R2 60s    Options menu    Circle back",
+    std::snprintf(hint, sizeof hint,
+                  "Cross pause    L1/R1 prev/next    Left/Right %ds    Options menu    Circle back",
                   settings::get().seek_step);
     c.text(48.f, 1070.f, hint, font::regular, 16, Color::faint);
 

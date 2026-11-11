@@ -22,6 +22,8 @@ struct Data
     bool debug_log = true;
     bool hw_decode = false; // stored for Phase 2b; this binary is software MPEG-1
     bool show_all = false;
+    bool auto_next = true;
+    bool newest_first = false;
     int volume = 100; // 50 / 75 / 100
     int repo_preset = 1; // cycle; nothing is fetched in this build
 };

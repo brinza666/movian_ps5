@@ -54,7 +54,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.4.0-options";
+constexpr const char *kVersion = "0.5.0-playlist";
 constexpr const char *kTitleId = "PPSA99455";
 constexpr const char *kBookmarksUri = "bookmarks:";
 
@@ -97,6 +97,8 @@ struct Row
     char path[fs::max_path + 1];
     RowKind kind;
     bool openable;
+    long long size;
+    long long mtime;
 };
 
 BrowseLevel g_stack[max_depth];
@@ -123,8 +125,14 @@ char g_item_title[96] = "";
 bool g_item_folder = false;
 bool g_item_file = false;
 
-constexpr int setting_count = 9;
-constexpr int item_action_count = 4;
+constexpr int setting_count = 11;
+constexpr int item_action_count = 5;
+
+char g_queue[max_entries][fs::max_path + 1];
+char g_queue_title[max_entries][96];
+int g_queue_n = 0;
+int g_queue_i = 0;
+bool g_auto_advanced = false;
 
 void append_log(const char *line) noexcept
 {
@@ -177,6 +185,35 @@ void format_clock(char *dst, std::size_t cap) noexcept
     snprintf(dst, cap, "%d:%02d %s", h, tm->tm_min, tm->tm_hour >= 12 ? "PM" : "AM");
 }
 
+void format_bytes(char *dst, std::size_t cap, long long bytes) noexcept
+{
+    if (bytes < 0)
+        bytes = 0;
+    if (bytes < 1024)
+        snprintf(dst, cap, "%lld B", bytes);
+    else if (bytes < 1024 * 1024)
+        snprintf(dst, cap, "%.1f KB", static_cast<double>(bytes) / 1024.0);
+    else
+        snprintf(dst, cap, "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+}
+
+void format_mtime(char *dst, std::size_t cap, long long t) noexcept
+{
+    if (t <= 0)
+    {
+        copy_text(dst, cap, "");
+        return;
+    }
+    const time_t raw = static_cast<time_t>(t);
+    const struct tm *tm = localtime(&raw);
+    if (!tm)
+    {
+        copy_text(dst, cap, "");
+        return;
+    }
+    snprintf(dst, cap, "%04d-%02d-%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+}
+
 void format_resume_detail(char *dst, std::size_t cap, const settings::Resume &r) noexcept
 {
     if (!r.valid)
@@ -192,6 +229,101 @@ void format_resume_detail(char *dst, std::size_t cap, const settings::Resume &r)
         snprintf(dst, cap, "%s  %d:%02d", r.title, t / 60, t % 60);
 }
 
+void queue_add(const char *path, const char *title) noexcept
+{
+    if (!path || !path[0] || g_queue_n >= max_entries)
+        return;
+    if (player::classify(path) != player::Kind::mpeg1)
+        return;
+    copy_text(g_queue[g_queue_n], sizeof g_queue[g_queue_n], path);
+    copy_text(g_queue_title[g_queue_n], sizeof g_queue_title[g_queue_n],
+              title && title[0] ? title : path);
+    ++g_queue_n;
+}
+
+void rebuild_queue_from_rows(const char *playing) noexcept
+{
+    g_queue_n = 0;
+    g_queue_i = 0;
+    for (int i = 0; i < g_row_count; ++i)
+    {
+        if (g_rows[i].kind != RowKind::file)
+            continue;
+        queue_add(g_rows[i].path, g_rows[i].title);
+        if (playing && std::strcmp(g_rows[i].path, playing) == 0)
+            g_queue_i = g_queue_n - 1;
+    }
+}
+
+void rebuild_queue_from_parent(const char *file_path) noexcept
+{
+    if (!file_path || !file_path[0])
+        return;
+    const char *slash = std::strrchr(file_path, '/');
+    if (!slash || slash == file_path)
+        return;
+    char dir[fs::max_path + 1];
+    const int n = static_cast<int>(slash - file_path);
+    if (n <= 0 || n >= static_cast<int>(sizeof dir))
+        return;
+    memcpy(dir, file_path, static_cast<std::size_t>(n));
+    dir[n] = 0;
+    fs::Entry entries[max_entries];
+    int count = 0;
+    int err = 0;
+    if (fs::list_dir(dir, entries, max_entries, &count, &err, false, settings::get().newest_first) != 0)
+        return;
+    g_queue_n = 0;
+    g_queue_i = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        queue_add(entries[i].path, entries[i].name);
+        if (std::strcmp(entries[i].path, file_path) == 0)
+            g_queue_i = g_queue_n - 1;
+    }
+}
+
+void ensure_queue(const char *playing) noexcept
+{
+    if (playing && playing[0])
+    {
+        for (int i = 0; i < g_queue_n; ++i)
+        {
+            if (std::strcmp(g_queue[i], playing) == 0)
+            {
+                g_queue_i = i;
+                return;
+            }
+        }
+    }
+    rebuild_queue_from_rows(playing);
+    if (g_queue_n == 0)
+        rebuild_queue_from_parent(playing);
+}
+
+bool play_path(const char *path, const char *title, bool from_start) noexcept; // defined below after helpers
+
+bool play_delta(int delta, bool wrap) noexcept
+{
+    const char *cur = player::path();
+    ensure_queue(cur && cur[0] ? cur : g_item_path);
+    if (g_queue_n <= 0)
+        return false;
+    int next = g_queue_i + delta;
+    if (wrap)
+    {
+        next %= g_queue_n;
+        if (next < 0)
+            next += g_queue_n;
+    }
+    else if (next < 0 || next >= g_queue_n)
+        return false;
+    if (next == g_queue_i && player::active())
+        return false;
+    g_queue_i = next;
+    return play_path(g_queue[g_queue_i], g_queue_title[g_queue_i], true);
+}
+
 bool play_path(const char *path, const char *title, bool from_start) noexcept
 {
     if (!path || !path[0])
@@ -204,6 +336,8 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
         append_log(g_status);
         screen::notify(from_start ? "Play from start" : "MPEG-1");
         g_overlay = Overlay::none;
+        g_auto_advanced = false;
+        ensure_queue(path);
         return true;
     }
     if (pk == player::Kind::mpeg1)
@@ -232,18 +366,22 @@ const char *setting_title(int row) noexcept
     case 0:
         return "Resume playback";
     case 1:
-        return "Seek step";
+        return "Play next when a file ends";
     case 2:
-        return "Volume";
+        return "Seek step";
     case 3:
-        return "24-hour clock";
+        return "Volume";
     case 4:
-        return "Debug log";
+        return "24-hour clock";
     case 5:
-        return "Hardware decode";
+        return "Debug log";
     case 6:
-        return "Show all files";
+        return "Hardware decode";
     case 7:
+        return "Show all files";
+    case 8:
+        return "Newest files first";
+    case 9:
         return "Plugin repository";
     default:
         return "About";
@@ -259,24 +397,30 @@ void setting_value(int row, char *dst, std::size_t cap) noexcept
         copy_text(dst, cap, d.resume ? "on" : "off");
         break;
     case 1:
-        snprintf(dst, cap, "%d seconds", d.seek_step);
+        copy_text(dst, cap, d.auto_next ? "on" : "off");
         break;
     case 2:
-        snprintf(dst, cap, "%d%%", d.volume);
+        snprintf(dst, cap, "%d seconds", d.seek_step);
         break;
     case 3:
-        copy_text(dst, cap, d.clock_24h ? "24h" : "12h");
+        snprintf(dst, cap, "%d%%", d.volume);
         break;
     case 4:
-        copy_text(dst, cap, d.debug_log ? "on" : "off");
+        copy_text(dst, cap, d.clock_24h ? "24h" : "12h");
         break;
     case 5:
-        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
+        copy_text(dst, cap, d.debug_log ? "on" : "off");
         break;
     case 6:
-        copy_text(dst, cap, d.show_all ? "on" : "media only");
+        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
         break;
     case 7:
+        copy_text(dst, cap, d.show_all ? "on" : "media only");
+        break;
+    case 8:
+        copy_text(dst, cap, d.newest_first ? "newest" : "A–Z");
+        break;
+    case 9:
         copy_text(dst, cap, settings::repo_label());
         break;
     default:
@@ -296,35 +440,46 @@ void setting_nudge(int row, int delta) noexcept
         screen::notify(d.resume ? "Resume on" : "Resume off");
         break;
     case 1:
+        d.auto_next = !d.auto_next;
+        settings::save();
+        screen::notify(d.auto_next ? "Auto-next on" : "Auto-next off");
+        break;
+    case 2:
         settings::cycle_seek(delta == 0 ? 1 : delta);
         screen::notify("Seek step");
         break;
-    case 2:
+    case 3:
         settings::cycle_volume(delta == 0 ? 1 : delta);
         audio::set_volume(settings::get().volume);
         screen::notify("Volume");
         break;
-    case 3:
+    case 4:
         d.clock_24h = !d.clock_24h;
         settings::save();
         break;
-    case 4:
+    case 5:
         d.debug_log = !d.debug_log;
         settings::save();
         screen::notify(d.debug_log ? "Debug log on" : "Debug log off");
         break;
-    case 5:
+    case 6:
         d.hw_decode = !d.hw_decode;
         settings::save();
         screen::notify("HW decode is stored for Phase 2b");
         break;
-    case 6:
+    case 7:
         d.show_all = !d.show_all;
         settings::save();
         g_videos_dirty = true;
         screen::notify(d.show_all ? "Showing all files" : "Media files only");
         break;
-    case 7:
+    case 8:
+        d.newest_first = !d.newest_first;
+        settings::save();
+        g_videos_dirty = true;
+        screen::notify(d.newest_first ? "Newest first" : "Name A–Z");
+        break;
+    case 9:
         settings::cycle_repo(delta == 0 ? 1 : delta);
         screen::notify("Repo URL stored — not fetched yet");
         break;
@@ -344,6 +499,8 @@ const char *item_action_title(int row) noexcept
         return "Play from beginning";
     case 2:
         return settings::is_bookmarked(g_item_path) ? "Remove bookmark" : "Bookmark";
+    case 3:
+        return "File info";
     default:
         return "Show path";
     }
@@ -355,7 +512,7 @@ bool item_action_enabled(int row) noexcept
         return g_item_folder || g_item_file;
     if (row == 1)
         return g_item_file && player::classify(g_item_path) == player::Kind::mpeg1;
-    if (row == 2)
+    if (row == 2 || row == 3)
         return g_item_path[0] != 0;
     return g_item_path[0] != 0;
 }
@@ -409,6 +566,8 @@ void add_message_row(const char *title, const char *detail) noexcept
     r.path[0] = 0;
     r.kind = RowKind::message;
     r.openable = false;
+    r.size = 0;
+    r.mtime = 0;
 }
 
 void add_folder_row(const char *title, const char *detail, const char *path, bool openable) noexcept
@@ -421,6 +580,8 @@ void add_folder_row(const char *title, const char *detail, const char *path, boo
     copy_text(r.path, sizeof r.path, path);
     r.kind = RowKind::folder;
     r.openable = openable;
+    r.size = 0;
+    r.mtime = 0;
 }
 
 void add_file_row(const fs::Entry &e) noexcept
@@ -430,16 +591,22 @@ void add_file_row(const fs::Entry &e) noexcept
     Row &r = g_rows[g_row_count++];
     copy_text(r.title, sizeof r.title, e.name);
     const player::Kind pk = player::classify(e.path);
+    char bytes[24];
+    char when[16];
+    format_bytes(bytes, sizeof bytes, e.size);
+    format_mtime(when, sizeof when, e.mtime);
     if (pk == player::Kind::mpeg1)
-        snprintf(r.detail, sizeof r.detail, "MPEG-1 — Cross plays (software)");
+        snprintf(r.detail, sizeof r.detail, "MPEG-1  %s  %s", bytes, when);
     else if (pk == player::Kind::later)
-        snprintf(r.detail, sizeof r.detail, "%s — needs FFmpeg (not in this binary)",
-                 kind_label(e.kind));
+        snprintf(r.detail, sizeof r.detail, "%s — needs FFmpeg  %s  %s", kind_label(e.kind), bytes,
+                 when);
     else
-        snprintf(r.detail, sizeof r.detail, "%s", kind_label(e.kind));
+        snprintf(r.detail, sizeof r.detail, "%s  %s  %s", kind_label(e.kind), bytes, when);
     copy_text(r.path, sizeof r.path, e.path);
     r.kind = RowKind::file;
     r.openable = false;
+    r.size = e.size;
+    r.mtime = e.mtime;
 }
 
 const char *errno_hint(int err) noexcept
@@ -467,7 +634,8 @@ void load_directory(const char *path) noexcept
     fs::Entry entries[max_entries];
     int n = 0;
     int err = 0;
-    if (fs::list_dir(path, entries, max_entries, &n, &err, settings::get().show_all) != 0)
+    if (fs::list_dir(path, entries, max_entries, &n, &err, settings::get().show_all,
+                     settings::get().newest_first) != 0)
     {
         char title[96];
         snprintf(title, sizeof title, "Cannot open %s", path);
@@ -525,7 +693,8 @@ void load_videos_root() noexcept
         fs::Entry entries[4];
         int n = 0;
         int err = 0;
-        const int opened = fs::list_dir(s.path, entries, 4, &n, &err, settings::get().show_all);
+        const int opened = fs::list_dir(s.path, entries, 4, &n, &err, settings::get().show_all,
+                                        settings::get().newest_first);
         char detail[96];
         if (opened != 0)
             snprintf(detail, sizeof detail, "%s — %s (errno %d)", s.hint, errno_hint(err), err);
@@ -577,6 +746,12 @@ void load_bookmarks() noexcept
             copy_text(e.name, sizeof e.name, title);
             copy_text(e.path, sizeof e.path, path);
             e.kind = fs::classify_name(title, false);
+            struct stat st{};
+            if (stat(path, &st) == 0)
+            {
+                e.size = static_cast<long long>(st.st_size);
+                e.mtime = static_cast<long long>(st.st_mtime);
+            }
             add_file_row(e);
         }
     }
@@ -672,6 +847,21 @@ void run_item_action(int row) noexcept
         else
             screen::notify("Bookmark removed");
         g_videos_dirty = true;
+        g_overlay = Overlay::none;
+        return;
+    }
+    if (row == 3)
+    {
+        struct stat st{};
+        char bytes[24] = "?";
+        char when[16] = "";
+        if (stat(g_item_path, &st) == 0)
+        {
+            format_bytes(bytes, sizeof bytes, static_cast<long long>(st.st_size));
+            format_mtime(when, sizeof when, static_cast<long long>(st.st_mtime));
+        }
+        snprintf(g_selected_note, sizeof g_selected_note, "%s  %s  %s", g_item_path, bytes, when);
+        screen::notify(bytes);
         g_overlay = Overlay::none;
         return;
     }
@@ -794,7 +984,7 @@ void draw_footer(screen::Canvas &c) noexcept
                            : g_overlay == Overlay::item
                                  ? "Cross action    Circle close"
                                  : g_place == Place::videos
-                                       ? "Cross open/play    Square item    Options settings    Circle back"
+                                       ? "Cross play    Square item    Options settings    Circle back"
                                        : "L1 / R1 places    Cross open    Options settings    Circle back";
     c.text(48.f, 1052.f, hint, font::regular, 18, Color::muted);
     c.text(1480.f, 1052.f, kVersion, font::mono_medium, 16, Color::faint);
@@ -918,14 +1108,14 @@ void draw_videos(screen::Canvas &c) noexcept
 void draw_settings_overlay(screen::Canvas &c) noexcept
 {
     c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
-    c.round_rect(360, 120, 1200, 820, 20, Color::surface);
-    c.round_frame(360, 120, 1200, 820, 20, 2, Color::accent, 180);
-    c.text(400.f, 180.f, "Settings", font::semibold, 34, Color::text);
-    c.text(400.f, 220.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
+    c.round_rect(360, 80, 1200, 920, 20, Color::surface);
+    c.round_frame(360, 80, 1200, 920, 20, 2, Color::accent, 180);
+    c.text(400.f, 140.f, "Settings", font::semibold, 34, Color::text);
+    c.text(400.f, 180.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
            Color::muted);
     for (int i = 0; i < setting_count; ++i)
     {
-        const int y = 250 + i * 68;
+        const int y = 210 + i * 64;
         const bool on = i == g_settings_row;
         if (on)
             c.round_rect(390, y, 1140, 58, 12, Color::hover);
@@ -943,15 +1133,15 @@ void draw_settings_overlay(screen::Canvas &c) noexcept
 void draw_item_overlay(screen::Canvas &c) noexcept
 {
     c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
-    c.round_rect(520, 220, 880, 560, 20, Color::surface);
-    c.round_frame(520, 220, 880, 560, 20, 2, Color::accent, 180);
-    c.text(560.f, 280.f, g_item_title[0] ? g_item_title : "Item", font::semibold, 28, Color::text);
+    c.round_rect(520, 180, 880, 680, 20, Color::surface);
+    c.round_frame(520, 180, 880, 680, 20, 2, Color::accent, 180);
+    c.text(560.f, 240.f, g_item_title[0] ? g_item_title : "Item", font::semibold, 28, Color::text);
     char shown[128];
-    c.text(560.f, 320.f, fit(g_item_path, 800, shown, sizeof shown, font::regular, 16),
+    c.text(560.f, 280.f, fit(g_item_path, 800, shown, sizeof shown, font::regular, 16),
            font::regular, 16, Color::muted);
     for (int i = 0; i < item_action_count; ++i)
     {
-        const int y = 360 + i * 80;
+        const int y = 320 + i * 80;
         const bool on = i == g_item_row;
         const bool enabled = item_action_enabled(i);
         if (on)
@@ -979,8 +1169,8 @@ void load() noexcept
     settings::load();
     audio::set_volume(settings::get().volume);
     if (settings::get().debug_log)
-        append_log("movian-ps5 options start");
-    snprintf(g_status, sizeof g_status, "PPSA99455 options %s", kVersion);
+        append_log("movian-ps5 playlist start");
+    snprintf(g_status, sizeof g_status, "PPSA99455 playlist %s", kVersion);
     (void)audio::init();
     enter_videos();
     g_place = Place::home;
@@ -1024,6 +1214,17 @@ bool update() noexcept
 
     if (player::active())
     {
+        if (!g_auto_advanced && player::ended() && settings::get().auto_next)
+        {
+            g_auto_advanced = true;
+            if (play_delta(1, false))
+                return true;
+            screen::notify("End of folder");
+        }
+        if ((pressed & pad::l1) && play_delta(-1, true))
+            return true;
+        if ((pressed & pad::r1) && play_delta(1, true))
+            return true;
         dirty = player::handle(pressed) || dirty;
         dirty = player::tick() || dirty;
         return dirty;

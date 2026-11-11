@@ -104,6 +104,8 @@ int cmp_ci(const char *a, const char *b) noexcept
     }
 }
 
+bool g_newest_first = false;
+
 int cmp_entry(const void *lhs, const void *rhs) noexcept
 {
     const auto *a = static_cast<const Entry *>(lhs);
@@ -112,6 +114,11 @@ int cmp_entry(const void *lhs, const void *rhs) noexcept
     const int rb = entry_rank(b->kind);
     if (ra != rb)
         return ra - rb;
+    if (g_newest_first && a->kind != Kind::directory)
+    {
+        if (a->mtime != b->mtime)
+            return a->mtime > b->mtime ? -1 : 1;
+    }
     return cmp_ci(a->name, b->name);
 }
 
@@ -146,7 +153,8 @@ Kind classify_name(const char *name, bool is_dir) noexcept
     return Kind::other;
 }
 
-int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool include_other) noexcept
+int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool include_other,
+             bool newest_first) noexcept
 {
     if (count)
         *count = 0;
@@ -239,11 +247,12 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool i
             if (!join_path(full, sizeof full, path, name))
                 continue;
 
+            struct stat st2{};
+            const bool have_stat = stat(full, &st2) == 0;
             bool is_dir = e->d_type == DT_DIR;
-            if (e->d_type == DT_UNKNOWN || e->d_type == DT_LNK)
+            if (e->d_type == DT_UNKNOWN || e->d_type == DT_LNK || have_stat)
             {
-                struct stat st2{};
-                if (stat(full, &st2) == 0)
+                if (have_stat)
                     is_dir = S_ISDIR(st2.st_mode);
             }
 
@@ -261,12 +270,15 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool i
             if (!copy_bounded(out[n].path, sizeof out[n].path, full))
                 continue;
             out[n].kind = kind;
+            out[n].size = have_stat ? static_cast<long long>(st2.st_size) : 0;
+            out[n].mtime = have_stat ? static_cast<long long>(st2.st_mtime) : 0;
             ++n;
         }
     }
 
     free(buf);
     close(fd);
+    g_newest_first = newest_first;
     if (n > 1)
         qsort(out, static_cast<std::size_t>(n), sizeof(Entry), cmp_entry);
     if (count)

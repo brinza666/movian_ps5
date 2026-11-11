@@ -29,14 +29,17 @@ struct Entry
     char name[max_name + 1];
     char path[max_path + 1];
     Kind kind;
+    long long size = 0;
+    long long mtime = 0;
 };
 
 // Walks one directory. Hidden names (leading '.') are skipped. Returns 0 when
 // the directory opened, -1 when it did not. *err is 0 on success, else errno
 // (or a positive leftover count when the listing was truncated).
 // include_other lists non-media files too (settings "Show all files").
+// newest_first keeps folders first, then files by mtime descending.
 int list_dir(const char *path, Entry *out, int cap, int *count, int *err,
-             bool include_other = false) noexcept;
+             bool include_other = false, bool newest_first = false) noexcept;
 
 [[nodiscard]] Kind classify_name(const char *name, bool is_dir) noexcept;
 } // namespace movian::fs

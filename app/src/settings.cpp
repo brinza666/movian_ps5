@@ -155,6 +155,10 @@ void load_settings_file() noexcept
             parse_bool(v, &g_data.hw_decode);
         else if (std::strcmp(k, "showall") == 0)
             parse_bool(v, &g_data.show_all);
+        else if (std::strcmp(k, "autonext") == 0)
+            parse_bool(v, &g_data.auto_next);
+        else if (std::strcmp(k, "newest") == 0)
+            parse_bool(v, &g_data.newest_first);
         else if (std::strcmp(k, "volume") == 0)
             g_data.volume = clamp_volume(std::atoi(v));
         else if (std::strcmp(k, "repo") == 0)
@@ -274,10 +278,11 @@ void save() noexcept
 {
     char body[512];
     std::snprintf(body, sizeof body,
-                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nvolume=%d\nrepo=%d\n",
+                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nvolume=%d\nrepo=%d\n",
                   g_data.resume ? 1 : 0, clamp_seek(g_data.seek_step), g_data.clock_24h ? 1 : 0,
                   g_data.debug_log ? 1 : 0, g_data.hw_decode ? 1 : 0, g_data.show_all ? 1 : 0,
-                  clamp_volume(g_data.volume), clamp_repo(g_data.repo_preset));
+                  g_data.auto_next ? 1 : 0, g_data.newest_first ? 1 : 0, clamp_volume(g_data.volume),
+                  clamp_repo(g_data.repo_preset));
     write_atomic(MOVIAN_SETTINGS_PATH, body);
 }
 
