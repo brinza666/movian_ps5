@@ -5,13 +5,14 @@ The television UI has four places, switched with **L1 / R1**:
 | Place | Now | Later |
 | --- | --- | --- |
 | Home | Tiles that jump into places | Live services and continue watching |
-| Videos | Lists `/download0`, `/data/movian`, `/mnt/usb0` | Playback (Phase 2) |
+| Videos | Lists folders; Cross plays MPEG-1 `.mpg` | H.264 / FFmpeg |
 | BitTorrent | Placeholder | Magnets and play-while-download |
 | Plugins | Placeholder | API v2 packages |
 
-Copy a test clip into `/download0` over FTP **while Movian is closed**.
+Copy a **MPEG-1** `.mpg` into `/download0` over FTP **while Movian is closed**.
 USB often stays invisible until a sandbox helper exists — Videos then
-shows a “cannot open path” row instead of crashing.
+shows a “cannot open path” row instead of crashing. MP4/H.264 files list
+but do not play yet.
 
 ## Controller
 
@@ -19,7 +20,7 @@ shows a “cannot open path” row instead of crashing.
 | --- | --- |
 | L1 / R1 | Previous / next place |
 | D-pad | Move Home tiles / Videos rows |
-| Cross | Open a folder, or select a file (no decoder yet) |
+| Cross | Open a folder, or play MPEG-1 / pause |
 | Circle | Back one folder, then Home |
 | Triangle | Reload the current folder |
 | L2 / R2 | Page the Videos list |

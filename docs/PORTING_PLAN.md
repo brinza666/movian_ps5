@@ -20,11 +20,11 @@ Plugins, klog shows `EXEC /app0/eboot.bin`, no crash.
 - [x] Archive broken trees
 - [x] Native C++ title on the starter kit
 - [x] Honest docs, credits, new-session handoff
-- [x] `app/build.sh` on this workstation produced signed `eboot.bin` (184009 bytes, 2026-11-11)
+- [x] `app/build.sh` on this workstation produced signed `eboot.bin` (258865 bytes, 2026-11-11)
 - [x] Folder deployed to `/data/homebrew/PPSA99455` (2026-11-11); ShadowMount mount OK
 - [ ] klog `createApp` / `EXEC /app0/eboot.bin` for this binary (open the icon)
 
-## Phase 1 — Browse  ← current
+## Phase 1 — Browse
 
 **Done when:** Videos lists real files from `/download0` and at least
 one of `/data/movian` or `/mnt/usb0`, Cross selects a row, Circle back.
@@ -43,7 +43,7 @@ path” row when `opendir` fails (sandbox), never crash.
 Optional: VLC-style Helper.elf later if USB stays invisible. Document
 the restriction instead of lying.
 
-## Phase 2 — Software playback
+## Phase 2 — Software playback  ← current
 
 **Done when:** Cross on an MPEG-1 or H.264 file plays video + stereo
 audio, pause/seek with the pad, OSD with time.
@@ -60,6 +60,11 @@ Path:
 
 Do not enable every codec on day one. MPEG-1 + H.264 + AAC is enough
 to prove the pipeline.
+
+- [x] MPEG-1 software path (pl_mpeg) + DualSense pause/seek + OSD time
+- [x] `sceAudioOut` 48 kHz stereo ring (starter grain/thread)
+- [ ] H.264 + AAC via a small static FFmpeg
+- [ ] Separate decode thread (decode currently on the UI tick)
 
 ## Phase 2b — Hardware decode
 

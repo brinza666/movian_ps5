@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "audio.hpp"
 #include "font.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
@@ -19,6 +20,7 @@ int main()
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
         movian::screen::notify("Movian: fonts missing from /app0/assets/fonts");
     (void)movian::pad::init();
+    (void)movian::audio::init();
     movian::ui::load();
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

@@ -8,6 +8,9 @@ copy of [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-na
 src/main.cpp          entry
 src/ui.cpp            Home / Videos / BitTorrent / Plugins
 src/fs.*              64 KiB getdents walker, video/audio classify
+src/player.*          MPEG-1 software player (pl_mpeg)
+src/audio.*           48 kHz stereo AudioOut
+src/pl_mpeg.h         PL_MPEG (MIT)
 src/screen.*          1920×1080 CPU VideoOut (starter / Breeze / boilerplate)
 src/pad.*             DualSense
 src/font.*            Inter + JetBrains Mono via stb_truetype
@@ -17,5 +20,5 @@ fonts/                OFL fonts
 stubs/common_dialog.c link-only IME stub
 ```
 
-Do not add FFmpeg objects here until Phase 2 has a working static library
-and `STATUS.md` is updated in the same change.
+MPEG-1 is in this binary. Do not add FFmpeg objects here until a working
+static library is linked and `STATUS.md` is updated in the same change.

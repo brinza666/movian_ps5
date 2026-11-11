@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="status" src="https://img.shields.io/badge/status-phase%201%20browse-yellow">
+  <img alt="status" src="https://img.shields.io/badge/status-phase%202%20mpeg1-yellow">
   <img alt="title" src="https://img.shields.io/badge/title-PPSA99455-1f1f1f">
   <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
 </p>
@@ -28,15 +28,16 @@ sent to port 9021.
 > loader experiment. They are kept under [`archive/`](archive/README.md) as
 > reference only. The live application is [`app/`](app/).
 
-## What works today (Phase 1)
+## What works today (Phase 2 MPEG-1)
 
 | Capability | Status |
 | --- | --- |
 | ShadowMountPlus title `PPSA99455` (Media category) | In tree — build with `app/build.sh` |
 | DualSense navigation, 1080p CPU UI | Implemented |
-| Videos file browser (`/download0`, `/data/movian`, USB) | Implemented (no decoder) |
-| Four Movian places: Home, Videos, BitTorrent, Plugins | Videos live; others shell |
-| Video / audio playback | **Not in this binary** (Phase 2) |
+| Videos file browser (`/download0`, `/data/movian`, USB) | Implemented |
+| MPEG-1 software playback (`.mpg`) | Implemented (pl_mpeg, CPU blit, stereo) |
+| H.264 / MP4 / MKV | **Not in this binary** (FFmpeg next) |
+| Four Movian places: Home, Videos, BitTorrent, Plugins | Videos + MPEG-1; others shell |
 | BitTorrent client | **Not in this binary** (Phase 3) |
 | Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |
 | Go `movian-go` ELF | Abandoned for PS5 (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |

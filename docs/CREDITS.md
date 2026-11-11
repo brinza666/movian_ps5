@@ -50,6 +50,7 @@ VLC sources are **not** vendored. We copy *process*: public SDK → signed
 | Work | License | File |
 | --- | --- | --- |
 | stb_truetype / stb_image (Sean Barrett) | public domain / MIT | `app/src/stb_*.h` |
+| PL_MPEG (Dominic Szablewski) | MIT | `app/src/pl_mpeg.h` |
 | Inter (rsms) | OFL-1.1 | `app/fonts/Inter-*` |
 | JetBrains Mono | OFL-1.1 | `app/fonts/JetBrainsMono-*` |
 | CPU compositor + DualSense | GPL-3.0-or-later | copied from the starter, namespaced `movian::` |

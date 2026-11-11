@@ -95,12 +95,12 @@ export PS5_HOST=192.168.10.238
 - Do not collide title IDs: Movian is `PPSA99455`. Hello PS5 is
   `PPSA99901`. VLC is `PPSA85300`.
 
-## Next engineering slice (Phase 1 → 2)
+## Next engineering slice (Phase 2)
 
-See [PORTING_PLAN.md](PORTING_PLAN.md). Videos already lists
-`/download0`, `/data/movian`, and `/mnt/usb0` (message row if the
-sandbox hides USB). Cross opens a folder or selects a file; there is
-**no decoder**. Next: Phase 2 software playback of MPEG-1 / H.264 + AAC.
+See [PORTING_PLAN.md](PORTING_PLAN.md). Videos lists `/download0`,
+`/data/movian`, `/mnt/usb0`. Cross on a `.mpg` plays MPEG-1 + MP2 in
+software (pl_mpeg, CPU blit, `sceAudioOut`). MP4/H.264 still needs a
+small static FFmpeg — that is the next slice.
 
 Keep the shell launching after every slice. When a feature’s intended
 behaviour is unclear, run `wsl -d Ubuntu-24.04 -- showtime` and/or read

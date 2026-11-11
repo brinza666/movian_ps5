@@ -1,5 +1,5 @@
 /*
- * Movian for PS5 — Home, Videos (Phase 1 browse), BitTorrent, Plugins.
+ * Movian for PS5 — Home, Videos browse, MPEG-1 player, BitTorrent, Plugins.
  * Controller-first layout matching Movian / movian-go's four primary places.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later

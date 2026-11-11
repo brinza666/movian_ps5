@@ -1,18 +1,19 @@
 # Playback
 
-**Phase 0 does not play video or audio.** The table below is the
-*target* from M7 / movian-go, to be ticked in [STATUS.md](STATUS.md)
-only when the player actually opens the file.
+**This binary plays MPEG-1 program streams** (`.mpg` / `.mpeg` / `.mpv` /
+`.m1v`) with pl_mpeg, CPU YUV→RGBA, and 48 kHz stereo AudioOut.
+H.264 / MP4 / MKV are **not** decoded until FFmpeg is linked.
 
 ## Target formats (Phase 2+)
 
-| Kind | Goal |
-| --- | --- |
-| Video | H.264, HEVC, MPEG-1/2/4, VP8, … via FFmpeg; HW path for H.264/HEVC |
-| Audio | AAC, AC-3, E-AC-3, MP3, DTS, TrueHD, Opus, FLAC, PCM → 48 kHz stereo first |
-| Containers | MP4, MKV, MPEG-TS, AVI, … |
-| Subtitles | SRT first; ASS/libass later |
-| BitTorrent | magnet / `.torrent`, play-while-download |
+| Kind | Now | Goal |
+| --- | --- | --- |
+| MPEG-1 video + MP2 | **in `app/`** | keep |
+| H.264 / AAC / MP4 / MKV | no | small static FFmpeg |
+| HEVC HW | no | `libSceVideodec2` |
+| Other containers | no | FFmpeg demux |
+| Subtitles | no | SRT first |
+| BitTorrent | no | Phase 3 |
 
 ## Hardware decode
 

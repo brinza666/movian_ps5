@@ -2,18 +2,20 @@
  * Movian for PS5 — DualSense shell with a Phase 1 Videos file browser.
  *
  * Honest about what this build does: DualSense navigation, four Movian
- * places, and a real directory listing of /download0, /data/movian, and
- * USB. Playback, plugins, and BitTorrent are not implemented in this
- * binary. They are the next porting phases.
+ * places, a real directory listing of /download0, /data/movian, and USB,
+ * and software MPEG-1 playback (pl_mpeg). H.264/FFmpeg, plugins, and
+ * BitTorrent are not in this binary.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "ui.hpp"
 
+#include "audio.hpp"
 #include "fs.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
+#include "player.hpp"
 
 #include <cstddef>
 #include <stdio.h>
@@ -50,7 +52,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.2.0-browse";
+constexpr const char *kVersion = "0.3.0-mpeg1";
 constexpr const char *kTitleId = "PPSA99455";
 
 // ---- Videos browser --------------------------------------------------------
@@ -195,7 +197,14 @@ void add_file_row(const fs::Entry &e) noexcept
         return;
     Row &r = g_rows[g_row_count++];
     copy_text(r.title, sizeof r.title, e.name);
-    snprintf(r.detail, sizeof r.detail, "%s — playback is Phase 2", kind_label(e.kind));
+    const player::Kind pk = player::classify(e.path);
+    if (pk == player::Kind::mpeg1)
+        snprintf(r.detail, sizeof r.detail, "MPEG-1 — Cross plays (software)");
+    else if (pk == player::Kind::later)
+        snprintf(r.detail, sizeof r.detail, "%s — needs FFmpeg (not in this binary)",
+                 kind_label(e.kind));
+    else
+        snprintf(r.detail, sizeof r.detail, "%s", kind_label(e.kind));
     copy_text(r.path, sizeof r.path, e.path);
     r.kind = RowKind::file;
     r.openable = false;
@@ -295,8 +304,8 @@ void load_videos_root() noexcept
         add_folder_row(s.title, detail, s.path, true);
     }
 
-    add_message_row("Playback is not in this build",
-                    "Cross opens a folder. Circle goes back. Phase 2 will play the file.");
+    add_message_row("MPEG-1 plays in this build",
+                    "Cross a .mpg to play. MP4/MKV/H.264 wait for FFmpeg.");
     snprintf(g_status, sizeof g_status, "Videos roots: %s, %s, %s", MOVIAN_DOWNLOAD0, MOVIAN_DATA_DIR,
              kUsb0);
 }
@@ -364,10 +373,31 @@ void select_row() noexcept
     }
     if (r.kind == RowKind::file)
     {
-        snprintf(g_selected_note, sizeof g_selected_note,
-                 "Selected %s — no decoder in this binary (Phase 2).", r.title);
+        const player::Kind pk = player::classify(r.path);
+        char why[128];
+        if (pk == player::Kind::mpeg1 && player::open(r.path, why, sizeof why))
+        {
+            snprintf(g_status, sizeof g_status, "playing %s", r.title);
+            append_log(g_status);
+            screen::notify("MPEG-1");
+            return;
+        }
+        if (pk == player::Kind::mpeg1)
+        {
+            snprintf(g_selected_note, sizeof g_selected_note, "%s", why);
+            screen::notify(why);
+        }
+        else if (pk == player::Kind::later)
+        {
+            snprintf(g_selected_note, sizeof g_selected_note,
+                     "%s — H.264/MP4 needs FFmpeg (not linked yet).", r.title);
+            screen::notify("Needs FFmpeg");
+        }
+        else
+        {
+            snprintf(g_selected_note, sizeof g_selected_note, "Selected %s", r.title);
+        }
         snprintf(g_status, sizeof g_status, "selected %s", r.title);
-        screen::notify("No playback yet (Phase 2)");
         char line[160];
         snprintf(line, sizeof line, "select %s", r.path);
         append_log(line);
@@ -451,9 +481,11 @@ void draw_footer(screen::Canvas &c) noexcept
 {
     c.rect(0, 1008, screen::width, 72, Color::surface);
     c.rect(0, 1008, screen::width, 2, Color::line);
-    const char *hint = g_place == Place::videos
-                           ? "L1 / R1  places    Cross  open    Circle  back    L2 / R2  page"
-                           : "L1 / R1  places    Cross  open    Circle  back    Options  status";
+    const char *hint = player::active()
+                           ? "Cross pause    Left/Right seek    Circle stop"
+                           : g_place == Place::videos
+                                 ? "L1 / R1  places    Cross  open/play    Circle  back    L2 / R2  page"
+                                 : "L1 / R1  places    Cross  open    Circle  back    Options  status";
     c.text(48.f, 1052.f, hint, font::regular, 18, Color::muted);
     c.text(1480.f, 1052.f, kVersion, font::mono_medium, 16, Color::faint);
 }
@@ -473,7 +505,7 @@ void draw_card(screen::Canvas &c, int x, int y, int w, int h, const char *title,
 void draw_home(screen::Canvas &c) noexcept
 {
     c.text(48.f, 160.f, "Home", font::semibold, 40, Color::text);
-    c.text(48.f, 208.f, "Phase 1 browse. Local files list for real; USB may be sandboxed.",
+    c.text(48.f, 208.f, "Videos lists local folders. MPEG-1 (.mpg) plays in software.",
            font::regular, 20, Color::muted);
 
     const char *titles[4] = {"Local files", "USB storage", "Network", "Plugins"};
@@ -518,7 +550,7 @@ void draw_videos(screen::Canvas &c) noexcept
 
     const BrowseLevel &lv = g_stack[g_depth];
     c.text(48.f, 160.f, lv.title, font::semibold, 40, Color::text);
-    const char *crumb = lv.path[0] ? lv.path : "Sources  ·  video/audio only  ·  no decoder yet";
+    const char *crumb = lv.path[0] ? lv.path : "Sources  ·  MPEG-1 plays  ·  other video needs FFmpeg";
     char crumb_buf[160];
     c.text(48.f, 208.f, fit(crumb, 1500, crumb_buf, sizeof crumb_buf, font::regular, 20),
            font::regular, 20, Color::muted);
@@ -583,8 +615,9 @@ void load() noexcept
     g_started_ms = screen::now_ms();
     mkdir(MOVIAN_DOWNLOAD0, 0777);
     mkdir(MOVIAN_DATA_DIR, 0777);
-    append_log("movian-ps5 browse start");
-    snprintf(g_status, sizeof g_status, "PPSA99455 browse %s", kVersion);
+    append_log("movian-ps5 mpeg1 start");
+    snprintf(g_status, sizeof g_status, "PPSA99455 mpeg1 %s", kVersion);
+    (void)audio::init();
     enter_videos();
     g_place = Place::home;
     screen::notify("Movian PS5");
@@ -594,6 +627,13 @@ bool update() noexcept
 {
     const unsigned pressed = pad::poll();
     bool dirty = pressed != 0;
+
+    if (player::active())
+    {
+        dirty = player::handle(pressed) || dirty;
+        dirty = player::tick() || dirty;
+        return dirty;
+    }
 
     if (pressed & pad::l1)
         g_place = static_cast<Place>((static_cast<int>(g_place) + place_count - 1) % place_count);
@@ -675,6 +715,11 @@ bool update() noexcept
 
 void draw(screen::Canvas &canvas) noexcept
 {
+    if (player::active())
+    {
+        player::draw(canvas);
+        return;
+    }
     canvas.clear(Color::bg);
     draw_tab_bar(canvas);
     switch (g_place)

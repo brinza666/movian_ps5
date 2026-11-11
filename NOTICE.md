@@ -31,8 +31,9 @@ and namespaced to `movian::`. They originally come from:
 - `app/stubs/common_dialog.c`: link-only stub, same approach as
   ProsperoStore (BlackBearReloaded).
 
-`app/src/ui.cpp`, `ui.hpp`, `main.cpp`, and `paths.hpp` are original to this
-port.
+`app/src/ui.cpp`, `ui.hpp`, `main.cpp`, `paths.hpp`, `fs.*`, `player.*`,
+and `audio.*` are original to this port (audio thread pattern from the
+starter).
 
 ## Fonts (`app/fonts`)
 
@@ -51,6 +52,12 @@ port.
 - Historical experiments in [`archive/`](archive/README.md), including
   Duktape, splicer payload sources, and a Go overlay. Those remain under
   the licenses recorded in the archived `LICENSE` / `README` files.
+
+## Linked in this binary
+
+- [PL_MPEG](https://github.com/phoboslab/pl_mpeg) — MIT, Dominic Szablewski.
+  MPEG-1 video + MP2 audio. Vendored as `app/src/pl_mpeg.h` from the
+  archived splicer copy.
 
 ## Optional later phases
 
