@@ -14,6 +14,7 @@ https://github.com/brinza666/movian_ps5/releases
 | `v0.3.0` | MPEG-1 player | Native title: Videos + software MPEG-1 |
 | `v0.4.0` | Options / resume / bookmarks | Native title tested after MPEG-1 |
 | `v0.5.0` | Playlist / auto-next | L1/R1 prev/next, newest-first, file info |
+| `v0.6.0` | Repeat / shuffle | OSD repeat+shuffle, media info |
 
 `v0.4.0` is the last **user-tested** native title. `v0.5.0` is the next
 console build (playlist). Install the matching

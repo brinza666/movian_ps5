@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-11 (Phase 2 MPEG-1 + playlist `v0.5.0`, `eboot.bin` 279185 bytes).
+Last updated: 2026-11-11 (Phase 2 MPEG-1 `v0.6.0` repeat/shuffle, `eboot.bin` 280529 bytes).
 
 Legend: **done** = observed on PS5 or in a shared-source host preview;
 **shell** = UI exists, backend does not; **no** = not in the live tree.

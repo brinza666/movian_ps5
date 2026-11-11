@@ -33,6 +33,8 @@ but do not play yet.
 
 - Resume playback
 - Play next when a file ends
+- Repeat: off / one / folder
+- Shuffle folder
 - Seek step (5 / 10 / 30 / 60 s)
 - Volume (50 / 75 / 100 %)
 - 24-hour clock

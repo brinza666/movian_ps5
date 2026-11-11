@@ -159,6 +159,17 @@ void load_settings_file() noexcept
             parse_bool(v, &g_data.auto_next);
         else if (std::strcmp(k, "newest") == 0)
             parse_bool(v, &g_data.newest_first);
+        else if (std::strcmp(k, "repeat") == 0)
+        {
+            int r = std::atoi(v);
+            if (r < 0)
+                r = 0;
+            if (r > 2)
+                r = 2;
+            g_data.repeat = r;
+        }
+        else if (std::strcmp(k, "shuffle") == 0)
+            parse_bool(v, &g_data.shuffle);
         else if (std::strcmp(k, "volume") == 0)
             g_data.volume = clamp_volume(std::atoi(v));
         else if (std::strcmp(k, "repo") == 0)
@@ -278,11 +289,11 @@ void save() noexcept
 {
     char body[512];
     std::snprintf(body, sizeof body,
-                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nvolume=%d\nrepo=%d\n",
+                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nrepeat=%d\nshuffle=%d\nvolume=%d\nrepo=%d\n",
                   g_data.resume ? 1 : 0, clamp_seek(g_data.seek_step), g_data.clock_24h ? 1 : 0,
                   g_data.debug_log ? 1 : 0, g_data.hw_decode ? 1 : 0, g_data.show_all ? 1 : 0,
-                  g_data.auto_next ? 1 : 0, g_data.newest_first ? 1 : 0, clamp_volume(g_data.volume),
-                  clamp_repo(g_data.repo_preset));
+                  g_data.auto_next ? 1 : 0, g_data.newest_first ? 1 : 0, g_data.repeat,
+                  g_data.shuffle ? 1 : 0, clamp_volume(g_data.volume), clamp_repo(g_data.repo_preset));
     write_atomic(MOVIAN_SETTINGS_PATH, body);
 }
 
@@ -332,6 +343,30 @@ void cycle_volume(int delta) noexcept
     idx = (idx + delta + 3) % 3;
     g_data.volume = kVolumes[idx];
     save();
+}
+
+void cycle_repeat(int delta) noexcept
+{
+    int v = g_data.repeat + (delta == 0 ? 1 : delta);
+    if (v < 0)
+        v = 2;
+    if (v > 2)
+        v = 0;
+    g_data.repeat = v;
+    save();
+}
+
+const char *repeat_label() noexcept
+{
+    switch (g_data.repeat)
+    {
+    case 1:
+        return "one";
+    case 2:
+        return "folder";
+    default:
+        return "off";
+    }
 }
 
 Resume last_resume() noexcept

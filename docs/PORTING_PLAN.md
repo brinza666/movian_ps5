@@ -66,6 +66,7 @@ to prove the pipeline.
 - [x] Options settings (resume, seek, volume, clock, debug, show-all, repo URL)
 - [x] Continue watching + bookmarks + Square item menu
 - [x] Auto-next, L1/R1 prev/next, newest-first sort, file info
+- [x] Repeat (off / one / folder) and shuffle
 - [ ] H.264 + AAC via a small static FFmpeg
 - [ ] Separate decode thread (decode currently on the UI tick)
 

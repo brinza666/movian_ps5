@@ -24,6 +24,8 @@ struct Data
     bool show_all = false;
     bool auto_next = true;
     bool newest_first = false;
+    int repeat = 0; // 0 off, 1 one, 2 folder
+    bool shuffle = false;
     int volume = 100; // 50 / 75 / 100
     int repo_preset = 1; // cycle; nothing is fetched in this build
 };
@@ -46,6 +48,8 @@ void save() noexcept;
 void cycle_repo(int delta) noexcept;
 void cycle_seek(int delta) noexcept;
 void cycle_volume(int delta) noexcept;
+void cycle_repeat(int delta) noexcept;
+[[nodiscard]] const char *repeat_label() noexcept;
 
 [[nodiscard]] Resume last_resume() noexcept;
 void remember_resume(const char *path, const char *title, double time, double duration) noexcept;

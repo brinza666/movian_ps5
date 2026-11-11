@@ -164,7 +164,7 @@ void seek_by(double delta) noexcept
     persist_resume();
 }
 
-constexpr int osd_row_count = 5;
+constexpr int osd_row_count = 7;
 
 const char *osd_title(int row) noexcept
 {
@@ -178,6 +178,10 @@ const char *osd_title(int row) noexcept
         return "Volume";
     case 3:
         return "Seek step";
+    case 4:
+        return "Repeat";
+    case 5:
+        return "Shuffle";
     default:
         return "Bookmark this file";
     }
@@ -198,6 +202,12 @@ void osd_value(int row, char *dst, int cap) noexcept
         break;
     case 3:
         std::snprintf(dst, static_cast<std::size_t>(cap), "%ds", settings::get().seek_step);
+        break;
+    case 4:
+        copy_text(dst, cap, settings::repeat_label());
+        break;
+    case 5:
+        copy_text(dst, cap, settings::get().shuffle ? "on" : "off");
         break;
     default:
         copy_text(dst, cap, settings::is_bookmarked(g_path) ? "saved" : "not saved");
@@ -227,6 +237,15 @@ void osd_activate() noexcept
     case 3:
         settings::cycle_seek(1);
         screen::notify("Seek step");
+        break;
+    case 4:
+        settings::cycle_repeat(1);
+        screen::notify("Repeat");
+        break;
+    case 5:
+        settings::get().shuffle = !settings::get().shuffle;
+        settings::save();
+        screen::notify(settings::get().shuffle ? "Shuffle on" : "Shuffle off");
         break;
     default:
         if (!g_path[0])
@@ -420,6 +439,13 @@ bool handle(unsigned pressed) noexcept
             }
             else if (g_osd_row == 3)
                 settings::cycle_seek(-1);
+            else if (g_osd_row == 4)
+                settings::cycle_repeat(-1);
+            else if (g_osd_row == 5)
+            {
+                settings::get().shuffle = !settings::get().shuffle;
+                settings::save();
+            }
         }
         if (pressed & pad::right)
         {
@@ -430,6 +456,13 @@ bool handle(unsigned pressed) noexcept
             }
             else if (g_osd_row == 3)
                 settings::cycle_seek(1);
+            else if (g_osd_row == 4)
+                settings::cycle_repeat(1);
+            else if (g_osd_row == 5)
+            {
+                settings::get().shuffle = !settings::get().shuffle;
+                settings::save();
+            }
         }
         if (pressed & pad::cross)
             osd_activate();
@@ -526,7 +559,9 @@ void draw(screen::Canvas &c) noexcept
 
     c.rect(0, 0, screen::width, 64, Color::surface, 180);
     c.text(48.f, 44.f, g_title[0] ? g_title : "MPEG-1", font::semibold, 24, Color::text);
-    c.text(1600.f, 44.f, "SW MPEG-1", font::mono_medium, 16, Color::accent);
+    char badge[48];
+    std::snprintf(badge, sizeof badge, "SW MPEG-1  %dx%d", g_src_w, g_src_h);
+    c.text(1480.f, 44.f, badge, font::mono_medium, 16, Color::accent);
 
     const double t = g_plm ? plm_get_time(g_plm) : 0;
     const double d = g_duration > 0 ? g_duration : 1;
@@ -549,14 +584,17 @@ void draw(screen::Canvas &c) noexcept
 
     if (g_osd)
     {
-        c.round_rect(560, 220, 800, 520, 18, Color::surface, 230);
-        c.round_frame(560, 220, 800, 520, 18, 2, Color::accent, 200);
-        c.text(600.f, 280.f, "Playback", font::semibold, 28, Color::text);
-        c.text(600.f, 318.f, "Left/Right changes a value. Circle closes.", font::regular, 16,
-               Color::muted);
+        c.round_rect(520, 140, 880, 740, 18, Color::surface, 230);
+        c.round_frame(520, 140, 880, 740, 18, 2, Color::accent, 200);
+        c.text(560.f, 200.f, "Playback", font::semibold, 28, Color::text);
+        char info[80];
+        std::snprintf(info, sizeof info, "%dx%d  %s  repeat %s  shuffle %s", g_src_w, g_src_h,
+                      g_ended ? "ended" : g_paused ? "paused" : "playing", settings::repeat_label(),
+                      settings::get().shuffle ? "on" : "off");
+        c.text(560.f, 238.f, info, font::regular, 16, Color::muted);
         for (int i = 0; i < osd_row_count; ++i)
         {
-            const int y = 350 + i * 70;
+            const int y = 270 + i * 78;
             const bool on = i == g_osd_row;
             if (on)
                 c.round_rect(590, y, 740, 60, 12, Color::hover);

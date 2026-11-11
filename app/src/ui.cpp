@@ -54,7 +54,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.5.0-playlist";
+constexpr const char *kVersion = "0.6.0-repeat";
 constexpr const char *kTitleId = "PPSA99455";
 constexpr const char *kBookmarksUri = "bookmarks:";
 
@@ -125,7 +125,7 @@ char g_item_title[96] = "";
 bool g_item_folder = false;
 bool g_item_file = false;
 
-constexpr int setting_count = 11;
+constexpr int setting_count = 13;
 constexpr int item_action_count = 5;
 
 char g_queue[max_entries][fs::max_path + 1];
@@ -309,16 +309,38 @@ bool play_delta(int delta, bool wrap) noexcept
     ensure_queue(cur && cur[0] ? cur : g_item_path);
     if (g_queue_n <= 0)
         return false;
-    int next = g_queue_i + delta;
-    if (wrap)
+    const settings::Data &d = settings::get();
+    if (d.repeat == 1 && delta != 0 && player::active() && !wrap)
+        return play_path(g_queue[g_queue_i], g_queue_title[g_queue_i], true);
+    int next = g_queue_i;
+    if (d.shuffle && g_queue_n > 1)
     {
-        next %= g_queue_n;
-        if (next < 0)
-            next += g_queue_n;
+        int hops = (delta < 0 ? -delta : delta);
+        if (hops < 1)
+            hops = 1;
+        for (int h = 0; h < hops; ++h)
+        {
+            int cand = static_cast<int>(screen::now_ms() + static_cast<std::uint64_t>(h) * 17u) %
+                       g_queue_n;
+            if (cand == next)
+                cand = (cand + 1) % g_queue_n;
+            next = cand;
+        }
     }
-    else if (next < 0 || next >= g_queue_n)
-        return false;
-    if (next == g_queue_i && player::active())
+    else
+    {
+        next = g_queue_i + delta;
+        const bool folder_wrap = wrap || d.repeat == 2;
+        if (folder_wrap)
+        {
+            next %= g_queue_n;
+            if (next < 0)
+                next += g_queue_n;
+        }
+        else if (next < 0 || next >= g_queue_n)
+            return false;
+    }
+    if (next == g_queue_i && player::active() && d.repeat != 1)
         return false;
     g_queue_i = next;
     return play_path(g_queue[g_queue_i], g_queue_title[g_queue_i], true);
@@ -368,20 +390,24 @@ const char *setting_title(int row) noexcept
     case 1:
         return "Play next when a file ends";
     case 2:
-        return "Seek step";
+        return "Repeat";
     case 3:
-        return "Volume";
+        return "Shuffle folder";
     case 4:
-        return "24-hour clock";
+        return "Seek step";
     case 5:
-        return "Debug log";
+        return "Volume";
     case 6:
-        return "Hardware decode";
+        return "24-hour clock";
     case 7:
-        return "Show all files";
+        return "Debug log";
     case 8:
-        return "Newest files first";
+        return "Hardware decode";
     case 9:
+        return "Show all files";
+    case 10:
+        return "Newest files first";
+    case 11:
         return "Plugin repository";
     default:
         return "About";
@@ -400,27 +426,33 @@ void setting_value(int row, char *dst, std::size_t cap) noexcept
         copy_text(dst, cap, d.auto_next ? "on" : "off");
         break;
     case 2:
-        snprintf(dst, cap, "%d seconds", d.seek_step);
+        copy_text(dst, cap, settings::repeat_label());
         break;
     case 3:
-        snprintf(dst, cap, "%d%%", d.volume);
+        copy_text(dst, cap, d.shuffle ? "on" : "off");
         break;
     case 4:
-        copy_text(dst, cap, d.clock_24h ? "24h" : "12h");
+        snprintf(dst, cap, "%d seconds", d.seek_step);
         break;
     case 5:
-        copy_text(dst, cap, d.debug_log ? "on" : "off");
+        snprintf(dst, cap, "%d%%", d.volume);
         break;
     case 6:
-        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
+        copy_text(dst, cap, d.clock_24h ? "24h" : "12h");
         break;
     case 7:
-        copy_text(dst, cap, d.show_all ? "on" : "media only");
+        copy_text(dst, cap, d.debug_log ? "on" : "off");
         break;
     case 8:
-        copy_text(dst, cap, d.newest_first ? "newest" : "A–Z");
+        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
         break;
     case 9:
+        copy_text(dst, cap, d.show_all ? "on" : "media only");
+        break;
+    case 10:
+        copy_text(dst, cap, d.newest_first ? "newest" : "A–Z");
+        break;
+    case 11:
         copy_text(dst, cap, settings::repo_label());
         break;
     default:
@@ -445,41 +477,50 @@ void setting_nudge(int row, int delta) noexcept
         screen::notify(d.auto_next ? "Auto-next on" : "Auto-next off");
         break;
     case 2:
+        settings::cycle_repeat(delta == 0 ? 1 : delta);
+        screen::notify("Repeat");
+        break;
+    case 3:
+        d.shuffle = !d.shuffle;
+        settings::save();
+        screen::notify(d.shuffle ? "Shuffle on" : "Shuffle off");
+        break;
+    case 4:
         settings::cycle_seek(delta == 0 ? 1 : delta);
         screen::notify("Seek step");
         break;
-    case 3:
+    case 5:
         settings::cycle_volume(delta == 0 ? 1 : delta);
         audio::set_volume(settings::get().volume);
         screen::notify("Volume");
         break;
-    case 4:
+    case 6:
         d.clock_24h = !d.clock_24h;
         settings::save();
         break;
-    case 5:
+    case 7:
         d.debug_log = !d.debug_log;
         settings::save();
         screen::notify(d.debug_log ? "Debug log on" : "Debug log off");
         break;
-    case 6:
+    case 8:
         d.hw_decode = !d.hw_decode;
         settings::save();
         screen::notify("HW decode is stored for Phase 2b");
         break;
-    case 7:
+    case 9:
         d.show_all = !d.show_all;
         settings::save();
         g_videos_dirty = true;
         screen::notify(d.show_all ? "Showing all files" : "Media files only");
         break;
-    case 8:
+    case 10:
         d.newest_first = !d.newest_first;
         settings::save();
         g_videos_dirty = true;
         screen::notify(d.newest_first ? "Newest first" : "Name A–Z");
         break;
-    case 9:
+    case 11:
         settings::cycle_repo(delta == 0 ? 1 : delta);
         screen::notify("Repo URL stored — not fetched yet");
         break;
@@ -1108,14 +1149,14 @@ void draw_videos(screen::Canvas &c) noexcept
 void draw_settings_overlay(screen::Canvas &c) noexcept
 {
     c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
-    c.round_rect(360, 80, 1200, 920, 20, Color::surface);
-    c.round_frame(360, 80, 1200, 920, 20, 2, Color::accent, 180);
-    c.text(400.f, 140.f, "Settings", font::semibold, 34, Color::text);
-    c.text(400.f, 180.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
+    c.round_rect(300, 40, 1320, 1000, 20, Color::surface);
+    c.round_frame(300, 40, 1320, 1000, 20, 2, Color::accent, 180);
+    c.text(340.f, 100.f, "Settings", font::semibold, 34, Color::text);
+    c.text(340.f, 140.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
            Color::muted);
     for (int i = 0; i < setting_count; ++i)
     {
-        const int y = 210 + i * 64;
+        const int y = 170 + i * 62;
         const bool on = i == g_settings_row;
         if (on)
             c.round_rect(390, y, 1140, 58, 12, Color::hover);
@@ -1214,10 +1255,11 @@ bool update() noexcept
 
     if (player::active())
     {
-        if (!g_auto_advanced && player::ended() && settings::get().auto_next)
+        if (!g_auto_advanced && player::ended() &&
+            (settings::get().auto_next || settings::get().repeat != 0))
         {
             g_auto_advanced = true;
-            if (play_delta(1, false))
+            if (play_delta(1, settings::get().repeat == 2))
                 return true;
             screen::notify("End of folder");
         }

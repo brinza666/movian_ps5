@@ -5,7 +5,8 @@ set -euo pipefail
 SDK=${PS5_PAYLOAD_SDK:-$HOME/.ps5-starter/ps5-payload-sdk}
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 VER=6.1.2
-SHA256=3e0ce06bff50122907c64f952256e3ba627622b4ee837a1ad914781aa81f0a0c
+# ffmpeg.org/releases/ffmpeg-6.1.2.tar.xz (content-length 10466152, 2024-08-01)
+SHA256=3b624649725ecdc565c903ca6643d41f33bd49239922e45c9b1442c63dca4e38
 SRC=$ROOT/.deps/ffmpeg-$VER
 PREFIX=$ROOT/.deps/ffmpeg-ps5
 JOBS=$(nproc 2>/dev/null || echo 2)
