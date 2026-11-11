@@ -7,6 +7,7 @@ copy of [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-na
 ```text
 src/main.cpp          entry
 src/ui.cpp            Home / Videos / BitTorrent / Plugins
+src/fs.*              64 KiB getdents walker, video/audio classify
 src/screen.*          1920×1080 CPU VideoOut (starter / Breeze / boilerplate)
 src/pad.*             DualSense
 src/font.*            Inter + JetBrains Mono via stb_truetype

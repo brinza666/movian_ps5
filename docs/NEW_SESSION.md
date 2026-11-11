@@ -95,13 +95,12 @@ export PS5_HOST=192.168.10.238
 - Do not collide title IDs: Movian is `PPSA99455`. Hello PS5 is
   `PPSA99901`. VLC is `PPSA85300`.
 
-## Next engineering slice (Phase 1)
+## Next engineering slice (Phase 1 → 2)
 
-See [PORTING_PLAN.md](PORTING_PLAN.md). The first real work after the
-shell is **directory listing** of `/download0`, `/data/movian`, and
-`/mnt/usb0` (best-effort; sandbox may hide USB until a helper lifts it),
-drawn in the Videos place with the existing DualSense list pattern from
-the starter (`page_notes.cpp` is the reference).
+See [PORTING_PLAN.md](PORTING_PLAN.md). Videos already lists
+`/download0`, `/data/movian`, and `/mnt/usb0` (message row if the
+sandbox hides USB). Cross opens a folder or selects a file; there is
+**no decoder**. Next: Phase 2 software playback of MPEG-1 / H.264 + AAC.
 
 Keep the shell launching after every slice. When a feature’s intended
 behaviour is unclear, run `wsl -d Ubuntu-24.04 -- showtime` and/or read

@@ -463,7 +463,7 @@ Legend: **now** = Phase 0 shell · **P1–P6** = [PORTING_PLAN.md](PORTING_PLAN.
 | Capability | M7 | PS5 plan |
 | --- | --- | --- |
 | Home tiles + search bar | yes (live) | P1 browse first, then Home lists real sources |
-| Local folders | yes | **P1** `/download0`, `/data/movian`, USB best-effort |
+| Local folders | yes | **P1 in tree** `/download0`, `/data/movian`, USB best-effort |
 | Software video + stereo | FFmpeg 4.4 | **P2** small FFmpeg, H.264/MPEG-1/AAC |
 | HW video | VDPAU / MediaCodec / … | **P2b** `libSceVideodec2` |
 | OSD pause/seek/resume | yes | P2 |

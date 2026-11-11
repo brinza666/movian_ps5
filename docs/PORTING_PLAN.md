@@ -11,7 +11,7 @@ Reference checkouts (read, do not vendor unless noted):
 - `archive/splicer/src` — local FFmpeg/hwdec/bt experiments
 - `C:\Users\brinza\Documents\deep\ps5-homebrew-starter`
 
-## Phase 0 — Native shell  ← current
+## Phase 0 — Native shell
 
 **Done when:** `app/build.sh` produces `build/app/PPSA99455/eboot.bin`,
 the icon launches, DualSense switches Home / Videos / BitTorrent /
@@ -20,10 +20,11 @@ Plugins, klog shows `EXEC /app0/eboot.bin`, no crash.
 - [x] Archive broken trees
 - [x] Native C++ title on the starter kit
 - [x] Honest docs, credits, new-session handoff
-- [x] `app/build.sh` on this workstation produced signed `eboot.bin` (173049 bytes, 2026-11-10)
-- [ ] Hardware confirmation of this exact shell (next human/agent deploy)
+- [x] `app/build.sh` on this workstation produced signed `eboot.bin` (184009 bytes, 2026-11-11)
+- [x] Folder deployed to `/data/homebrew/PPSA99455` (2026-11-11); ShadowMount mount OK
+- [ ] klog `createApp` / `EXEC /app0/eboot.bin` for this binary (open the icon)
 
-## Phase 1 — Browse
+## Phase 1 — Browse  ← current
 
 **Done when:** Videos lists real files from `/download0` and at least
 one of `/data/movian` or `/mnt/usb0`, Cross selects a row, Circle back.
@@ -32,6 +33,12 @@ Steal list + scroll behaviour from
 `ps5-homebrew-starter/app/src/page_notes.cpp`. File types: video/audio
 extensions only; do not pretend to decode yet. Show a “cannot open
 path” row when `opendir` fails (sandbox), never crash.
+
+- [x] Videos lists `/download0`, `/data/movian`, `/mnt/usb0` (64 KiB getdents walker)
+- [x] Cross opens a folder or selects a file row; Circle back; Triangle reloads
+- [x] Failed `open` becomes a message row (errno), never a crash
+- [ ] Hardware confirmation that `/download0` listing is visible on this console (open the icon)
+- [ ] USB may stay invisible until a VLC-style Helper.elf — document, do not lie
 
 Optional: VLC-style Helper.elf later if USB stays invisible. Document
 the restriction instead of lying.

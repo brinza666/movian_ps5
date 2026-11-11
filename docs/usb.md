@@ -20,8 +20,8 @@ Until we have an equivalent helper:
 
 - Prefer copying a test clip into `/download0` over FTP while Movian is
   **closed**.
-- If `opendir("/mnt/usb0")` fails, the Videos place must show that
-  error, not crash.
+- If `open("/mnt/usb0")` fails, Videos shows a “cannot open path”
+  row (errno), not a crash. Triangle reloads the current folder.
 
 USB sticks should be exFAT or FAT32.
 

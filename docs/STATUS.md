@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-11.
+Last updated: 2026-11-11 (Phase 1 browse `eboot.bin` 184009 bytes).
 
 Legend: **done** = observed on PS5 or in a shared-source host preview;
 **shell** = UI exists, backend does not; **no** = not in the live tree.
@@ -9,11 +9,11 @@ Official M7 column is from the live WSL2 7.0.273 install — see
 
 | Feature | Official M7 | Live `app/` | Notes |
 | --- | --- | --- | --- |
-| Home-screen title | n/a | **shell** | `PPSA99455`, Media category; signed `eboot.bin` built 2026-11-10 |
-| DualSense navigation | pad/keyboard | **done** (code) | hardware check pending for this binary |
+| Home-screen title | n/a | **shell** | `PPSA99455`, Media category; Phase 1 browse UI |
+| DualSense navigation | pad/keyboard | **done** (code) | folder mounted 2026-11-11; open the icon for klog EXEC |
 | Home tiles + search | **yes** (live) | **shell** | M7: Plugins / Local network / Settings / folders |
-| Local file browser | **yes** | **no** | Phase 1 |
-| USB | **yes** | **no** | sandbox may hide `/mnt/usb*` |
+| Local file browser | **yes** | **shell** | Videos lists `/download0` + `/data/movian`; no decoder |
+| USB | **yes** | **shell** | `/mnt/usb0` is attempted; sandbox may hide it |
 | Software video | FFmpeg 4.4.4 | **no** | Phase 2 |
 | Hardware video | VDPAU / MediaCodec / … | **no** | Phase 2b, `libSceVideodec2` |
 | Audio | Pulse / AT / passthrough | **no** | stereo first |
