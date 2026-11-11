@@ -6,10 +6,11 @@ copy of [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-na
 
 ```text
 src/main.cpp          entry
-src/ui.cpp            Home / Videos / BitTorrent / Plugins
+src/ui.cpp            Home / Videos / BitTorrent / Plugins + Options
+src/settings.*        /download0 settings, resume, bookmarks
 src/fs.*              64 KiB getdents walker, video/audio classify
-src/player.*          MPEG-1 software player (pl_mpeg)
-src/audio.*           48 kHz stereo AudioOut
+src/player.*          MPEG-1 software player (pl_mpeg, resume, OSD)
+src/audio.*           48 kHz stereo AudioOut + volume/mute
 src/pl_mpeg.h         PL_MPEG (MIT)
 src/screen.*          1920×1080 CPU VideoOut (starter / Breeze / boilerplate)
 src/pad.*             DualSense

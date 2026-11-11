@@ -23,3 +23,5 @@
 #define MOVIAN_DATA_DIR MOVIAN_DATA "/movian"
 #define MOVIAN_LOG_PATH MOVIAN_DOWNLOAD0 "/movian-ps5.log"
 #define MOVIAN_SETTINGS_PATH MOVIAN_DOWNLOAD0 "/settings.txt"
+#define MOVIAN_RESUME_PATH MOVIAN_DOWNLOAD0 "/resume.txt"
+#define MOVIAN_BOOKMARKS_PATH MOVIAN_DOWNLOAD0 "/bookmarks.txt"

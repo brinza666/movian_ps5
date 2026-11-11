@@ -63,6 +63,8 @@ to prove the pipeline.
 
 - [x] MPEG-1 software path (pl_mpeg) + DualSense pause/seek + OSD time
 - [x] `sceAudioOut` 48 kHz stereo ring (starter grain/thread)
+- [x] Options settings (resume, seek, volume, clock, debug, show-all, repo URL)
+- [x] Continue watching + bookmarks + Square item menu
 - [ ] H.264 + AAC via a small static FFmpeg
 - [ ] Separate decode thread (decode currently on the UI tick)
 
@@ -106,8 +108,9 @@ ships libsmb2 on this OS — copy build flags from
 ## Phase 6 — Polish
 
 On-screen keyboard (starter `keyboard.cpp` + CommonDialog stub already
-in `app/stubs`), settings file, resume, SRT, 5.1 downmix, optional
-Vulkan UI if CPU blit becomes the bottleneck.
+in `app/stubs`), SRT, 5.1 downmix, optional Vulkan UI if CPU blit
+becomes the bottleneck. Settings file + resume + bookmarks are in
+`app/` (`/download0/settings.txt`).
 
 ## Explicit non-goals (until the phases above exist)
 

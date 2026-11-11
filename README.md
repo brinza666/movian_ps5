@@ -35,9 +35,10 @@ sent to port 9021.
 | ShadowMountPlus title `PPSA99455` (Media category) | In tree — build with `app/build.sh` |
 | DualSense navigation, 1080p CPU UI | Implemented |
 | Videos file browser (`/download0`, `/data/movian`, USB) | Implemented |
-| MPEG-1 software playback (`.mpg`) | Implemented (pl_mpeg, CPU blit, stereo) |
+| MPEG-1 software playback (`.mpg`) | Implemented (pl_mpeg, CPU blit, stereo, resume) |
+| Settings / bookmarks / continue watching | Implemented (`/download0/*.txt`) |
 | H.264 / MP4 / MKV | **Not in this binary** (FFmpeg next) |
-| Four Movian places: Home, Videos, BitTorrent, Plugins | Videos + MPEG-1; others shell |
+| Four Movian places: Home, Videos, BitTorrent, Plugins | Videos + MPEG-1 + Options; others shell |
 | BitTorrent client | **Not in this binary** (Phase 3) |
 | Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |
 | Go `movian-go` ELF | Abandoned for PS5 (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |

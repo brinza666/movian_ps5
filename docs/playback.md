@@ -2,7 +2,8 @@
 
 **This binary plays MPEG-1 program streams** (`.mpg` / `.mpeg` / `.mpv` /
 `.m1v`) with pl_mpeg, CPU YUV→RGBA, and 48 kHz stereo AudioOut.
-H.264 / MP4 / MKV are **not** decoded until FFmpeg is linked.
+Resume, seek step, volume/mute, and an OSD menu (Options) are in this
+binary. H.264 / MP4 / MKV are **not** decoded until FFmpeg is linked.
 
 ## Target formats (Phase 2+)
 

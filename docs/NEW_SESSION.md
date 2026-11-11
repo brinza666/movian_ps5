@@ -99,8 +99,9 @@ export PS5_HOST=192.168.10.238
 
 See [PORTING_PLAN.md](PORTING_PLAN.md). Videos lists `/download0`,
 `/data/movian`, `/mnt/usb0`. Cross on a `.mpg` plays MPEG-1 + MP2 in
-software (pl_mpeg, CPU blit, `sceAudioOut`). MP4/H.264 still needs a
-small static FFmpeg — that is the next slice.
+software (pl_mpeg, CPU blit, `sceAudioOut`). Options opens settings;
+resume and bookmarks persist under `/download0`. MP4/H.264 still needs
+a small static FFmpeg — that is the next slice.
 
 Keep the shell launching after every slice. When a feature’s intended
 behaviour is unclear, run `wsl -d Ubuntu-24.04 -- showtime` and/or read

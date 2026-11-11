@@ -146,7 +146,7 @@ Kind classify_name(const char *name, bool is_dir) noexcept
     return Kind::other;
 }
 
-int list_dir(const char *path, Entry *out, int cap, int *count, int *err) noexcept
+int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool include_other) noexcept
 {
     if (count)
         *count = 0;
@@ -248,7 +248,7 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err) noexce
             }
 
             const Kind kind = classify_name(name, is_dir);
-            if (kind == Kind::other)
+            if (kind == Kind::other && !include_other)
                 continue;
 
             if (n >= cap)

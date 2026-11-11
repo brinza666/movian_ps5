@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-11 (Phase 2 MPEG-1 `eboot.bin` 258865 bytes).
+Last updated: 2026-11-11 (Phase 2 MPEG-1 + Options/resume, `eboot.bin` 275233 bytes).
 
 Legend: **done** = observed on PS5 or in a shared-source host preview;
 **shell** = UI exists, backend does not; **no** = not in the live tree.
@@ -11,12 +11,14 @@ Official M7 column is from the live WSL2 7.0.273 install — see
 | --- | --- | --- | --- |
 | Home-screen title | n/a | **shell** | `PPSA99455`, Media category; Phase 1 browse UI |
 | DualSense navigation | pad/keyboard | **done** (code) | folder mounted 2026-11-11; open the icon for klog EXEC |
-| Home tiles + search | **yes** (live) | **shell** | M7: Plugins / Local network / Settings / folders |
-| Local file browser | **yes** | **shell** | Videos lists `/download0` + `/data/movian` |
+| Home tiles + search | **yes** (live) | **shell** | Continue / Videos / Bookmarks / Settings; no search OSK |
+| Local file browser | **yes** | **shell** | Videos lists `/download0` + `/data/movian` + bookmarks |
 | USB | **yes** | **shell** | `/mnt/usb0` is attempted; sandbox may hide it |
-| Software video | FFmpeg 4.4.4 | **shell** | MPEG-1 via pl_mpeg; H.264 waits for FFmpeg |
-| Hardware video | VDPAU / MediaCodec / … | **no** | Phase 2b, `libSceVideodec2` |
-| Audio | Pulse / AT / passthrough | **shell** | MPEG-1 MP2 → 48 kHz stereo |
+| Software video | FFmpeg 4.4.4 | **shell** | MPEG-1 via pl_mpeg; resume/OSD; H.264 waits for FFmpeg |
+| Hardware video | VDPAU / MediaCodec / … | **no** | Phase 2b, `libSceVideodec2` (toggle stored only) |
+| Audio | Pulse / AT / passthrough | **shell** | MPEG-1 MP2 → 48 kHz stereo, volume/mute |
+| Settings file | **yes** | **shell** | `/download0/settings.txt` DualSense toggles |
+| Resume / bookmarks | **yes** | **shell** | `/download0/resume.txt` + `bookmarks.txt` |
 | HLS / HTTP | **yes** (TS + fMP4) | **no** | Phase 5 |
 | BitTorrent | **yes** (built-in) | **no** | Phase 3 |
 | Plugins API v2 | Duktape 1.8 | **no** | Phase 4 |

@@ -36,6 +36,8 @@ std::int16_t g_ring[cap_frames * 2];
 std::atomic<int> g_read{0};
 std::atomic<int> g_write{0};
 std::atomic<bool> g_ready{false};
+std::atomic<int> g_volume{100};
+std::atomic<bool> g_mute{false};
 int g_handle = -1;
 
 int next_index(int i) noexcept
@@ -121,6 +123,11 @@ void push(const float *interleaved, int frames) noexcept
             break; // drop rather than overwrite unread audio
         float l = interleaved[2 * i];
         float rg = interleaved[2 * i + 1];
+        const float gain = g_mute.load(std::memory_order_relaxed)
+                               ? 0.f
+                               : static_cast<float>(g_volume.load(std::memory_order_relaxed)) / 100.f;
+        l *= gain;
+        rg *= gain;
         l = l > 1.f ? 1.f : l < -1.f ? -1.f : l;
         rg = rg > 1.f ? 1.f : rg < -1.f ? -1.f : rg;
         g_ring[2 * w] = static_cast<std::int16_t>(l * 32767.f);
@@ -134,5 +141,31 @@ void clear() noexcept
 {
     g_read.store(0, std::memory_order_relaxed);
     g_write.store(0, std::memory_order_relaxed);
+}
+
+void set_volume(int percent) noexcept
+{
+    if (percent < 0)
+        percent = 0;
+    if (percent > 100)
+        percent = 100;
+    g_volume.store(percent, std::memory_order_relaxed);
+}
+
+int volume() noexcept
+{
+    return g_volume.load(std::memory_order_relaxed);
+}
+
+void set_mute(bool on) noexcept
+{
+    g_mute.store(on, std::memory_order_relaxed);
+    if (on)
+        clear();
+}
+
+bool muted() noexcept
+{
+    return g_mute.load(std::memory_order_relaxed);
 }
 } // namespace movian::audio

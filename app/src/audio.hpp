@@ -20,4 +20,10 @@ bool init() noexcept;
 // Interleaved stereo float -1..1. Extra samples are dropped if the ring is full.
 void push(const float *interleaved, int frames) noexcept;
 void clear() noexcept;
+
+// Volume is 0..100 and persists via settings. Mute is a session flag.
+void set_volume(int percent) noexcept;
+[[nodiscard]] int volume() noexcept;
+void set_mute(bool on) noexcept;
+[[nodiscard]] bool muted() noexcept;
 } // namespace movian::audio

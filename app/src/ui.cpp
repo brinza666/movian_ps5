@@ -16,8 +16,10 @@
 #include "pad.hpp"
 #include "paths.hpp"
 #include "player.hpp"
+#include "settings.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -52,8 +54,9 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.3.0-mpeg1";
+constexpr const char *kVersion = "0.4.0-options";
 constexpr const char *kTitleId = "PPSA99455";
+constexpr const char *kBookmarksUri = "bookmarks:";
 
 // ---- Videos browser --------------------------------------------------------
 constexpr int max_entries = 80;
@@ -105,6 +108,24 @@ float g_scroll = 0;
 bool g_videos_dirty = true;
 char g_selected_note[160] = "";
 
+enum class Overlay
+{
+    none,
+    settings,
+    item,
+};
+
+Overlay g_overlay = Overlay::none;
+int g_settings_row = 0;
+int g_item_row = 0;
+char g_item_path[fs::max_path + 1] = "";
+char g_item_title[96] = "";
+bool g_item_folder = false;
+bool g_item_file = false;
+
+constexpr int setting_count = 9;
+constexpr int item_action_count = 4;
+
 void append_log(const char *line) noexcept
 {
     FILE *f = fopen(MOVIAN_LOG_PATH, "a");
@@ -126,6 +147,217 @@ void copy_text(char *dst, std::size_t cap, const char *src) noexcept
         return;
     }
     snprintf(dst, cap, "%s", src);
+}
+
+bool path_is_dir(const char *path) noexcept
+{
+    if (!path || !path[0] || std::strcmp(path, kBookmarksUri) == 0)
+        return false;
+    struct stat st{};
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+void format_clock(char *dst, std::size_t cap) noexcept
+{
+    const time_t now = time(nullptr);
+    const struct tm *tm = localtime(&now);
+    if (!tm)
+    {
+        copy_text(dst, cap, "--:--");
+        return;
+    }
+    if (settings::get().clock_24h)
+    {
+        snprintf(dst, cap, "%02d:%02d", tm->tm_hour, tm->tm_min);
+        return;
+    }
+    int h = tm->tm_hour % 12;
+    if (h == 0)
+        h = 12;
+    snprintf(dst, cap, "%d:%02d %s", h, tm->tm_min, tm->tm_hour >= 12 ? "PM" : "AM");
+}
+
+void format_resume_detail(char *dst, std::size_t cap, const settings::Resume &r) noexcept
+{
+    if (!r.valid)
+    {
+        copy_text(dst, cap, "Nothing saved yet — play an MPEG-1 file.");
+        return;
+    }
+    const int t = static_cast<int>(r.time);
+    const int d = static_cast<int>(r.duration);
+    if (d > 0)
+        snprintf(dst, cap, "%s  %d:%02d / %d:%02d", r.title, t / 60, t % 60, d / 60, d % 60);
+    else
+        snprintf(dst, cap, "%s  %d:%02d", r.title, t / 60, t % 60);
+}
+
+bool play_path(const char *path, const char *title, bool from_start) noexcept
+{
+    if (!path || !path[0])
+        return false;
+    char why[128];
+    const player::Kind pk = player::classify(path);
+    if (pk == player::Kind::mpeg1 && player::open(path, why, sizeof why, from_start))
+    {
+        snprintf(g_status, sizeof g_status, "playing %s", title && title[0] ? title : path);
+        append_log(g_status);
+        screen::notify(from_start ? "Play from start" : "MPEG-1");
+        g_overlay = Overlay::none;
+        return true;
+    }
+    if (pk == player::Kind::mpeg1)
+    {
+        snprintf(g_selected_note, sizeof g_selected_note, "%s", why);
+        screen::notify(why);
+    }
+    else if (pk == player::Kind::later)
+    {
+        snprintf(g_selected_note, sizeof g_selected_note,
+                 "%s — H.264/MP4 needs FFmpeg (not linked yet).", title ? title : path);
+        screen::notify("Needs FFmpeg");
+    }
+    else
+    {
+        snprintf(g_selected_note, sizeof g_selected_note, "Cannot play %s", title ? title : path);
+        screen::notify("Not a video");
+    }
+    return false;
+}
+
+const char *setting_title(int row) noexcept
+{
+    switch (row)
+    {
+    case 0:
+        return "Resume playback";
+    case 1:
+        return "Seek step";
+    case 2:
+        return "Volume";
+    case 3:
+        return "24-hour clock";
+    case 4:
+        return "Debug log";
+    case 5:
+        return "Hardware decode";
+    case 6:
+        return "Show all files";
+    case 7:
+        return "Plugin repository";
+    default:
+        return "About";
+    }
+}
+
+void setting_value(int row, char *dst, std::size_t cap) noexcept
+{
+    const settings::Data &d = settings::get();
+    switch (row)
+    {
+    case 0:
+        copy_text(dst, cap, d.resume ? "on" : "off");
+        break;
+    case 1:
+        snprintf(dst, cap, "%d seconds", d.seek_step);
+        break;
+    case 2:
+        snprintf(dst, cap, "%d%%", d.volume);
+        break;
+    case 3:
+        copy_text(dst, cap, d.clock_24h ? "24h" : "12h");
+        break;
+    case 4:
+        copy_text(dst, cap, d.debug_log ? "on" : "off");
+        break;
+    case 5:
+        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
+        break;
+    case 6:
+        copy_text(dst, cap, d.show_all ? "on" : "media only");
+        break;
+    case 7:
+        copy_text(dst, cap, settings::repo_label());
+        break;
+    default:
+        copy_text(dst, cap, kVersion);
+        break;
+    }
+}
+
+void setting_nudge(int row, int delta) noexcept
+{
+    settings::Data &d = settings::get();
+    switch (row)
+    {
+    case 0:
+        d.resume = !d.resume;
+        settings::save();
+        screen::notify(d.resume ? "Resume on" : "Resume off");
+        break;
+    case 1:
+        settings::cycle_seek(delta == 0 ? 1 : delta);
+        screen::notify("Seek step");
+        break;
+    case 2:
+        settings::cycle_volume(delta == 0 ? 1 : delta);
+        audio::set_volume(settings::get().volume);
+        screen::notify("Volume");
+        break;
+    case 3:
+        d.clock_24h = !d.clock_24h;
+        settings::save();
+        break;
+    case 4:
+        d.debug_log = !d.debug_log;
+        settings::save();
+        screen::notify(d.debug_log ? "Debug log on" : "Debug log off");
+        break;
+    case 5:
+        d.hw_decode = !d.hw_decode;
+        settings::save();
+        screen::notify("HW decode is stored for Phase 2b");
+        break;
+    case 6:
+        d.show_all = !d.show_all;
+        settings::save();
+        g_videos_dirty = true;
+        screen::notify(d.show_all ? "Showing all files" : "Media files only");
+        break;
+    case 7:
+        settings::cycle_repo(delta == 0 ? 1 : delta);
+        screen::notify("Repo URL stored — not fetched yet");
+        break;
+    default:
+        screen::notify("Movian PS5 native title");
+        break;
+    }
+}
+
+const char *item_action_title(int row) noexcept
+{
+    switch (row)
+    {
+    case 0:
+        return g_item_folder ? "Open" : "Play";
+    case 1:
+        return "Play from beginning";
+    case 2:
+        return settings::is_bookmarked(g_item_path) ? "Remove bookmark" : "Bookmark";
+    default:
+        return "Show path";
+    }
+}
+
+bool item_action_enabled(int row) noexcept
+{
+    if (row == 0)
+        return g_item_folder || g_item_file;
+    if (row == 1)
+        return g_item_file && player::classify(g_item_path) == player::Kind::mpeg1;
+    if (row == 2)
+        return g_item_path[0] != 0;
+    return g_item_path[0] != 0;
 }
 
 const char *kind_label(fs::Kind k) noexcept
@@ -235,7 +467,7 @@ void load_directory(const char *path) noexcept
     fs::Entry entries[max_entries];
     int n = 0;
     int err = 0;
-    if (fs::list_dir(path, entries, max_entries, &n, &err) != 0)
+    if (fs::list_dir(path, entries, max_entries, &n, &err, settings::get().show_all) != 0)
     {
         char title[96];
         snprintf(title, sizeof title, "Cannot open %s", path);
@@ -293,7 +525,7 @@ void load_videos_root() noexcept
         fs::Entry entries[4];
         int n = 0;
         int err = 0;
-        const int opened = fs::list_dir(s.path, entries, 4, &n, &err);
+        const int opened = fs::list_dir(s.path, entries, 4, &n, &err, settings::get().show_all);
         char detail[96];
         if (opened != 0)
             snprintf(detail, sizeof detail, "%s — %s (errno %d)", s.hint, errno_hint(err), err);
@@ -304,10 +536,51 @@ void load_videos_root() noexcept
         add_folder_row(s.title, detail, s.path, true);
     }
 
+    char resume_detail[96];
+    format_resume_detail(resume_detail, sizeof resume_detail, settings::last_resume());
+    if (settings::last_resume().valid)
+        add_folder_row("Continue watching", resume_detail, settings::last_resume().path, false);
+    else
+        add_message_row("Continue watching", resume_detail);
+
+    char bm_detail[96];
+    snprintf(bm_detail, sizeof bm_detail, "%d saved  ·  Square on a file to bookmark",
+             settings::bookmark_count());
+    add_folder_row("Bookmarks", bm_detail, kBookmarksUri, true);
+
     add_message_row("MPEG-1 plays in this build",
                     "Cross a .mpg to play. MP4/MKV/H.264 wait for FFmpeg.");
     snprintf(g_status, sizeof g_status, "Videos roots: %s, %s, %s", MOVIAN_DOWNLOAD0, MOVIAN_DATA_DIR,
              kUsb0);
+}
+
+void load_bookmarks() noexcept
+{
+    g_row_count = 0;
+    g_truncated = 0;
+    const int n = settings::bookmark_count();
+    if (n == 0)
+    {
+        add_message_row("No bookmarks yet", "Square on a file or folder, or use item options.");
+        snprintf(g_status, sizeof g_status, "Bookmarks empty");
+        return;
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        const char *path = settings::bookmark_path(i);
+        const char *title = settings::bookmark_title(i);
+        if (path_is_dir(path))
+            add_folder_row(title, path, path, true);
+        else
+        {
+            fs::Entry e{};
+            copy_text(e.name, sizeof e.name, title);
+            copy_text(e.path, sizeof e.path, path);
+            e.kind = fs::classify_name(title, false);
+            add_file_row(e);
+        }
+    }
+    snprintf(g_status, sizeof g_status, "Bookmarks  %d", n);
 }
 
 void reload_videos() noexcept
@@ -315,6 +588,8 @@ void reload_videos() noexcept
     const BrowseLevel &lv = g_stack[g_depth];
     if (lv.path[0] == 0)
         load_videos_root();
+    else if (std::strcmp(lv.path, kBookmarksUri) == 0)
+        load_bookmarks();
     else
         load_directory(lv.path);
     keep_in_view();
@@ -358,11 +633,64 @@ bool pop_folder() noexcept
     return false;
 }
 
+void open_item_menu(const Row &r) noexcept
+{
+    if (r.path[0] == 0 && r.kind != RowKind::file && r.kind != RowKind::folder)
+        return;
+    copy_text(g_item_path, sizeof g_item_path, r.path);
+    copy_text(g_item_title, sizeof g_item_title, r.title);
+    g_item_folder = r.kind == RowKind::folder && r.openable;
+    g_item_file = r.kind == RowKind::file;
+    g_item_row = 0;
+    g_overlay = Overlay::item;
+}
+
+void run_item_action(int row) noexcept
+{
+    if (!item_action_enabled(row))
+        return;
+    if (row == 0)
+    {
+        if (g_item_folder)
+        {
+            push_folder(g_item_path, g_item_title);
+            g_overlay = Overlay::none;
+            return;
+        }
+        play_path(g_item_path, g_item_title, false);
+        return;
+    }
+    if (row == 1)
+    {
+        play_path(g_item_path, g_item_title, true);
+        return;
+    }
+    if (row == 2)
+    {
+        if (settings::toggle_bookmark(g_item_path, g_item_title))
+            screen::notify("Bookmarked");
+        else
+            screen::notify("Bookmark removed");
+        g_videos_dirty = true;
+        g_overlay = Overlay::none;
+        return;
+    }
+    snprintf(g_selected_note, sizeof g_selected_note, "%s", g_item_path);
+    screen::notify(g_item_path);
+    g_overlay = Overlay::none;
+}
+
 void select_row() noexcept
 {
     if (g_row_count <= 0)
         return;
     const Row &r = g_rows[g_stack[g_depth].selected];
+    if (r.kind == RowKind::folder && r.path[0] && std::strcmp(r.path, kBookmarksUri) != 0 &&
+        !r.openable && player::classify(r.path) == player::Kind::mpeg1)
+    {
+        play_path(r.path, r.title, false);
+        return;
+    }
     if (r.kind == RowKind::folder && r.openable && r.path[0])
     {
         push_folder(r.path, r.title);
@@ -373,30 +701,7 @@ void select_row() noexcept
     }
     if (r.kind == RowKind::file)
     {
-        const player::Kind pk = player::classify(r.path);
-        char why[128];
-        if (pk == player::Kind::mpeg1 && player::open(r.path, why, sizeof why))
-        {
-            snprintf(g_status, sizeof g_status, "playing %s", r.title);
-            append_log(g_status);
-            screen::notify("MPEG-1");
-            return;
-        }
-        if (pk == player::Kind::mpeg1)
-        {
-            snprintf(g_selected_note, sizeof g_selected_note, "%s", why);
-            screen::notify(why);
-        }
-        else if (pk == player::Kind::later)
-        {
-            snprintf(g_selected_note, sizeof g_selected_note,
-                     "%s — H.264/MP4 needs FFmpeg (not linked yet).", r.title);
-            screen::notify("Needs FFmpeg");
-        }
-        else
-        {
-            snprintf(g_selected_note, sizeof g_selected_note, "Selected %s", r.title);
-        }
+        play_path(r.path, r.title, false);
         snprintf(g_status, sizeof g_status, "selected %s", r.title);
         char line[160];
         snprintf(line, sizeof line, "select %s", r.path);
@@ -475,17 +780,22 @@ void draw_tab_bar(screen::Canvas &c) noexcept
         c.text(x + 28.f, 54.f, place_name[i], on ? font::semibold : font::medium, 22,
                on ? Color::text : Color::muted);
     }
+    char clock[24];
+    format_clock(clock, sizeof clock);
+    c.text(1760.f, 54.f, clock, font::mono_medium, 20, Color::muted);
 }
 
 void draw_footer(screen::Canvas &c) noexcept
 {
     c.rect(0, 1008, screen::width, 72, Color::surface);
     c.rect(0, 1008, screen::width, 2, Color::line);
-    const char *hint = player::active()
-                           ? "Cross pause    Left/Right seek    Circle stop"
-                           : g_place == Place::videos
-                                 ? "L1 / R1  places    Cross  open/play    Circle  back    L2 / R2  page"
-                                 : "L1 / R1  places    Cross  open    Circle  back    Options  status";
+    const char *hint = g_overlay == Overlay::settings
+                           ? "Cross toggle    Left/Right change    Options / Circle close"
+                           : g_overlay == Overlay::item
+                                 ? "Cross action    Circle close"
+                                 : g_place == Place::videos
+                                       ? "Cross open/play    Square item    Options settings    Circle back"
+                                       : "L1 / R1 places    Cross open    Options settings    Circle back";
     c.text(48.f, 1052.f, hint, font::regular, 18, Color::muted);
     c.text(1480.f, 1052.f, kVersion, font::mono_medium, 16, Color::faint);
 }
@@ -505,15 +815,20 @@ void draw_card(screen::Canvas &c, int x, int y, int w, int h, const char *title,
 void draw_home(screen::Canvas &c) noexcept
 {
     c.text(48.f, 160.f, "Home", font::semibold, 40, Color::text);
-    c.text(48.f, 208.f, "Videos lists local folders. MPEG-1 (.mpg) plays in software.",
+    c.text(48.f, 208.f, "Continue watching, folders, settings. MPEG-1 (.mpg) plays in software.",
            font::regular, 20, Color::muted);
 
-    const char *titles[4] = {"Local files", "USB storage", "Network", "Plugins"};
+    char resume_body[96];
+    format_resume_detail(resume_body, sizeof resume_body, settings::last_resume());
+    char bm_body[96];
+    snprintf(bm_body, sizeof bm_body, "%d saved — Square on a Videos row to add one",
+             settings::bookmark_count());
+    const char *titles[4] = {"Continue watching", "Videos", "Bookmarks", "Settings"};
     const char *bodies[4] = {
-        "/download0 and /data/movian — Videos lists them",
-        "/mnt/usb0 — best-effort; Cross opens Videos",
-        "SMB2 / HTTP / HLS — later phases",
-        "Duktape API v2 — later phase",
+        resume_body,
+        "/download0, /data/movian, USB — Cross opens the browser",
+        bm_body,
+        "Resume, seek, volume, clock, debug log, plugin repo URL",
     };
     for (int i = 0; i < 4; ++i)
     {
@@ -600,6 +915,52 @@ void draw_videos(screen::Canvas &c) noexcept
         c.text(72.f, 980.f, g_selected_note, font::regular, 18, Color::orange);
 }
 
+void draw_settings_overlay(screen::Canvas &c) noexcept
+{
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
+    c.round_rect(360, 120, 1200, 820, 20, Color::surface);
+    c.round_frame(360, 120, 1200, 820, 20, 2, Color::accent, 180);
+    c.text(400.f, 180.f, "Settings", font::semibold, 34, Color::text);
+    c.text(400.f, 220.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
+           Color::muted);
+    for (int i = 0; i < setting_count; ++i)
+    {
+        const int y = 250 + i * 68;
+        const bool on = i == g_settings_row;
+        if (on)
+            c.round_rect(390, y, 1140, 58, 12, Color::hover);
+        c.text(420.f, static_cast<float>(y + 38), setting_title(i), font::medium, 22,
+               on ? Color::text : Color::muted);
+        char value[64];
+        setting_value(i, value, sizeof value);
+        char shown[64];
+        c.text(980.f, static_cast<float>(y + 38),
+               fit(value, 520, shown, sizeof shown, font::mono_medium, 18), font::mono_medium, 18,
+               Color::accent);
+    }
+}
+
+void draw_item_overlay(screen::Canvas &c) noexcept
+{
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
+    c.round_rect(520, 220, 880, 560, 20, Color::surface);
+    c.round_frame(520, 220, 880, 560, 20, 2, Color::accent, 180);
+    c.text(560.f, 280.f, g_item_title[0] ? g_item_title : "Item", font::semibold, 28, Color::text);
+    char shown[128];
+    c.text(560.f, 320.f, fit(g_item_path, 800, shown, sizeof shown, font::regular, 16),
+           font::regular, 16, Color::muted);
+    for (int i = 0; i < item_action_count; ++i)
+    {
+        const int y = 360 + i * 80;
+        const bool on = i == g_item_row;
+        const bool enabled = item_action_enabled(i);
+        if (on)
+            c.round_rect(550, y, 820, 68, 12, Color::hover);
+        c.text(580.f, static_cast<float>(y + 42), item_action_title(i), font::medium, 24,
+               enabled ? (on ? Color::text : Color::muted) : Color::faint);
+    }
+}
+
 void draw_status_strip(screen::Canvas &c) noexcept
 {
     const std::uint64_t ms = screen::now_ms() - g_started_ms;
@@ -615,12 +976,45 @@ void load() noexcept
     g_started_ms = screen::now_ms();
     mkdir(MOVIAN_DOWNLOAD0, 0777);
     mkdir(MOVIAN_DATA_DIR, 0777);
-    append_log("movian-ps5 mpeg1 start");
-    snprintf(g_status, sizeof g_status, "PPSA99455 mpeg1 %s", kVersion);
+    settings::load();
+    audio::set_volume(settings::get().volume);
+    if (settings::get().debug_log)
+        append_log("movian-ps5 options start");
+    snprintf(g_status, sizeof g_status, "PPSA99455 options %s", kVersion);
     (void)audio::init();
     enter_videos();
     g_place = Place::home;
     screen::notify("Movian PS5");
+}
+
+bool handle_overlay(unsigned pressed) noexcept
+{
+    if (g_overlay == Overlay::none)
+        return false;
+    if ((pressed & pad::circle) || (g_overlay == Overlay::settings && (pressed & pad::options)))
+    {
+        g_overlay = Overlay::none;
+        return true;
+    }
+    if (g_overlay == Overlay::settings)
+    {
+        if (pressed & pad::up)
+            g_settings_row = (g_settings_row + setting_count - 1) % setting_count;
+        if (pressed & pad::down)
+            g_settings_row = (g_settings_row + 1) % setting_count;
+        if (pressed & pad::left)
+            setting_nudge(g_settings_row, -1);
+        if ((pressed & pad::right) || (pressed & pad::cross))
+            setting_nudge(g_settings_row, 1);
+        return true;
+    }
+    if (pressed & pad::up)
+        g_item_row = (g_item_row + item_action_count - 1) % item_action_count;
+    if (pressed & pad::down)
+        g_item_row = (g_item_row + 1) % item_action_count;
+    if (pressed & pad::cross)
+        run_item_action(g_item_row);
+    return true;
 }
 
 bool update() noexcept
@@ -633,6 +1027,15 @@ bool update() noexcept
         dirty = player::handle(pressed) || dirty;
         dirty = player::tick() || dirty;
         return dirty;
+    }
+
+    if (handle_overlay(pressed))
+        return true;
+
+    if (pressed & pad::options)
+    {
+        g_overlay = Overlay::settings;
+        return true;
     }
 
     if (pressed & pad::l1)
@@ -652,11 +1055,29 @@ bool update() noexcept
             g_home_row = (g_home_row + 2) % 4;
         if (pressed & pad::cross)
         {
-            static const Place jump[4] = {Place::videos, Place::videos, Place::bittorrent,
-                                          Place::plugins};
-            g_place = jump[g_home_row];
-            if (g_place == Place::videos)
+            if (g_home_row == 0)
+            {
+                const settings::Resume r = settings::last_resume();
+                if (r.valid)
+                    play_path(r.path, r.title, false);
+                else
+                    screen::notify("Nothing to continue");
+            }
+            else if (g_home_row == 1)
+            {
+                g_place = Place::videos;
                 enter_videos();
+            }
+            else if (g_home_row == 2)
+            {
+                g_place = Place::videos;
+                enter_videos();
+                push_folder(kBookmarksUri, "Bookmarks");
+            }
+            else
+            {
+                g_overlay = Overlay::settings;
+            }
         }
     }
     else if (g_place == Place::videos)
@@ -673,6 +1094,8 @@ bool update() noexcept
             move_selection(rows_in_view);
         if (pressed & pad::cross)
             select_row();
+        if ((pressed & pad::square) && g_row_count > 0)
+            open_item_menu(g_rows[g_stack[g_depth].selected]);
         if (pressed & pad::circle)
         {
             if (!pop_folder())
@@ -688,9 +1111,6 @@ bool update() noexcept
     {
         g_place = Place::home;
     }
-
-    if (pressed & pad::options)
-        screen::notify(g_status);
 
     if (g_place == Place::videos)
     {
@@ -736,6 +1156,10 @@ void draw(screen::Canvas &canvas) noexcept
     }
     if (g_place != Place::videos)
         draw_status_strip(canvas);
+    if (g_overlay == Overlay::settings)
+        draw_settings_overlay(canvas);
+    else if (g_overlay == Overlay::item)
+        draw_item_overlay(canvas);
     draw_footer(canvas);
 }
 } // namespace movian::ui

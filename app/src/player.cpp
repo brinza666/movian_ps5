@@ -14,6 +14,7 @@
 #include "image.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
+#include "settings.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -30,7 +31,6 @@ using screen::Color;
 
 constexpr int picture_w = 1280;
 constexpr int picture_h = 720;
-constexpr double seek_step = 10.0;
 
 char g_path[384] = "";
 char g_title[96] = "";
@@ -40,10 +40,13 @@ movian::image::Image g_picture{};
 std::uint64_t g_last_ms = 0;
 bool g_paused = false;
 bool g_ended = false;
+bool g_osd = false;
+int g_osd_row = 0;
 int g_src_w = 0;
 int g_src_h = 0;
 int g_src_rate = 0;
 double g_duration = 0;
+std::uint64_t g_saved_ms = 0;
 
 bool ends_with_ci(const char *name, const char *ext) noexcept
 {
@@ -133,6 +136,19 @@ void format_time(char *dst, int cap, double seconds) noexcept
     std::snprintf(dst, static_cast<std::size_t>(cap), "%d:%02d", t / 60, t % 60);
 }
 
+double seek_step() noexcept
+{
+    const int s = settings::get().seek_step;
+    return s > 0 ? static_cast<double>(s) : 10.0;
+}
+
+void persist_resume() noexcept
+{
+    if (!g_plm || !g_path[0])
+        return;
+    settings::remember_resume(g_path, g_title, plm_get_time(g_plm), g_duration);
+}
+
 void seek_by(double delta) noexcept
 {
     if (!g_plm)
@@ -145,6 +161,82 @@ void seek_by(double delta) noexcept
     audio::clear();
     plm_seek(g_plm, t, FALSE);
     g_ended = plm_has_ended(g_plm) != 0;
+    persist_resume();
+}
+
+constexpr int osd_row_count = 5;
+
+const char *osd_title(int row) noexcept
+{
+    switch (row)
+    {
+    case 0:
+        return "Pause / play";
+    case 1:
+        return "Mute";
+    case 2:
+        return "Volume";
+    case 3:
+        return "Seek step";
+    default:
+        return "Bookmark this file";
+    }
+}
+
+void osd_value(int row, char *dst, int cap) noexcept
+{
+    switch (row)
+    {
+    case 0:
+        copy_text(dst, cap, g_ended ? "ended" : g_paused ? "paused" : "playing");
+        break;
+    case 1:
+        copy_text(dst, cap, audio::muted() ? "on" : "off");
+        break;
+    case 2:
+        std::snprintf(dst, static_cast<std::size_t>(cap), "%d%%", audio::volume());
+        break;
+    case 3:
+        std::snprintf(dst, static_cast<std::size_t>(cap), "%ds", settings::get().seek_step);
+        break;
+    default:
+        copy_text(dst, cap, settings::is_bookmarked(g_path) ? "saved" : "not saved");
+        break;
+    }
+}
+
+void osd_activate() noexcept
+{
+    switch (g_osd_row)
+    {
+    case 0:
+        g_paused = !g_paused;
+        if (g_paused)
+            audio::clear();
+        g_last_ms = screen::now_ms();
+        break;
+    case 1:
+        audio::set_mute(!audio::muted());
+        screen::notify(audio::muted() ? "Muted" : "Unmuted");
+        break;
+    case 2:
+        settings::cycle_volume(1);
+        audio::set_volume(settings::get().volume);
+        screen::notify("Volume");
+        break;
+    case 3:
+        settings::cycle_seek(1);
+        screen::notify("Seek step");
+        break;
+    default:
+        if (!g_path[0])
+            break;
+        if (settings::toggle_bookmark(g_path, g_title))
+            screen::notify("Bookmarked");
+        else
+            screen::notify("Bookmark removed");
+        break;
+    }
 }
 } // namespace
 
@@ -162,7 +254,7 @@ Kind classify(const char *path) noexcept
     return Kind::none;
 }
 
-bool open(const char *path, char *why, int why_cap) noexcept
+bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
 {
     close();
     if (!path || !path[0])
@@ -216,10 +308,23 @@ bool open(const char *path, char *why, int why_cap) noexcept
     copy_text(g_title, static_cast<int>(sizeof g_title), basename_of(path));
     g_paused = false;
     g_ended = false;
+    g_osd = false;
+    g_osd_row = 0;
     g_last_ms = screen::now_ms();
+    g_saved_ms = g_last_ms;
     g_error[0] = 0;
     (void)audio::init();
+    audio::set_volume(settings::get().volume);
     audio::clear();
+
+    double resume_at = 0;
+    if (!from_start && settings::get().resume && settings::resume_for(path, &resume_at, nullptr) &&
+        resume_at > 1.0)
+    {
+        plm_seek(g_plm, resume_at, TRUE);
+        g_ended = plm_has_ended(g_plm) != 0;
+    }
+
     (void)picture_w;
     (void)picture_h;
     return true;
@@ -229,6 +334,7 @@ void close() noexcept
 {
     if (g_plm)
     {
+        persist_resume();
         plm_destroy(g_plm);
         g_plm = nullptr;
     }
@@ -238,6 +344,8 @@ void close() noexcept
     g_title[0] = 0;
     g_paused = false;
     g_ended = false;
+    g_osd = false;
+    g_osd_row = 0;
     g_src_w = g_src_h = g_src_rate = 0;
     g_duration = 0;
 }
@@ -252,26 +360,91 @@ bool playing() noexcept
     return g_plm && !g_paused && !g_ended;
 }
 
+const char *path() noexcept
+{
+    return g_path;
+}
+
+const char *title() noexcept
+{
+    return g_title;
+}
+
+double time() noexcept
+{
+    return g_plm ? plm_get_time(g_plm) : 0;
+}
+
+double duration() noexcept
+{
+    return g_duration;
+}
+
 bool handle(unsigned pressed) noexcept
 {
     if (!g_plm)
         return false;
     bool dirty = pressed != 0;
+    if (pressed & pad::options)
+    {
+        g_osd = !g_osd;
+        return true;
+    }
+    if (g_osd)
+    {
+        if (pressed & pad::up)
+            g_osd_row = (g_osd_row + osd_row_count - 1) % osd_row_count;
+        if (pressed & pad::down)
+            g_osd_row = (g_osd_row + 1) % osd_row_count;
+        if (pressed & pad::left)
+        {
+            if (g_osd_row == 2)
+            {
+                settings::cycle_volume(-1);
+                audio::set_volume(settings::get().volume);
+            }
+            else if (g_osd_row == 3)
+                settings::cycle_seek(-1);
+        }
+        if (pressed & pad::right)
+        {
+            if (g_osd_row == 2)
+            {
+                settings::cycle_volume(1);
+                audio::set_volume(settings::get().volume);
+            }
+            else if (g_osd_row == 3)
+                settings::cycle_seek(1);
+        }
+        if (pressed & pad::cross)
+            osd_activate();
+        if (pressed & pad::circle)
+            g_osd = false;
+        return dirty;
+    }
     if (pressed & pad::cross)
     {
         g_paused = !g_paused;
         if (g_paused)
             audio::clear();
         g_last_ms = screen::now_ms();
+        persist_resume();
     }
     if (pressed & pad::left)
-        seek_by(-seek_step);
+        seek_by(-seek_step());
     if (pressed & pad::right)
-        seek_by(seek_step);
+        seek_by(seek_step());
     if (pressed & pad::l2)
         seek_by(-60.0);
     if (pressed & pad::r2)
         seek_by(60.0);
+    if (pressed & pad::square)
+    {
+        if (g_path[0] && settings::toggle_bookmark(g_path, g_title))
+            screen::notify("Bookmarked");
+        else
+            screen::notify("Bookmark removed");
+    }
     if (pressed & pad::circle)
     {
         close();
@@ -303,6 +476,12 @@ bool tick() noexcept
             g_ended = true;
             g_paused = true;
             audio::clear();
+            settings::clear_resume();
+        }
+        else if (now - g_saved_ms > 4000)
+        {
+            persist_resume();
+            g_saved_ms = now;
         }
     }
     return true;
@@ -343,9 +522,31 @@ void draw(screen::Canvas &c) noexcept
     c.text(1760.f, 1040.f, right, font::mono_medium, 18, Color::muted);
     const char *state = g_ended ? "ended" : g_paused ? "paused" : "playing";
     c.text(900.f, 1040.f, state, font::medium, 18, Color::text);
-    c.text(48.f, 1070.f, "Cross pause    Left/Right 10s    L2/R2 60s    Circle back",
-           font::regular, 16, Color::faint);
+    char hint[96];
+    std::snprintf(hint, sizeof hint, "Cross pause    Left/Right %ds    L2/R2 60s    Options menu    Circle back",
+                  settings::get().seek_step);
+    c.text(48.f, 1070.f, hint, font::regular, 16, Color::faint);
+
+    if (g_osd)
+    {
+        c.round_rect(560, 220, 800, 520, 18, Color::surface, 230);
+        c.round_frame(560, 220, 800, 520, 18, 2, Color::accent, 200);
+        c.text(600.f, 280.f, "Playback", font::semibold, 28, Color::text);
+        c.text(600.f, 318.f, "Left/Right changes a value. Circle closes.", font::regular, 16,
+               Color::muted);
+        for (int i = 0; i < osd_row_count; ++i)
+        {
+            const int y = 350 + i * 70;
+            const bool on = i == g_osd_row;
+            if (on)
+                c.round_rect(590, y, 740, 60, 12, Color::hover);
+            c.text(620.f, static_cast<float>(y + 38), osd_title(i), font::medium, 22,
+                   on ? Color::text : Color::muted);
+            char value[32];
+            osd_value(i, value, static_cast<int>(sizeof value));
+            c.text(1080.f, static_cast<float>(y + 38), value, font::mono_medium, 20, Color::accent);
+        }
+    }
     (void)g_error;
-    (void)g_path;
 }
 } // namespace movian::player
