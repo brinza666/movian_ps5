@@ -1,7 +1,7 @@
 /*
- * Movian for PS5 — software FFmpeg decode (H.264 + AAC and kin).
- * Compiled always; bodies are stubs unless MOVIAN_HAVE_FFMPEG is set
- * and static libs are linked. MPEG-1 stays on pl_mpeg.
+ * Movian for PS5 — FFmpeg demux + software H.264/AAC, or libSceVideodec2.
+ * HEVC is hardware-only (VLC ps5vdec). Software HEVC is refused: it
+ * crashed this title on the TV.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -24,6 +24,8 @@ void close() noexcept;
 [[nodiscard]] double time() noexcept;
 [[nodiscard]] double duration() noexcept;
 [[nodiscard]] const std::uint32_t *rgba() noexcept; // 0xAABBGGRR
+[[nodiscard]] const char *codec_name() noexcept;
+[[nodiscard]] const char *mode() noexcept; // "HW" or "SW"
 bool tick(double dt) noexcept;
 void seek(double seconds) noexcept;
 } // namespace movian::avdec

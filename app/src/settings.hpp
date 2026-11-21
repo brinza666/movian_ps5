@@ -20,7 +20,7 @@ struct Data
     int seek_step = 10; // 5, 10, 30, or 60 seconds
     bool clock_24h = true;
     bool debug_log = true;
-    bool hw_decode = false; // stored for Phase 2b; this binary is software MPEG-1
+    bool hw_decode = true; // libSceVideodec2 when the module loads; else software H.264
     bool show_all = false;
     bool auto_next = true;
     bool newest_first = false;

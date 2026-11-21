@@ -1,5 +1,7 @@
 # Movian for PlayStation 5
 
+> **Native playback test branch** — builds the isolated PS5 title PPSA99456. See the [playback test handoff](docs/PLAYBACK_TEST_HANDOFF.md) for tested codecs, build instructions and open failures.
+
 <p align="center">
   <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
 </p>
@@ -11,8 +13,8 @@
 </p>
 
 <p align="center">
-  <img alt="status" src="https://img.shields.io/badge/status-phase%202%20mpeg1-yellow">
-  <img alt="title" src="https://img.shields.io/badge/title-PPSA99455-1f1f1f">
+  <img alt="status" src="https://img.shields.io/badge/status-hardware%20playback%20test-yellow">
+  <img alt="title" src="https://img.shields.io/badge/title-PPSA99456-1f1f1f">
   <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
 </p>
 

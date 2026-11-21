@@ -46,8 +46,8 @@ starter).
 - [czz/movian-go](https://github.com/czz/movian-go) — GPL, desktop Go port of
   Movian. Plugin API, backends, and UX reference. Not built for PS5.
 - [ZiZc3/VLC](https://github.com/ZiZc3/VLC) — GPL-3.0, VLC 3.0 native PS5
-  title. Packaging and platform patterns we follow. We do not copy VLC
-  sources into this tree.
+  title. Packaging and platform patterns we follow. The playback test uses the VLC
+  Videodec2 link-only stub under GPL-2.0-or-later.
 - [andoma/movian](https://github.com/andoma/movian) — original C Movian.
 - Historical experiments in [`archive/`](archive/README.md), including
   Duktape, splicer payload sources, and a Go overlay. Those remain under
@@ -65,3 +65,12 @@ FFmpeg, libass, libsmb2, hardware video decode (`libSceVideodec2`), Vulkan /
 RADV via PS5_Vulkan, and a JavaScript engine (Duktape or a native goja port)
 will be introduced with their own notices when they are actually linked.
 Do not list a library here until `app/build.sh` compiles against it.
+
+## Native playback test release
+
+- FFmpeg 6.1.2 is statically linked for demux, format adaptation, software
+  video/audio decoding and libswresample. Exact inputs and flags are in
+  the test build recipe. The release includes the FFmpeg source tarball.
+- The [VLC Videodec2 import stub](https://github.com/ZiZc3/VLC/blob/7f104abb5a88dd675b60261769dc86d5dfb0a0d4/ps5/stubs/videodec2_link_stub.c)
+  is used at link time. It is not packaged. Videodec2 is supplied by the console.
+- The included HEVC test fixture is a generated color pattern and sine tone.

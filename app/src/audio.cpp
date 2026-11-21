@@ -72,6 +72,10 @@ void pull(std::int16_t *out, int frames) noexcept
 #ifndef MOVIAN_HOST_PREVIEW
 void *output(void *) noexcept
 {
+    if (g_handle < 0)
+    {
+        return nullptr;
+    }
     alignas(64) static std::int16_t samples[grain * 2];
     for (;;)
     {

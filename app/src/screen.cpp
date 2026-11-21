@@ -747,7 +747,11 @@ void notify(std::string_view message) noexcept
     (void)sceSystemServiceHideSplashScreen();
     const int video = sceVideoOutOpen(0xff, 0, 0, nullptr);
     if (video < 0)
-        halt("Movian: sceVideoOutOpen failed");
+    {
+        char msg[128];
+        snprintf(msg, sizeof msg, "Movian: sceVideoOutOpen failed (%d)", video);
+        halt(msg);
+    }
 
     const std::size_t pool_size = sceKernelGetDirectMemorySize();
     if (pool_size < memory_bytes)
@@ -763,8 +767,8 @@ void notify(std::string_view message) noexcept
     void *mapped = nullptr;
     result = sceKernelMapDirectMemory(&mapped, memory_bytes, map_protection, 0, physical_address,
                                       memory_alignment);
-    if (result < 0)
-        halt("Movian: direct-memory mapping failed");
+    if (result < 0 || !mapped)
+        halt("Movian: direct-memory mapping failed or returned NULL");
 
     std::array<VideoBuffer, 2> buffers{{
         {mapped, nullptr, nullptr, nullptr},

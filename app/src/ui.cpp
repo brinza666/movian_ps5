@@ -3,8 +3,8 @@
  *
  * Honest about what this build does: DualSense navigation, four Movian
  * places, a real directory listing of /download0, /data/movian, and USB,
- * and software MPEG-1 playback (pl_mpeg). H.264/FFmpeg, plugins, and
- * BitTorrent are not in this binary.
+ * MPEG-1 (pl_mpeg), H.264/AAC (FFmpeg), HEVC on Videodec2 only. Plugins
+ * and BitTorrent are not in this binary.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -12,7 +12,9 @@
 #include "ui.hpp"
 
 #include "audio.hpp"
+#include "avdec.hpp"
 #include "fs.hpp"
+#include "hwdec.h"
 #include "pad.hpp"
 #include "paths.hpp"
 #include "player.hpp"
@@ -54,8 +56,8 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "0.7.0-ffmpeg";
-constexpr const char *kTitleId = "PPSA99455";
+constexpr const char *kVersion = "sandboxed-hevc-test";
+constexpr const char *kTitleId = "PPSA99456";
 constexpr const char *kBookmarksUri = "bookmarks:";
 
 // ---- Videos browser --------------------------------------------------------
@@ -68,11 +70,8 @@ constexpr int list_w = 1776;
 constexpr int list_h = 680;
 constexpr int rows_in_view = list_h / row_h;
 
-constexpr const char *kUsb0 =
 #ifdef MOVIAN_HOST_PREVIEW
-    "usb0";
-#else
-    "/mnt/usb0";
+constexpr const char *kUsb0 = "usb0";
 #endif
 
 struct BrowseLevel
@@ -358,13 +357,19 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
     {
         snprintf(g_status, sizeof g_status, "playing %s", title && title[0] ? title : path);
         append_log(g_status);
-        screen::notify(from_start ? "Play from start" : (pk == player::Kind::ffmpeg ? "FFmpeg" : "MPEG-1"));
+        screen::notify(from_start ? "Play from start"
+                                  : (pk == player::Kind::ffmpeg ? avdec::mode() : "MPEG-1"));
         g_overlay = Overlay::none;
         g_auto_advanced = false;
         ensure_queue(path);
         return true;
     }
     if (pk == player::Kind::mpeg1)
+    {
+        snprintf(g_selected_note, sizeof g_selected_note, "%s", why);
+        screen::notify(why);
+    }
+    else if (pk == player::Kind::ffmpeg)
     {
         snprintf(g_selected_note, sizeof g_selected_note, "%s", why);
         screen::notify(why);
@@ -446,7 +451,8 @@ void setting_value(int row, char *dst, std::size_t cap) noexcept
         copy_text(dst, cap, d.debug_log ? "on" : "off");
         break;
     case 8:
-        copy_text(dst, cap, d.hw_decode ? "prefer (not in this binary)" : "software MPEG-1");
+        copy_text(dst, cap, hwdec_ready() ? (d.hw_decode ? "libSceVideodec2" : "software H.264")
+                                         : "software H.264 (chip not loaded)");
         break;
     case 9:
         copy_text(dst, cap, d.show_all ? "on" : "media only");
@@ -507,8 +513,9 @@ void setting_nudge(int row, int delta) noexcept
         break;
     case 8:
         d.hw_decode = !d.hw_decode;
+        hwdec_force_software(d.hw_decode ? 0 : 1);
         settings::save();
-        screen::notify("HW decode is stored for Phase 2b");
+        screen::notify(d.hw_decode ? "Prefer Videodec2" : "Software H.264");
         break;
     case 9:
         d.show_all = !d.show_all;
@@ -644,7 +651,7 @@ void add_file_row(const fs::Entry &e) noexcept
     if (pk == player::Kind::mpeg1)
         snprintf(r.detail, sizeof r.detail, "MPEG-1  %s  %s", bytes, when);
     else if (pk == player::Kind::ffmpeg)
-        snprintf(r.detail, sizeof r.detail, "H.264/AAC  %s  %s", bytes, when);
+        snprintf(r.detail, sizeof r.detail, "FFmpeg/HW  %s  %s", bytes, when);
     else if (pk == player::Kind::later)
         snprintf(r.detail, sizeof r.detail, "%s — needs FFmpeg  %s  %s", kind_label(e.kind), bytes,
                  when);
@@ -730,12 +737,23 @@ void load_videos_root() noexcept
         const char *title;
         const char *path;
         const char *hint;
+        bool hide_if_closed;
     } sources[] = {
-        {"Title data", MOVIAN_DOWNLOAD0, "settings, log, test clips"},
-        {"Movian library", MOVIAN_DATA_DIR, "FTP extra media if the sandbox can see /data"},
-        {"USB", kUsb0, "often hidden until a helper lifts the sandbox"},
+        {"Title data", MOVIAN_DOWNLOAD0, "settings, log, test clips", false},
+        {"Movian library", MOVIAN_DATA_DIR, "FTP extra media if the sandbox can see /data", false},
+#ifndef MOVIAN_HOST_PREVIEW
+        {"USB 0", "/mnt/usb0", "often hidden until a helper lifts the sandbox", false},
+        {"USB 1", "/mnt/usb1", "second stick", true},
+        {"USB 2", "/mnt/usb2", "third stick", true},
+        {"USB 3", "/mnt/usb3", "fourth stick", true},
+        {"External 0", "/mnt/ext0", "external HDD if mounted", true},
+        {"External 1", "/mnt/ext1", "second external volume", true},
+#else
+        {"USB", kUsb0, "host preview folder", false},
+#endif
     };
 
+    int usb_open = 0;
     for (const Source &s : sources)
     {
         fs::Entry entries[4];
@@ -743,6 +761,8 @@ void load_videos_root() noexcept
         int err = 0;
         const int opened = fs::list_dir(s.path, entries, 4, &n, &err, settings::get().show_all,
                                         settings::get().newest_first);
+        if (opened != 0 && s.hide_if_closed)
+            continue;
         char detail[96];
         if (opened != 0)
             snprintf(detail, sizeof detail, "%s — %s (errno %d)", s.hint, errno_hint(err), err);
@@ -751,6 +771,8 @@ void load_videos_root() noexcept
         else
             snprintf(detail, sizeof detail, "%s — %d listed", s.hint, n);
         add_folder_row(s.title, detail, s.path, true);
+        if (opened == 0 && std::strncmp(s.path, "/mnt/usb", 8) == 0)
+            ++usb_open;
     }
 
     char resume_detail[96];
@@ -765,10 +787,10 @@ void load_videos_root() noexcept
              settings::bookmark_count());
     add_folder_row("Bookmarks", bm_detail, kBookmarksUri, true);
 
-    add_message_row("MPEG-1 plays in this build",
-                    "Cross a .mpg to play. MP4/MKV/H.264 wait for FFmpeg.");
-    snprintf(g_status, sizeof g_status, "Videos roots: %s, %s, %s", MOVIAN_DOWNLOAD0, MOVIAN_DATA_DIR,
-             kUsb0);
+    add_message_row("MPEG-1, H.264, HEVC (chip) in this build",
+                    "Cross a file. HEVC needs Videodec2; software HEVC is refused.");
+    snprintf(g_status, sizeof g_status, "Videos  %s  USB open %d  %s", "sandboxed", usb_open,
+             hwdec_status());
 }
 
 void load_bookmarks() noexcept
@@ -1054,7 +1076,7 @@ void draw_card(screen::Canvas &c, int x, int y, int w, int h, const char *title,
 void draw_home(screen::Canvas &c) noexcept
 {
     c.text(48.f, 160.f, "Home", font::semibold, 40, Color::text);
-    c.text(48.f, 208.f, "Continue watching, folders, settings. MPEG-1 (.mpg) plays in software.",
+    c.text(48.f, 208.f, "Continue watching, folders, settings. MPEG-1 / H.264 / HEVC on the chip.",
            font::regular, 20, Color::muted);
 
     char resume_body[96];
@@ -1065,7 +1087,7 @@ void draw_home(screen::Canvas &c) noexcept
     const char *titles[4] = {"Continue watching", "Videos", "Bookmarks", "Settings"};
     const char *bodies[4] = {
         resume_body,
-        "/download0, /data/movian, USB — Cross opens the browser",
+        "/download0, /data/movian, USB — Triangle reloads after a helper",
         bm_body,
         "Resume, seek, volume, clock, debug log, plugin repo URL",
     };
@@ -1204,8 +1226,8 @@ void draw_status_strip(screen::Canvas &c) noexcept
 {
     const std::uint64_t ms = screen::now_ms() - g_started_ms;
     char line[160];
-    snprintf(line, sizeof line, "title %s   uptime %llu s   log %s   DualSense ready", kTitleId,
-             static_cast<unsigned long long>(ms / 1000), g_log_ok ? "download0" : "none");
+    snprintf(line, sizeof line, "title %s   uptime %llu s   %s   vdec %s", kTitleId,
+             static_cast<unsigned long long>(ms / 1000), "sandboxed", hwdec_status());
     c.text(48.f, 980.f, line, font::mono_medium, 16, Color::faint);
 }
 } // namespace
@@ -1214,16 +1236,17 @@ void load() noexcept
 {
     g_started_ms = screen::now_ms();
     mkdir(MOVIAN_DOWNLOAD0, 0777);
-    mkdir(MOVIAN_DATA_DIR, 0777);
     settings::load();
+    hwdec_force_software(settings::get().hw_decode ? 0 : 1);
     audio::set_volume(settings::get().volume);
     if (settings::get().debug_log)
         append_log("movian-ps5 playlist start");
-    snprintf(g_status, sizeof g_status, "PPSA99455 playlist %s", kVersion);
+    snprintf(g_status, sizeof g_status, "PPSA99456 %s  %s  %s", kVersion, "sandboxed",
+             hwdec_status());
     (void)audio::init();
     enter_videos();
     g_place = Place::home;
-    screen::notify("Movian PS5");
+    screen::notify("Press Cross to test 1080p hardware HEVC");
 }
 
 bool handle_overlay(unsigned pressed) noexcept
@@ -1282,6 +1305,15 @@ bool update() noexcept
 
     if (handle_overlay(pressed))
         return true;
+
+    if (g_place == Place::home && (pressed & pad::cross))
+    {
+        append_log("HEVC test requested after startup");
+        constexpr const char *fixture = MOVIAN_APP0 "/assets/hevc-test.mp4";
+        if (!play_path(fixture, "1080p HEVC test", true))
+            append_log(g_selected_note);
+        return true;
+    }
 
     if (pressed & pad::options)
     {

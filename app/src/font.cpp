@@ -86,7 +86,9 @@ bool load(const char *dir) noexcept
         char path[256];
         const size_t n = strlen(dir);
         if (n + strlen(files[f]) + 1 > sizeof path)
+        {
             return false;
+        }
         memcpy(path, dir, n);
         strcpy(path + n, files[f]);
         unsigned char *data = read_file(path);

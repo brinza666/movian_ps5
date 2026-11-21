@@ -3,7 +3,7 @@
  *
  * Build model follows VLC for PS5 (ZiZc3/VLC) and Hello PS5
  * (MiladRTX/ps5-homebrew-starter): a signed eboot.bin in
- * /data/homebrew/PPSA99455, not a Go ELF and not a port-9021 payload.
+ * /data/homebrew/PPSA99456, not a Go ELF and not a port-9021 payload.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -15,12 +15,29 @@
 #include "screen.hpp"
 #include "ui.hpp"
 
+#include <cstdio>
+
+namespace {
+void checkpoint(const char *message)
+{
+    std::fprintf(stderr, "[movian-hevc-test] %s\n", message);
+    std::fflush(stderr);
+    if (auto *file = std::fopen(MOVIAN_DOWNLOAD0 "/hevc-test-startup.log", "a")) {
+        std::fprintf(file, "%s\n", message);
+        std::fclose(file);
+    }
+}
+}
+
 int main()
 {
+    checkpoint("v3 entered main");
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
-        movian::screen::notify("Movian: fonts missing from /app0/assets/fonts");
+        movian::screen::notify("Movian: fonts missing from title folder");
+    checkpoint("v3 fonts attempted");
     (void)movian::pad::init();
-    (void)movian::audio::init();
+    checkpoint("v3 pad initialized");
     movian::ui::load();
+    checkpoint("v3 UI loaded; waiting for Cross");
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

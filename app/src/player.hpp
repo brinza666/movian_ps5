@@ -1,7 +1,7 @@
 /*
  * Movian for PS5 — software MPEG-1 player (pl_mpeg).
- * MPEG-1 always uses pl_mpeg. H.264/AAC play only when this binary was
- * linked with static FFmpeg (MOVIAN_HAVE_FFMPEG).
+ * MPEG-1 always uses pl_mpeg. H.264/AAC use static FFmpeg when linked.
+ * HEVC is hardware-only (libSceVideodec2); software HEVC is refused.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -16,7 +16,7 @@ enum class Kind
 {
     none,
     mpeg1,
-    ffmpeg, // H.264/AAC when static FFmpeg is linked
+    ffmpeg, // H.264 software, or H.264/HEVC on libSceVideodec2
     later,  // recognised video, no decoder in this binary
 };
 

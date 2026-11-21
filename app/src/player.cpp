@@ -17,6 +17,8 @@
 #include "paths.hpp"
 #include "settings.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -40,7 +42,7 @@ plm_t *g_plm = nullptr;
 bool g_use_ffmpeg = false;
 movian::image::Image g_picture{};
 std::uint64_t g_last_ms = 0;
-bool g_paused = false;
+std::atomic<bool> g_paused{false};
 bool g_ended = false;
 bool g_osd = false;
 int g_osd_row = 0;
@@ -88,10 +90,11 @@ void free_picture() noexcept
 
 void on_video(plm_t *, plm_frame_t *frame, void *) noexcept
 {
-    if (!frame || !g_picture.pixels)
+    if (!frame || !g_picture.pixels || g_picture.w <= 0 || g_picture.h <= 0)
         return;
     // RGBA bytes = 0xAABBGGRR uint32 on little-endian, matching Canvas.
-    plm_frame_to_rgba(frame, reinterpret_cast<uint8_t *>(g_picture.pixels), g_picture.w * 4);
+    plm_frame_to_rgba(frame, reinterpret_cast<uint8_t *>(g_picture.pixels),
+                      static_cast<int>(g_picture.w) * 4);
 }
 
 void resample_push(const float *src, int src_frames, int src_rate) noexcept
@@ -103,24 +106,28 @@ void resample_push(const float *src, int src_frames, int src_rate) noexcept
         audio::push(src, src_frames);
         return;
     }
-    // Linear resample into 48 kHz stereo. Bound the burst so a huge ratio
-    // cannot stall the UI thread.
-    const double step = static_cast<double>(src_rate) / static_cast<double>(audio::rate);
-    const int out_frames = static_cast<int>(src_frames / step);
+    // Keep scratch space small enough for the FFmpeg decode thread.
+    const double step = static_cast<double>(src_rate) / audio::rate;
     constexpr int max_out = 8192;
-    float buf[max_out * 2];
-    const int n = out_frames > max_out ? max_out : out_frames;
+    constexpr int batch_frames = 256;
+    const int count = static_cast<int>(std::min(src_frames / step, static_cast<double>(max_out)));
+    float batch[batch_frames * 2];
     double pos = 0;
-    for (int i = 0; i < n; ++i)
+    for (int written = 0; written < count;)
     {
-        const int i0 = static_cast<int>(pos);
-        const int i1 = i0 + 1 < src_frames ? i0 + 1 : src_frames - 1;
-        const float t = static_cast<float>(pos - i0);
-        buf[2 * i] = src[2 * i0] + (src[2 * i1] - src[2 * i0]) * t;
-        buf[2 * i + 1] = src[2 * i0 + 1] + (src[2 * i1] - src[2 * i0 + 1]) * t;
-        pos += step;
+        const int size = std::min(count - written, batch_frames);
+        for (int i = 0; i < size; ++i)
+        {
+            const int i0 = std::min(static_cast<int>(pos), src_frames - 1);
+            const int i1 = std::min(i0 + 1, src_frames - 1);
+            const float t = static_cast<float>(pos - i0);
+            batch[2 * i] = src[2 * i0] + (src[2 * i1] - src[2 * i0]) * t;
+            batch[2 * i + 1] = src[2 * i0 + 1] + (src[2 * i1 + 1] - src[2 * i0 + 1]) * t;
+            pos += step;
+        }
+        audio::push(batch, size);
+        written += size;
     }
-    audio::push(buf, n);
 }
 
 void on_audio(plm_t *, plm_samples_t *samples, void *) noexcept
@@ -158,7 +165,6 @@ void on_ffmpeg_pcm(const float *interleaved, int frames, int rate) noexcept
 {
     if (g_paused)
         return;
-    g_src_rate = rate;
     resample_push(interleaved, frames, rate);
 }
 
@@ -331,7 +337,10 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
         g_last_ms = screen::now_ms();
         g_saved_ms = g_last_ms;
         g_error[0] = 0;
-        (void)audio::init();
+        if (!audio::init())
+        {
+            fprintf(stderr, "[movian] player: audio init failed\n");
+        }
         audio::set_volume(settings::get().volume);
         audio::clear();
         double resume_at = 0;
@@ -386,7 +395,10 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
     g_last_ms = screen::now_ms();
     g_saved_ms = g_last_ms;
     g_error[0] = 0;
-    (void)audio::init();
+    if (!audio::init())
+    {
+        fprintf(stderr, "[movian] player: audio init failed\n");
+    }
     audio::set_volume(settings::get().volume);
     audio::clear();
 
@@ -619,6 +631,16 @@ bool tick() noexcept
 void draw(screen::Canvas &c) noexcept
 {
     c.clear(Color::bg);
+    if (g_use_ffmpeg)
+    {
+        g_picture.pixels = const_cast<std::uint32_t *>(avdec::rgba());
+        g_picture.w = avdec::width();
+        g_picture.h = avdec::height();
+        if (g_picture.w > 0)
+            g_src_w = g_picture.w;
+        if (g_picture.h > 0)
+            g_src_h = g_picture.h;
+    }
     if (g_picture.loaded())
     {
         // Fit inside 1920x900, keep aspect.
@@ -637,8 +659,10 @@ void draw(screen::Canvas &c) noexcept
     c.rect(0, 0, screen::width, 64, Color::surface, 180);
     c.text(48.f, 44.f, g_title[0] ? g_title : "MPEG-1", font::semibold, 24, Color::text);
     char badge[48];
-    std::snprintf(badge, sizeof badge, "%s  %dx%d", g_use_ffmpeg ? "SW FFmpeg" : "SW MPEG-1", g_src_w,
-                  g_src_h);
+    std::snprintf(badge, sizeof badge, "%s %s  %dx%d",
+                  g_use_ffmpeg ? avdec::mode() : "SW",
+                  g_use_ffmpeg ? (avdec::codec_name()[0] ? avdec::codec_name() : "FFmpeg") : "MPEG-1",
+                  g_src_w, g_src_h);
     c.text(1480.f, 44.f, badge, font::mono_medium, 16, Color::accent);
 
     const double t = time();

@@ -65,10 +65,17 @@ PS5_PAYLOAD_SDK=$sdk sh "$kit/tooling/prospero-clang18" -O2 -Wall -Wextra -fPIC 
 "$sdk/bin/prospero-lld" --shared -soname libSceCommonDialog.sprx \
     -o "$kit/movian/stubs/libSceCommonDialog.so" "$kit/movian/stubs/common_dialog.o"
 
+cp "$sdk/target/lib/libSceSysmodule.so" "$kit/movian/stubs/libSceSysmodule.so"
+
+PS5_PAYLOAD_SDK=$sdk sh "$kit/tooling/prospero-clang18" -O2 -Wall -Wextra -fPIC \
+    -c "$here/stubs/videodec2_link_stub.c" -o "$kit/movian/stubs/videodec2_link_stub.o"
+"$sdk/bin/prospero-lld" --shared -soname libSceVideodec2.prx \
+    -o "$kit/movian/stubs/libSceVideodec2.so" "$kit/movian/stubs/videodec2_link_stub.o"
+
 ffmpeg_prefix=$repo/.deps/ffmpeg-ps5
 vars=(APP_SOURCE_DIR=movian/src APP_PARAM=movian/sce_sys/param.json
       APP_SCE_SYS=movian/sce_sys APP_ASSETS=movian/assets
-      APP_IMPORT_STUBS=movian/stubs/libSceCommonDialog.so)
+      APP_IMPORT_STUBS="movian/stubs/libSceCommonDialog.so movian/stubs/libSceSysmodule.so movian/stubs/libSceVideodec2.so")
 if [[ -f $ffmpeg_prefix/lib/libavcodec.a && -f $ffmpeg_prefix/lib/libavformat.a && -f $ffmpeg_prefix/lib/libavutil.a ]]; then
     echo "Linking static FFmpeg from $ffmpeg_prefix"
     rm -rf "$kit/ffmpeg-ps5"
