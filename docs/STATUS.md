@@ -1,5 +1,10 @@
 # Status
 
+The isolated `PPSA99456` playback test has a local v15 candidate. v14 verified
+repeated H.264 hardware starts and E-AC-3 stereo conversion on the console.
+The complete MKV audio and EOF checks are in progress. Production status
+for `PPSA99455` is below.
+
 Last updated: 2026-11-11 (`v0.7.0` static FFmpeg linked, `eboot.bin` 3381807 bytes).
 
 Legend: **done** = observed on PS5 or in a shared-source host preview;

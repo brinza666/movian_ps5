@@ -31,13 +31,13 @@ void checkpoint(const char *message)
 
 int main()
 {
-    checkpoint("v3 entered main");
+    checkpoint("v15 entered main");
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
         movian::screen::notify("Movian: fonts missing from title folder");
-    checkpoint("v3 fonts attempted");
+    checkpoint("v15 fonts attempted");
     (void)movian::pad::init();
-    checkpoint("v3 pad initialized");
+    checkpoint("v15 pad initialized");
     movian::ui::load();
-    checkpoint("v3 UI loaded; waiting for Cross");
+    checkpoint("v15 UI loaded; waiting for Cross");
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

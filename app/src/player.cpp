@@ -177,14 +177,14 @@ void seek_by(double delta) noexcept
         t = 0;
     if (g_duration > 0 && t > g_duration)
         t = g_duration;
-    audio::clear();
     if (g_use_ffmpeg)
     {
         avdec::seek(t);
-        g_ended = avdec::ended();
+        g_ended = false;
     }
     else
     {
+        audio::clear();
         plm_seek(g_plm, t, FALSE);
         g_ended = plm_has_ended(g_plm) != 0;
     }
@@ -292,7 +292,7 @@ Kind classify(const char *path) noexcept
         return Kind::none;
     if (ends_with_ci(path, ".mpg") || ends_with_ci(path, ".mpeg") || ends_with_ci(path, ".mpv") ||
         ends_with_ci(path, ".m1v"))
-        return Kind::mpeg1;
+        return avdec::available() ? Kind::ffmpeg : Kind::mpeg1;
     if (ends_with_ci(path, ".mp4") || ends_with_ci(path, ".m4v") || ends_with_ci(path, ".mov") ||
         ends_with_ci(path, ".mkv") || ends_with_ci(path, ".ts") || ends_with_ci(path, ".m2ts") ||
         ends_with_ci(path, ".avi") || ends_with_ci(path, ".webm") || ends_with_ci(path, ".m2v"))
@@ -319,15 +319,15 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
 
     if (kind == Kind::ffmpeg)
     {
+        if (!audio::init())
+            fprintf(stderr, "[movian] player: audio init failed\n");
+        audio::set_volume(settings::get().volume);
         if (!avdec::open(path, why, why_cap, on_ffmpeg_pcm))
             return false;
         g_use_ffmpeg = true;
         g_src_w = avdec::width();
         g_src_h = avdec::height();
         g_duration = avdec::duration();
-        g_picture.w = g_src_w;
-        g_picture.h = g_src_h;
-        g_picture.pixels = const_cast<std::uint32_t *>(avdec::rgba());
         copy_text(g_path, static_cast<int>(sizeof g_path), path);
         copy_text(g_title, static_cast<int>(sizeof g_title), basename_of(path));
         g_paused = false;
@@ -337,12 +337,6 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
         g_last_ms = screen::now_ms();
         g_saved_ms = g_last_ms;
         g_error[0] = 0;
-        if (!audio::init())
-        {
-            fprintf(stderr, "[movian] player: audio init failed\n");
-        }
-        audio::set_volume(settings::get().volume);
-        audio::clear();
         double resume_at = 0;
         if (!from_start && settings::get().resume && settings::resume_for(path, &resume_at, nullptr) &&
             resume_at > 1.0)
@@ -417,7 +411,7 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
 
 void close() noexcept
 {
-    if (g_plm || g_use_ffmpeg)
+    if ((g_plm || g_use_ffmpeg) && !g_ended)
         persist_resume();
     if (g_plm)
     {
@@ -600,22 +594,21 @@ bool tick() noexcept
         if (g_use_ffmpeg)
         {
             avdec::tick(dt);
-            if (avdec::ended())
+            if (avdec::ended() && audio::drained())
             {
                 g_ended = true;
                 g_paused = true;
-                audio::clear();
+                audio::log_drain();
                 settings::clear_resume();
             }
         }
         else
         {
             plm_decode(g_plm, dt);
-            if (plm_has_ended(g_plm))
+            if (plm_has_ended(g_plm) && audio::drained())
             {
                 g_ended = true;
                 g_paused = true;
-                audio::clear();
                 settings::clear_resume();
             }
         }
@@ -628,33 +621,34 @@ bool tick() noexcept
     return true;
 }
 
-void draw(screen::Canvas &c) noexcept
+static void draw_picture(screen::Canvas &c, const image::Image &picture) noexcept
 {
-    c.clear(Color::bg);
-    if (g_use_ffmpeg)
-    {
-        g_picture.pixels = const_cast<std::uint32_t *>(avdec::rgba());
-        g_picture.w = avdec::width();
-        g_picture.h = avdec::height();
-        if (g_picture.w > 0)
-            g_src_w = g_picture.w;
-        if (g_picture.h > 0)
-            g_src_h = g_picture.h;
-    }
-    if (g_picture.loaded())
+    if (picture.loaded())
     {
         // Fit inside 1920x900, keep aspect.
         const float max_w = 1920.f;
         const float max_h = 900.f;
-        float w = static_cast<float>(g_picture.w);
-        float h = static_cast<float>(g_picture.h);
+        float w = static_cast<float>(picture.w);
+        float h = static_cast<float>(picture.h);
         const float s = w / max_w > h / max_h ? max_w / w : max_h / h;
         w *= s;
         h *= s;
         const int x = static_cast<int>((1920.f - w) * 0.5f);
         const int y = static_cast<int>((900.f - h) * 0.5f) + 40;
-        c.image(x, y, static_cast<int>(w), static_cast<int>(h), g_picture);
+        c.image(x, y, static_cast<int>(w), static_cast<int>(h), picture);
     }
+}
+
+void draw(screen::Canvas &c) noexcept
+{
+    c.clear(Color::bg);
+    if (g_use_ffmpeg)
+        avdec::with_picture([](void *context, const std::uint32_t *pixels, int width, int height) {
+            const image::Image picture{width, height, const_cast<std::uint32_t *>(pixels)};
+            draw_picture(*static_cast<screen::Canvas *>(context), picture);
+        }, &c);
+    else
+        draw_picture(c, g_picture);
 
     c.rect(0, 0, screen::width, 64, Color::surface, 180);
     c.text(48.f, 44.f, g_title[0] ? g_title : "MPEG-1", font::semibold, 24, Color::text);

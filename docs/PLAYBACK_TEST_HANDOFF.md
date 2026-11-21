@@ -1,12 +1,20 @@
 # Movian PS5 playback test handoff
 
-Updated 2026-11-21. Release tag `playback-test-v12` and branch
+Updated 2026-11-21. Release tag `playback-test-v15` and branch
 `test/native-playback` track the isolated native test title `PPSA99456`.
 The production folder title is `PPSA99455`. Keep the test and production
 title IDs separate. Make source changes in this branch when reproducing a
 test result.
 
 ## Verified and open
+
+v15 keeps the single picture allocation across file opens, synchronizes its
+use by the renderer, and drains the AudioOut queue before auto-advance. It
+captures FFmpeg diagnostics in `/download0/hevc-test-ffmpeg.log` and selects
+the MPEG demuxer for a Program Stream pack header in an `.mpg` or `.mpeg`.
+v14 successfully switched among hardware H.264 files and returned from
+failed MPEG opens. v15's MPEG replay and the full E-AC-3 feature playback
+are awaiting console observations.
 
 | Case | Evidence | Status |
 | --- | --- | --- |
@@ -24,7 +32,7 @@ passthrough and multichannel AudioOut are outside this stereo build.
 
 ## Where to resume
 
-1. Start v12 (or its successor) on the PS5. Cross on Home starts the built-in
+1. Start v15 on the PS5. Cross on Home starts the built-in
    HEVC fixture. To test H.264 plus E-AC-3, go to Videos and open a known
    local MKV with both streams. Confirm that picture and tone/dialogue
    continue past 15 seconds. Seek once, then test a short fixture through EOF.

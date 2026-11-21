@@ -1,6 +1,6 @@
 # Movian for PlayStation 5
 
-> **Native playback test branch** — builds the isolated PS5 title PPSA99456. See the [playback test handoff](docs/PLAYBACK_TEST_HANDOFF.md) for tested codecs, build instructions and open failures.
+> **Native playback test branch** — builds the isolated PS5 title PPSA99456. The [v15 prerelease](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v15) is the current test build. See the [playback test handoff](docs/PLAYBACK_TEST_HANDOFF.md) for build instructions and console evidence.
 
 <p align="center">
   <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
@@ -30,16 +30,17 @@ sent to port 9021.
 > loader experiment. They are kept under [`archive/`](archive/README.md) as
 > reference only. The live application is [`app/`](app/).
 
-## What works today (Phase 2 MPEG-1)
+## Native playback test
 
 | Capability | Status |
 | --- | --- |
-| ShadowMountPlus title `PPSA99455` (Media category) | In tree — build with `app/build.sh` |
+| ShadowMountPlus title `PPSA99456` (Media category) | In tree. Build with `app/build.sh`. |
 | DualSense navigation, 1080p CPU UI | Implemented |
 | Videos file browser (`/download0`, `/data/movian`, USB) | Implemented |
-| MPEG-1 software playback (`.mpg`) | Implemented (pl_mpeg, CPU blit, stereo, resume) |
+| MPEG Program Stream (`.mpg`) | FFmpeg software decode. v15 console retest pending. |
 | Settings / bookmarks / continue watching | Implemented (`/download0/*.txt`) |
-| H.264 / AAC / MP4 / MKV | **Linked in v0.7.0** (static FFmpeg 6.1.2) — TV unproven |
+| H.264 / HEVC hardware video | Videodec2 output on PS5 in MKV and MP4 test runs. |
+| E-AC-3 audio | 5.1 decoded to 48 kHz stereo PCM on PS5. Audible playback through the MKV's EOF is pending. |
 | Four Movian places: Home, Videos, BitTorrent, Plugins | Videos + MPEG-1 + Options; others shell |
 | BitTorrent client | **Not in this binary** (Phase 3) |
 | Plugin host (Movian API v2) | **Not in this binary** (Phase 4) |

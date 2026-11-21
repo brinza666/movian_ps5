@@ -352,6 +352,12 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
         return false;
     char why[128];
     const player::Kind pk = player::classify(path);
+    if (pk == player::Kind::mpeg1 || pk == player::Kind::ffmpeg)
+    {
+        char event[fs::max_path + 64];
+        snprintf(event, sizeof event, "v15 open video %s", path);
+        append_log(event);
+    }
     if ((pk == player::Kind::mpeg1 || pk == player::Kind::ffmpeg) &&
         player::open(path, why, sizeof why, from_start))
     {

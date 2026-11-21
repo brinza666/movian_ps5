@@ -13,11 +13,13 @@
 #include "hwdec.h"
 
 #include <atomic>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <pthread.h>
+#include <strings.h>
 #include <unistd.h>
 
 #ifdef MOVIAN_HAVE_FFMPEG
@@ -28,12 +30,13 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/frame.h>
+#include <libavutil/log.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 int sceKernelMapFlexibleMemory(void **address, std::size_t length, int protection, int flags);
-int sceKernelReleaseFlexibleMemory(void *address, std::size_t length);
+int sceKernelMunmap(void *address, std::size_t length);
 }
 #endif
 
@@ -57,6 +60,7 @@ std::size_t g_picture_mapping_size = 0;
 hwdec_t *g_hw = nullptr;
 AVBSFContext *g_video_bsf = nullptr;
 int g_hw_demux_result = 0;
+bool g_sw_demux_eof = false;
 int g_w = 0;
 int g_h = 0;
 int g_vindex = -1;
@@ -66,6 +70,7 @@ AVChannelLayout g_pcm_input_layout{};
 int g_pcm_input_rate = 0;
 AVSampleFormat g_pcm_input_format = AV_SAMPLE_FMT_NONE;
 bool g_pcm_reported = false;
+unsigned long long g_pcm_frames = 0;
 bool g_ended = false;
 unsigned g_hw_presented = 0;
 double g_clock = 0;
@@ -82,9 +87,41 @@ void record_decode(const char *event, int value_a, int value_b, unsigned frames)
 {
     if (auto *log = std::fopen("/download0/hevc-test-decode.log", "a"))
     {
-        std::fprintf(log, "v12 %s codec=%s a=%d b=%d frames=%u\n", event, g_codec, value_a, value_b, frames);
+        std::fprintf(log, "v15 %s codec=%s a=%d b=%d frames=%u\n", event, g_codec, value_a, value_b, frames);
         std::fclose(log);
     }
+}
+
+void log_ffmpeg(void *, int level, const char *format, std::va_list arguments) noexcept
+{
+    if (level > AV_LOG_WARNING)
+        return;
+    char message[512];
+    std::vsnprintf(message, sizeof message, format, arguments);
+    if (auto *log = std::fopen("/download0/hevc-test-ffmpeg.log", "a"))
+    {
+        std::fputs(message, log);
+        std::fclose(log);
+    }
+}
+
+const AVInputFormat *mpeg_program_stream(const char *path) noexcept
+{
+    const char *ext = std::strrchr(path, '.');
+    if (!ext || (strcasecmp(ext, ".mpg") != 0 && strcasecmp(ext, ".mpeg") != 0))
+        return nullptr;
+
+    // Only override autodetection when the file starts with an MPEG pack.
+    auto *file = std::fopen(path, "rb");
+    if (!file)
+        return nullptr;
+    unsigned char header[4]{};
+    const auto size = std::fread(header, 1, sizeof header, file);
+    std::fclose(file);
+    return size == sizeof header && header[0] == 0 && header[1] == 0 &&
+                   header[2] == 1 && header[3] == 0xba
+               ? av_find_input_format("mpeg")
+               : nullptr;
 }
 
 void present() noexcept
@@ -276,6 +313,7 @@ void convert_pcm(const AVFrame *frame) noexcept
         g_pcm_reported = true;
     }
     g_pcm(g_pcm_buf, written, audio::rate);
+    g_pcm_frames += written;
 }
 
 void emit_audio() noexcept
@@ -298,6 +336,13 @@ void finish_audio() noexcept
         emit_audio();
     if (g_resampler)
         convert_pcm(nullptr);
+    if (auto *log = std::fopen("/download0/hevc-test-decode.log", "a"))
+    {
+        std::fprintf(log, "v15 %s PCM EOF codec=%s frames=%llu\n",
+                     g_acodec->codec_id == AV_CODEC_ID_EAC3 ? "E-AC-3" : "audio",
+                     g_codec, g_pcm_frames);
+        std::fclose(log);
+    }
 }
 
 int open_codec(AVCodecContext **ctx, int index) noexcept
@@ -392,33 +437,10 @@ int hw_pull() noexcept
 
 int sw_pull() noexcept
 {
-    if (!g_fmt || !g_pkt)
-        return -1;
-    if (g_ended)
-        return -1;
-    const int rr = av_read_frame(g_fmt, g_pkt);
-    if (rr < 0)
+    for (int packets = 0; packets < 64; ++packets)
     {
-        if (rr == AVERROR_EOF)
-            finish_audio();
-        g_ended = true;
-        return -1;
-    }
-    if (g_pkt->stream_index == g_aindex && g_acodec)
-    {
-        if (avcodec_send_packet(g_acodec, g_pkt) == 0)
-            emit_audio();
-        av_packet_unref(g_pkt);
-        return 0;
-    }
-    if (g_pkt->stream_index != g_vindex)
-    {
-        av_packet_unref(g_pkt);
-        return 0;
-    }
-    if (g_vcodec && avcodec_send_packet(g_vcodec, g_pkt) == 0)
-    {
-        while (avcodec_receive_frame(g_vcodec, g_vframe) == 0)
+        const int received = avcodec_receive_frame(g_vcodec, g_vframe);
+        if (received == 0)
         {
             int64_t p = g_vframe->best_effort_timestamp;
             if (p == AV_NOPTS_VALUE)
@@ -430,12 +452,40 @@ int sw_pull() noexcept
             if (g_vframe->format == AV_PIX_FMT_YUV420P || g_vframe->format == AV_PIX_FMT_YUVJ420P)
                 yuv420_to_rgba(g_vframe);
             av_frame_unref(g_vframe);
-            av_packet_unref(g_pkt);
             present();
             return 1;
         }
+        if (received != AVERROR(EAGAIN) || g_sw_demux_eof)
+        {
+            g_ended = true;
+            record_decode("software drain", received, 0, 0);
+            return -1;
+        }
+
+        const int rr = av_read_frame(g_fmt, g_pkt);
+        if (rr == AVERROR(EAGAIN))
+            return 0;
+        if (rr == AVERROR_EOF)
+        {
+            finish_audio();
+            g_sw_demux_eof = true;
+            avcodec_send_packet(g_vcodec, nullptr);
+            continue;
+        }
+        if (rr < 0)
+        {
+            g_ended = true;
+            record_decode("software read failed", rr, 0, 0);
+            return -1;
+        }
+
+        if (g_pkt->stream_index == g_vindex)
+            avcodec_send_packet(g_vcodec, g_pkt);
+        else if (g_pkt->stream_index == g_aindex && g_acodec &&
+                 avcodec_send_packet(g_acodec, g_pkt) == 0)
+            emit_audio();
+        av_packet_unref(g_pkt);
     }
-    av_packet_unref(g_pkt);
     return 0;
 }
 
@@ -459,20 +509,35 @@ bool alloc_picture(int w, int h, char *why, int why_cap) noexcept
     const std::size_t image_size = static_cast<std::size_t>(w) * h * sizeof(std::uint32_t);
     const std::size_t image_span = (image_size + page_mask) & ~page_mask;
     const std::size_t mapping_size = image_span * 2;
-    void *mapping = nullptr;
-    const int result = sceKernelMapFlexibleMemory(&mapping, mapping_size, 0x03, 0);
-    if (result != 0 || !mapping)
+    // The title has one active player. Reuse its flexible memory across opens.
+    if (mapping_size > g_picture_mapping_size)
     {
-        record_decode("picture mapping failed", result, static_cast<int>(mapping_size), 0);
-        copy_text(why, why_cap, "video buffer mapping failed");
-        return false;
+        constexpr std::size_t hd_capacity = 16 * 1024 * 1024;
+        constexpr std::size_t uhd_capacity = 64 * 1024 * 1024;
+        const std::size_t capacity = mapping_size <= hd_capacity ? hd_capacity : uhd_capacity;
+        void *mapping = nullptr;
+        const int result = sceKernelMapFlexibleMemory(&mapping, capacity, 0x03, 0);
+        if (result != 0 || !mapping)
+        {
+            record_decode("picture mapping failed", result, static_cast<int>(capacity), 0);
+            copy_text(why, why_cap, "video buffer mapping failed");
+            return false;
+        }
+        if (g_picture_mapping)
+        {
+            const int unmapped = sceKernelMunmap(g_picture_mapping, g_picture_mapping_size);
+            record_decode("old picture mapping unmap", unmapped,
+                          static_cast<int>(g_picture_mapping_size), 0);
+        }
+        g_picture_mapping = mapping;
+        g_picture_mapping_size = capacity;
+        record_decode("picture mapping allocated", 0, static_cast<int>(capacity), 0);
     }
-    g_picture_mapping = mapping;
-    g_picture_mapping_size = mapping_size;
     g_w = w;
     g_h = h;
-    g_front = static_cast<std::uint32_t *>(mapping);
-    g_back = reinterpret_cast<std::uint32_t *>(static_cast<std::uint8_t *>(mapping) + image_span);
+    g_front = static_cast<std::uint32_t *>(g_picture_mapping);
+    g_back = reinterpret_cast<std::uint32_t *>(
+        static_cast<std::uint8_t *>(g_picture_mapping) + image_span);
     std::memset(g_front, 0, image_size);
     std::memset(g_back, 0, image_size);
     return true;
@@ -560,12 +625,14 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
     close();
+    // Avoid FFmpeg's terminal probing in a title without a terminal.
+    av_log_set_callback(log_ffmpeg);
     if (!path || !path[0])
     {
         copy_text(why, why_cap, "empty path");
         return false;
     }
-    if (avformat_open_input(&g_fmt, path, nullptr, nullptr) < 0)
+    if (avformat_open_input(&g_fmt, path, mpeg_program_stream(path), nullptr) < 0)
     {
         copy_text(why, why_cap, "FFmpeg could not open the file");
         close();
@@ -686,6 +753,9 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
 void close() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
+    const bool had_media = g_fmt != nullptr;
+    if (had_media)
+        record_decode("close begin", 0, 0, 0);
     stop_thread();
     pthread_mutex_lock(&g_lock);
     if (g_hw)
@@ -705,23 +775,23 @@ void close() noexcept
         avcodec_free_context(&g_vcodec);
     if (g_fmt)
         avformat_close_input(&g_fmt);
-    if (g_picture_mapping)
-        sceKernelReleaseFlexibleMemory(g_picture_mapping, g_picture_mapping_size);
-    g_picture_mapping = nullptr;
-    g_picture_mapping_size = 0;
     reset_resampler();
     g_pcm_reported = false;
+    g_pcm_frames = 0;
     std::free(g_pcm_buf);
     av_bsf_free(&g_video_bsf);
     g_front = g_back = nullptr;
     g_pcm_buf = nullptr;
     g_pcm_cap = 0;
     g_hw_demux_result = 0;
+    g_sw_demux_eof = false;
     g_w = g_h = 0;
     g_vindex = g_aindex = -1;
     g_ended = false;
     g_clock = g_pts = g_duration = 0;
     g_pcm = nullptr;
+    if (had_media)
+        record_decode("close complete", 0, 0, 0);
     g_codec[0] = 0;
     copy_text(g_mode, static_cast<int>(sizeof g_mode), "SW");
     pthread_mutex_unlock(&g_lock);
@@ -740,7 +810,10 @@ bool active() noexcept
 bool ended() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    return g_fmt && g_ended;
+    pthread_mutex_lock(&g_lock);
+    const bool result = g_fmt && g_ended;
+    pthread_mutex_unlock(&g_lock);
+    return result;
 #else
     return false;
 #endif
@@ -749,12 +822,6 @@ bool ended() noexcept
 int width() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    if (g_hw)
-    {
-        const int w = hwdec_shown_width(g_hw);
-        if (w > 0)
-            return w;
-    }
     return g_w;
 #else
     return 0;
@@ -764,12 +831,6 @@ int width() noexcept
 int height() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    if (g_hw)
-    {
-        const int h = hwdec_shown_height(g_hw);
-        if (h > 0)
-            return h;
-    }
     return g_h;
 #else
     return 0;
@@ -779,7 +840,10 @@ int height() noexcept
 double time() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    return g_pts;
+    pthread_mutex_lock(&g_lock);
+    const double result = g_pts;
+    pthread_mutex_unlock(&g_lock);
+    return result;
 #else
     return 0;
 #endif
@@ -794,12 +858,16 @@ double duration() noexcept
 #endif
 }
 
-const std::uint32_t *rgba() noexcept
+void with_picture(PictureFn draw, void *context) noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    return g_front;
+    pthread_mutex_lock(&g_lock);
+    if (g_front)
+        draw(context, g_front, g_w, g_h);
+    pthread_mutex_unlock(&g_lock);
 #else
-    return nullptr;
+    (void)draw;
+    (void)context;
 #endif
 }
 
@@ -851,6 +919,8 @@ void seek(double seconds) noexcept
     const int64_t ts = static_cast<int64_t>(seconds * static_cast<double>(AV_TIME_BASE));
     if (av_seek_frame(g_fmt, -1, ts, AVSEEK_FLAG_BACKWARD) >= 0)
     {
+        audio::clear();
+        g_pcm_frames = 0;
         if (g_vcodec)
             avcodec_flush_buffers(g_vcodec);
         if (g_acodec)
@@ -861,6 +931,7 @@ void seek(double seconds) noexcept
         if (g_hw)
             hwdec_reset(g_hw);
         g_hw_demux_result = 0;
+        g_sw_demux_eof = false;
         g_ended = false;
         g_clock = seconds;
         g_pts = seconds;

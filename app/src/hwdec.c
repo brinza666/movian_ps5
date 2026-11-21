@@ -130,7 +130,6 @@ typedef int (*k_release_fn)(int64_t, size_t);
 typedef int (*k_munmap_fn)(void *, size_t);
 typedef int (*k_flex_fn)(void **, size_t, int, int, const char *);
 typedef int (*k_flex_plain_fn)(void **, size_t, int, int);
-typedef int (*k_unflex_fn)(void *, size_t);
 extern int sceSysmoduleLoadModule(uint32_t module_id);
 
 static vdec_query_compute_fn p_query_compute;
@@ -151,7 +150,6 @@ static k_release_fn p_release_dm;
 static k_munmap_fn p_munmap;
 static k_flex_fn p_flex;
 static k_flex_plain_fn p_flex_plain;
-static k_unflex_fn p_unflex;
 
 static int g_probed;
 static int g_ready;
@@ -256,7 +254,6 @@ extern int sceKernelReleaseDirectMemory(int64_t, size_t);
 extern int sceKernelMunmap(void *, size_t);
 extern int sceKernelMapNamedFlexibleMemory(void **, size_t, int, int, const char *);
 extern int sceKernelMapFlexibleMemory(void **, size_t, int, int);
-extern int sceKernelReleaseFlexibleMemory(void *, size_t);
 
 static void
 bind_decoder_imports(void)
@@ -278,7 +275,6 @@ bind_decoder_imports(void)
     p_munmap = sceKernelMunmap;
     p_flex = sceKernelMapNamedFlexibleMemory;
     p_flex_plain = sceKernelMapFlexibleMemory;
-    p_unflex = sceKernelReleaseFlexibleMemory;
 }
 
 static void
@@ -297,6 +293,14 @@ record_decoder_result(const char *stage, const SceVideodec2DecoderConfigInfo *cf
     char detail[96];
     snprintf(detail, sizeof detail, "profile=%u level=%u depth=%u rc=%#x",
              cfg->profile, cfg->max_level, cfg->pipeline_depth, (unsigned)rc);
+    record_probe(stage, detail);
+}
+
+static void
+record_memory_result(const char *stage, size_t bytes, int rc)
+{
+    char detail[96];
+    snprintf(detail, sizeof detail, "bytes=%zu rc=%#x", bytes, (unsigned)rc);
     record_probe(stage, detail);
 }
 
@@ -376,7 +380,7 @@ hwdec_probe(void)
     if (g_probed)
         return g_ready ? 0 : -1;
     g_probed = 1;
-    record_probe("Video test v12", "probe started");
+    record_probe("Video test v14", "probe started");
     if (!load_videodec_module())
         return -1;
     const int queue_status = make_compute_queue();
@@ -430,10 +434,13 @@ alloc_dm(size_t size, int prot, int64_t *pa, void **va)
 		return 0;
 	size = align16k(size);
 	rc = p_alloc_dm(0, p_dm_size(), size, 0x4000, 12, pa);
-	if (rc)
+	if (rc) {
+		record_memory_result("direct allocate failed", size, rc);
 		return rc;
+	}
 	rc = p_map_dm(va, size, prot, 0, *pa, 0x4000);
 	if (rc || !*va) {
+		record_memory_result("direct map failed", size, rc);
 		p_release_dm(*pa, size);
 		*pa = -1;
 		*va = NULL;
@@ -448,10 +455,16 @@ free_dm(void *va, int64_t pa, size_t size)
 	if (!size)
 		return;
 	size = align16k(size);
-	if (va && p_munmap)
-		p_munmap(va, size);
-	if (pa >= 0 && p_release_dm)
-		p_release_dm(pa, size);
+	if (va && p_munmap) {
+		const int rc = p_munmap(va, size);
+		if (rc)
+			record_memory_result("direct unmap failed", size, rc);
+	}
+	if (pa >= 0 && p_release_dm) {
+		const int rc = p_release_dm(pa, size);
+		if (rc)
+			record_memory_result("direct release failed", size, rc);
+	}
 }
 
 static int
@@ -475,6 +488,9 @@ cpu_block_take(hwdec_t *h, size_t size, void **addr)
 			void *grown = NULL;
 			size_t want = size > ((size_t)96 << 20) ? size : ((size_t)96 << 20);
 			if (map_flex(&grown, want) == 0) {
+				if (g_cpu_block)
+					record_memory_result("old decoder CPU unmap", g_cpu_block_len,
+						p_munmap(g_cpu_block, g_cpu_block_len));
 				g_cpu_block = grown;
 				g_cpu_block_len = want;
 			}
@@ -503,8 +519,10 @@ release_all(hwdec_t *h)
 {
 	if (!h)
 		return;
-	if (h->decoder && p_delete)
-		p_delete(h->decoder);
+	if (h->decoder && p_delete) {
+		record_probe("Videodec2 decoder delete", "begin");
+		record_memory_result("Videodec2 decoder delete", 0, p_delete(h->decoder));
+	}
 	h->decoder = NULL;
 	/* The compute queue is process-wide; never release it here. */
 	h->queue = NULL;
@@ -525,12 +543,9 @@ release_all(hwdec_t *h)
 			g_cpu_block_busy = 0;
 		else if (h->cpu_direct)
 			free_dm(h->cpu_mem, h->cpu_pa, h->cpu_bytes);
-		else {
-			if (p_unflex)
-				p_unflex(h->cpu_mem, h->cpu_bytes);
-			if (p_munmap)
-				p_munmap(h->cpu_mem, h->cpu_bytes);
-		}
+		else if (p_munmap)
+			record_memory_result("decoder CPU unmap", h->cpu_bytes,
+				p_munmap(h->cpu_mem, h->cpu_bytes));
 	}
 	h->frame_mem = h->cpu_gpu_mem = h->gpu_mem = NULL;
 	h->cpu_mem = h->compute_mem = NULL;

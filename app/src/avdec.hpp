@@ -23,7 +23,9 @@ void close() noexcept;
 [[nodiscard]] int height() noexcept;
 [[nodiscard]] double time() noexcept;
 [[nodiscard]] double duration() noexcept;
-[[nodiscard]] const std::uint32_t *rgba() noexcept; // 0xAABBGGRR
+// The returned pixels are valid for the duration of the callback.
+using PictureFn = void (*)(void *, const std::uint32_t *, int, int);
+void with_picture(PictureFn draw, void *context) noexcept;
 [[nodiscard]] const char *codec_name() noexcept;
 [[nodiscard]] const char *mode() noexcept; // "HW" or "SW"
 bool tick(double dt) noexcept;

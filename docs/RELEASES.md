@@ -7,6 +7,7 @@ https://github.com/brinza666/movian_ps5/releases
 
 | Tag | Title | What it is |
 | --- | --- | --- |
+| playback-test-v15 | Native video switching test (prerelease) | Adds picture buffer reuse, AudioOut EOF drain, FFmpeg diagnostics and MPEG Program Stream detection to PPSA99456. |
 | playback-test-v12 | Native hardware playback test (prerelease) | Separate PPSA99456 test title. Hardware HEVC/H.264 and E-AC-3 stereo PCM evidence in the [test handoff](PLAYBACK_TEST_HANDOFF.md). |
 | `pre-alpha` | SPLICER pre-alpha | Archived elfldr payload — not the home-screen title |
 | `fw403-20261030` | 4.03 linear test ELFs | Archived loader tests |
