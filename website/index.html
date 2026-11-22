@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Movian for PlayStation 5</title>
-  <meta name="description" content="Native PS5 port of the Movian media center. ShadowMountPlus title PPSA99455, following VLC for PS5.">
+  <meta name="description" content="Native PS5 port of the Movian media center. Latest test release v53 for title PPSA99456.">
   <style>
     :root {
       --bg: #0b0d10;
@@ -71,8 +71,8 @@
   <header>
     <img src="icon0.png" alt="Movian icon">
     <p>
-      <span class="badge">Phase 2 MPEG-1</span>
-      <span class="badge">PPSA99455</span>
+      <span class="badge">v53 playback test</span>
+      <span class="badge">PPSA99456</span>
       <span class="badge">GPL-3.0-or-later</span>
     </p>
     <h1>Movian for PlayStation 5</h1>
@@ -85,25 +85,30 @@
   </header>
   <main>
     <section>
-      <h2>Status</h2>
+      <h2>Latest test release — v53</h2>
       <p>
-        The live tree is an honest DualSense shell, a Videos file browser
-        for <code>/download0</code>, <code>/data/movian</code>, and USB, and
-        software MPEG-1 playback. H.264/FFmpeg, torrents, and the plugin host
-        are the next phases — they are <strong>not</strong> in this binary.
-        Earlier GitHub trees over-claimed those features; that code is archived.
+        Movian HEVC Test v53 adds an in-video control bar with seek previews,
+        audio track selection, and a subtitle picker that lists embedded tracks.
+        Subtitle rendering is pending. The test title is <code>PPSA99456</code>.
+      </p>
+      <p>Playback, seeking, and picker navigation passed host tests. Console
+        verification of v53 is pending. The package excludes sandbox-lift.</p>
+      <p>
+        <a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53">Release notes and downloads</a>
+        · <a href="https://github.com/brinza666/movian_ps5/releases/download/playback-test-v53/PPSA99456-v53.zip">Download v53 ZIP</a>
+        · <a href="https://github.com/brinza666/movian_ps5/blob/playback-test-v53/docs/UI_WORK_LIST.md">UI work list</a>
       </p>
     </section>
     <section>
       <h2>Get the source</h2>
-      <pre>git clone https://github.com/brinza666/movian_ps5.git
+      <pre>git clone --branch playback-test-v53 https://github.com/brinza666/movian_ps5.git
 cd movian_ps5
 # WSL2 Ubuntu 24.04
 bash scripts/doctor.sh
 bash app/build.sh</pre>
       <p>
-        New contributors and AI sessions: read
-        <a href="https://github.com/brinza666/movian_ps5/blob/main/docs/NEW_SESSION.md">docs/NEW_SESSION.md</a>.
+        New contributors and AI sessions: read the
+        <a href="https://github.com/brinza666/movian_ps5/blob/playback-test-v53/AGENTS.md">test branch build notes</a>.
       </p>
     </section>
     <section>
@@ -111,7 +116,7 @@ bash app/build.sh</pre>
       <div class="grid">
         <div class="card">
           <h3>Native title</h3>
-          <p>Signed <code>eboot.bin</code> in <code>/data/homebrew/PPSA99455</code>, launched from the PS5 home screen via ShadowMountPlus.</p>
+          <p>Signed <code>eboot.bin</code> in <code>/data/homebrew/PPSA99456</code>, launched from the PS5 home screen via ShadowMountPlus.</p>
         </div>
         <div class="card">
           <h3>Not a Go ELF</h3>

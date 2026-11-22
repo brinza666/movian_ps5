@@ -1,5 +1,7 @@
 # Movian for PlayStation 5
 
+**Latest playback test — v53.** Movian HEVC Test (`PPSA99456`) adds an in-video control bar, a seek preview you can confirm or cancel, audio track selection, and a subtitle picker. Subtitle rendering and v53 console verification are pending. [Release notes and ZIP](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53) · [Project page](https://brinza666.github.io/movian_ps5/)
+
 <p align="center">
   <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
 </p>
