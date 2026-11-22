@@ -19,18 +19,18 @@ namespace
 {
 constexpr const char *kRepoPreset[repo_preset_count] = {
     "",
-    "https://bit.ly/mprepo",
+    mprepo_short_url,
     "https://raw.githubusercontent.com/brinza666/movian_ps5/main/plugins/repo.json",
     "https://repo.movian.eu/plugins-v1.json",
+    mprepo_direct_url,
 };
 constexpr const char *kRepoLabel[repo_preset_count] = {
     "none (not fetched)",
     "bit.ly/mprepo",
     "github repo.json",
     "repo.movian.eu",
+    "mprepo (Google Drive)",
 };
-constexpr int kSeekSteps[] = {5, 10, 30, 60};
-constexpr int kVolumes[] = {50, 75, 100};
 
 Data g_data{};
 Resume g_resume{};
@@ -64,7 +64,7 @@ const char *basename_of(const char *path) noexcept
 
 int clamp_seek(int v) noexcept
 {
-    for (int s : kSeekSteps)
+    for (int s : seek_steps)
         if (v == s)
             return v;
     return 10;
@@ -112,6 +112,43 @@ bool write_atomic(const char *path, const char *body) noexcept
         return false;
     }
     return true;
+}
+
+constexpr char browser_file[] = MOVIAN_DOWNLOAD0 "/browser-views.txt";
+constexpr int browser_pref_limit = 48;
+struct BrowserEntry
+{
+    char path[max_path + 1];
+    BrowserPrefs prefs;
+};
+BrowserEntry browser_entries[browser_pref_limit];
+int browser_count = 0;
+
+void load_browser_prefs() noexcept
+{
+    browser_count = 0;
+    auto *file = std::fopen(browser_file, "r");
+    if (!file) return;
+    char line[max_path + 22];
+    while (browser_count < browser_pref_limit && std::fgets(line, sizeof line, file))
+    {
+        const auto end = std::strcspn(line, "\r\n");
+        if (line[end] == 0 && !std::feof(file))
+        {
+            int c;
+            do { c = std::fgetc(file); } while (c != '\n' && c != EOF);
+            continue;
+        }
+        line[end] = 0;
+        int layout, sort, folders, supported, start = 0;
+        if (std::sscanf(line, "%1d,%1d,%1d,%1d|%n", &layout, &sort, &folders, &supported, &start) != 4 ||
+            start == 0 || end - start > max_path || layout > 1 || sort > 2 || folders > 1 || supported > 1)
+            continue;
+        auto &entry = browser_entries[browser_count++];
+        copy_text(entry.path, sizeof entry.path, line + start);
+        entry.prefs = {layout == 1, static_cast<fs::SortOrder>(sort), folders == 1, supported == 1};
+    }
+    std::fclose(file);
 }
 
 void parse_bool(const char *v, bool *out) noexcept
@@ -174,6 +211,52 @@ void load_settings_file() noexcept
             g_data.volume = clamp_volume(std::atoi(v));
         else if (std::strcmp(k, "repo") == 0)
             g_data.repo_preset = clamp_repo(std::atoi(v));
+        else if (std::strcmp(k, "torrent_trackers") == 0)
+            parse_bool(v, &g_data.torrent_trackers);
+        else if (std::strcmp(k, "torrent_progressive") == 0)
+            parse_bool(v, &g_data.torrent_progressive);
+        else if (std::strcmp(k, "remote_diagnostics") == 0)
+            parse_bool(v, &g_data.remote_diagnostics);
+        else if (std::strcmp(k, "torrent_cache_path") == 0)
+        {
+            const int path = std::atoi(v);
+            if (path >= 0 && path <= 2) g_data.torrent_cache_path = path;
+        }
+        else if (std::strcmp(k, "torrent_cache_mib") == 0)
+        {
+            const int size = std::atoi(v);
+            if (size >= 0 && size <= 512) g_data.torrent_cache_mib = static_cast<unsigned>(size);
+        }
+        else if (std::strcmp(k, "torrent_read_ahead") == 0)
+        {
+            const int percent = std::atoi(v);
+            if (percent >= 5 && percent <= 100) g_data.torrent_read_ahead = static_cast<unsigned>(percent);
+        }
+        else if (std::strcmp(k, "torrent_preload") == 0)
+        {
+            const int percent = std::atoi(v);
+            if (percent >= -1 && percent <= 100) g_data.torrent_preload = percent;
+        }
+        else if (std::strcmp(k, "torrent_connections") == 0)
+        {
+            const int limit = std::atoi(v);
+            if (limit >= 1 && limit <= 8) g_data.torrent_connections = static_cast<unsigned>(limit);
+        }
+        else if (std::strcmp(k, "torrent_requests") == 0)
+        {
+            const int limit = std::atoi(v);
+            if (limit >= 1 && limit <= 32) g_data.torrent_requests = static_cast<unsigned>(limit);
+        }
+        else if (std::strcmp(k, "torrent_block_timeout") == 0)
+        {
+            const int seconds = std::atoi(v);
+            if (seconds >= 3 && seconds <= 30) g_data.torrent_block_timeout = static_cast<unsigned>(seconds);
+        }
+        else if (std::strcmp(k, "torrent_retrackers") == 0)
+        {
+            const int mode = std::atoi(v);
+            if (mode >= 0 && mode <= 3) g_data.torrent_retrackers = static_cast<unsigned>(mode);
+        }
     }
     std::fclose(f);
 }
@@ -281,19 +364,65 @@ void load() noexcept
     mkdir(MOVIAN_DOWNLOAD0, 0777);
     g_data = Data{};
     load_settings_file();
+    load_browser_prefs();
     load_resume_file();
     load_bookmarks_file();
+}
+
+BrowserPrefs browser_prefs(const char *path) noexcept
+{
+    for (int i = 0; i < browser_count; ++i)
+        if (std::strcmp(browser_entries[i].path, path) == 0)
+            return browser_entries[i].prefs;
+    return {false, g_data.newest_first ? fs::SortOrder::newest : fs::SortOrder::filename,
+            true, !g_data.show_all};
+}
+
+void save_browser_prefs(const char *path, BrowserPrefs prefs) noexcept
+{
+    if (std::strlen(path) > max_path) return;
+    int pos = 0;
+    while (pos < browser_count && std::strcmp(browser_entries[pos].path, path)) ++pos;
+    if (pos == browser_count)
+    {
+        if (browser_count == browser_pref_limit) --pos;
+        else ++browser_count;
+    }
+    // Most recently changed folders are retained at the start of the cache.
+    std::memmove(browser_entries + 1, browser_entries, pos * sizeof browser_entries[0]);
+    copy_text(browser_entries[0].path, sizeof browser_entries[0].path, path);
+    browser_entries[0].prefs = prefs;
+
+    char body[browser_pref_limit * (max_path + 22)]{};
+    std::size_t used = 0;
+    for (int i = 0; i < browser_count; ++i)
+    {
+        const auto &entry = browser_entries[i];
+        if (std::strpbrk(entry.path, "\r\n")) continue;
+        const auto &p = entry.prefs;
+        const int n = std::snprintf(body + used, sizeof body - used, "%d,%d,%d,%d|%s\n",
+                                    p.grid, static_cast<int>(p.sort), p.folders_first, p.supported_only, entry.path);
+        if (n < 0 || static_cast<std::size_t>(n) >= sizeof body - used) break;
+        used += n;
+    }
+    write_atomic(browser_file, body);
 }
 
 void save() noexcept
 {
     char body[512];
     std::snprintf(body, sizeof body,
-                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nrepeat=%d\nshuffle=%d\nvolume=%d\nrepo=%d\n",
+                  "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nrepeat=%d\nshuffle=%d\nvolume=%d\nrepo=%d\ntorrent_trackers=%d\ntorrent_progressive=%d\n"
+                  "torrent_cache_path=%d\nremote_diagnostics=%d\ntorrent_cache_mib=%u\ntorrent_read_ahead=%u\ntorrent_preload=%d\n"
+                  "torrent_connections=%u\ntorrent_requests=%u\ntorrent_block_timeout=%u\ntorrent_retrackers=%u\n",
                   g_data.resume ? 1 : 0, clamp_seek(g_data.seek_step), g_data.clock_24h ? 1 : 0,
                   g_data.debug_log ? 1 : 0, g_data.hw_decode ? 1 : 0, g_data.show_all ? 1 : 0,
                   g_data.auto_next ? 1 : 0, g_data.newest_first ? 1 : 0, g_data.repeat,
-                  g_data.shuffle ? 1 : 0, clamp_volume(g_data.volume), clamp_repo(g_data.repo_preset));
+                  g_data.shuffle ? 1 : 0, clamp_volume(g_data.volume), clamp_repo(g_data.repo_preset),
+                  g_data.torrent_trackers ? 1 : 0, g_data.torrent_progressive ? 1 : 0,
+                  g_data.torrent_cache_path, g_data.remote_diagnostics ? 1 : 0, g_data.torrent_cache_mib,
+                  g_data.torrent_read_ahead, g_data.torrent_preload, g_data.torrent_connections,
+                  g_data.torrent_requests, g_data.torrent_block_timeout, g_data.torrent_retrackers);
     write_atomic(MOVIAN_SETTINGS_PATH, body);
 }
 
@@ -309,7 +438,12 @@ const char *repo_url() noexcept
 
 const char *repo_label() noexcept
 {
-    return kRepoLabel[clamp_repo(g_data.repo_preset)];
+    return repo_label(g_data.repo_preset);
+}
+
+const char *repo_label(int preset) noexcept
+{
+    return kRepoLabel[clamp_repo(preset)];
 }
 
 void cycle_repo(int delta) noexcept
@@ -327,10 +461,10 @@ void cycle_seek(int delta) noexcept
 {
     int idx = 1;
     for (int i = 0; i < 4; ++i)
-        if (kSeekSteps[i] == g_data.seek_step)
+        if (seek_steps[i] == g_data.seek_step)
             idx = i;
     idx = (idx + delta + 4) % 4;
-    g_data.seek_step = kSeekSteps[idx];
+    g_data.seek_step = seek_steps[idx];
     save();
 }
 
@@ -338,10 +472,10 @@ void cycle_volume(int delta) noexcept
 {
     int idx = 2;
     for (int i = 0; i < 3; ++i)
-        if (kVolumes[i] == g_data.volume)
+        if (volume_presets[i] == g_data.volume)
             idx = i;
     idx = (idx + delta + 3) % 3;
-    g_data.volume = kVolumes[idx];
+    g_data.volume = volume_presets[idx];
     save();
 }
 

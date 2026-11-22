@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <emmintrin.h>
 #include <sys/types.h>
 
 /* Layout of libSceVideodec2, as used by the public players that call it
@@ -168,6 +170,8 @@ static size_t g_cpu_block_len;
 static int g_cpu_block_busy;
 
 struct hwdec {
+	uint64_t conversion_us;
+	unsigned conversions;
 	void *queue;
 	void *decoder;
 	void *compute_mem;
@@ -833,6 +837,50 @@ put_rgb(uint8_t *p, int y, int u, int v)
 	p[3] = 255;
 }
 
+static __m128i
+rgb_channel(__m128i y, __m128i u, __m128i v, int c0, int c1)
+{
+	const __m128i coeff = _mm_set1_epi32((int)((uint32_t)(uint16_t)c0 |
+		((uint32_t)(uint16_t)c1 << 16)));
+	const __m128i ycoeff = _mm_set1_epi32(298);
+	const __m128i zero = _mm_setzero_si128();
+	const __m128i bias = _mm_set1_epi32(128);
+	const __m128i lo = _mm_add_epi32(
+		_mm_madd_epi16(_mm_unpacklo_epi16(y, zero), ycoeff),
+		_mm_madd_epi16(_mm_unpacklo_epi16(u, v), coeff));
+	const __m128i hi = _mm_add_epi32(
+		_mm_madd_epi16(_mm_unpackhi_epi16(y, zero), ycoeff),
+		_mm_madd_epi16(_mm_unpackhi_epi16(u, v), coeff));
+	return _mm_packus_epi16(_mm_packs_epi32(
+		_mm_srai_epi32(_mm_add_epi32(lo, bias), 8),
+		_mm_srai_epi32(_mm_add_epi32(hi, bias), 8)), zero);
+}
+
+static void
+nv12_half_row(uint8_t *dst, const uint8_t *yp, const uint8_t *uv, int width)
+{
+	const __m128i low_byte = _mm_set1_epi16(255);
+	const __m128i alpha = _mm_set1_epi8(-1);
+	int x = 0;
+	for (; x + 8 <= width; x += 8) {
+		const __m128i input_y = _mm_loadu_si128((const __m128i *)(yp + 2 * x));
+		const __m128i input_uv = _mm_loadu_si128((const __m128i *)(uv + 2 * x));
+		const __m128i y = _mm_sub_epi16(_mm_and_si128(input_y, low_byte), _mm_set1_epi16(16));
+		/* Sign-extend U and V independently before forming each coefficient pair. */
+		const __m128i u = _mm_sub_epi16(_mm_and_si128(input_uv, low_byte), _mm_set1_epi16(128));
+		const __m128i v = _mm_sub_epi16(_mm_srli_epi16(input_uv, 8), _mm_set1_epi16(128));
+		const __m128i r = rgb_channel(y, u, v, 0, 409);
+		const __m128i green = rgb_channel(y, u, v, -100, -208);
+		const __m128i b = rgb_channel(y, u, v, 516, 0);
+		const __m128i rg = _mm_unpacklo_epi8(r, green);
+		const __m128i ba = _mm_unpacklo_epi8(b, alpha);
+		_mm_storeu_si128((__m128i *)(dst + 4 * x), _mm_unpacklo_epi16(rg, ba));
+		_mm_storeu_si128((__m128i *)(dst + 4 * x + 16), _mm_unpackhi_epi16(rg, ba));
+	}
+	for (; x < width; ++x)
+		put_rgb(dst + 4 * x, yp[2 * x], uv[2 * x], uv[2 * x + 1]);
+}
+
 static void
 frame_back(hwdec_t *h, const void *buffer)
 {
@@ -901,10 +949,6 @@ shown_size(hwdec_t *h, const SceVideodec2OutputInfo *out, int *w, int *hh)
 		vw = h->rgba_w > 0 ? h->rgba_w : (int)out->width;
 	if (vh <= 0)
 		vh = h->rgba_h > 0 ? h->rgba_h : (int)out->height;
-	if (h->rgba_w > 0 && vw > h->rgba_w)
-		vw = h->rgba_w;
-	if (h->rgba_h > 0 && vh > h->rgba_h)
-		vh = h->rgba_h;
 	*w = vw;
 	*hh = vh;
 }
@@ -931,30 +975,47 @@ copy_picture(hwdec_t *h, const SceVideodec2OutputInfo *out)
 		pitch = out->pitch * 2u;
 	rows = out->height ? out->height : (uint32_t)h->h;
 	shown_size(h, out, &w, &hh);
-	if (w <= 0 || hh <= 0)
+	if (w <= 0 || hh <= 0 || h->rgba_w <= 0 || h->rgba_h <= 0 ||
+	    (unsigned)hh > rows || (size_t)((w + 1) & ~1) * (ten ? 2u : 1u) > pitch ||
+	    (uint64_t)pitch * (rows + (unsigned)(hh + 1) / 2) > h->frame_size)
 		return 0;
 	base = (const uint8_t *)out->buffer;
 	uv = base + (size_t)pitch * rows;
 	dst = h->rgba;
-	/* Pack at the shown size (VLC visible). Canvas uses w as the stride. */
-	for (y = 0; y < hh; y++) {
-		uint8_t *row = dst + (size_t)y * (size_t)w * 4u;
-		for (x = 0; x < w; x++) {
+	/* Sample at display resolution while retaining native decoder pitch and crop. */
+	const int x_step = w / h->rgba_w;
+	const int x_remainder = w % h->rgba_w;
+	for (y = 0; y < h->rgba_h; y++) {
+		const int sy = y * hh / h->rgba_h;
+		const uint8_t *yp = base + (size_t)sy * pitch;
+		const uint8_t *up = uv + (size_t)(sy / 2) * pitch;
+		uint8_t *row = dst + (size_t)y * (size_t)h->rgba_w * 4u;
+		if (!ten && w == 2 * h->rgba_w) {
+			nv12_half_row(row, yp, up, h->rgba_w);
+			continue;
+		}
+		int sx = 0;
+		int remainder = 0;
+		for (x = 0; x < h->rgba_w; x++) {
 			int Y, U, V;
 			if (!ten) {
-				const uint8_t *yp = base + (size_t)y * pitch;
-				const uint8_t *up = uv + (size_t)(y / 2) * pitch;
-				Y = yp[x];
-				U = up[x & ~1];
-				V = up[(x & ~1) + 1];
+				Y = yp[sx];
+				U = up[sx & ~1];
+				V = up[(sx & ~1) + 1];
 			} else {
-				const uint16_t *yp = (const uint16_t *)(base + (size_t)y * pitch);
-				const uint16_t *up = (const uint16_t *)(uv + (size_t)(y / 2) * pitch);
-				Y = yp[x] >> 2;
-				U = up[x & ~1] >> 2;
-				V = up[(x & ~1) + 1] >> 2;
+				const uint16_t *luma = (const uint16_t *)yp;
+				const uint16_t *chroma = (const uint16_t *)up;
+				Y = luma[sx] >> 2;
+				U = chroma[sx & ~1] >> 2;
+				V = chroma[(sx & ~1) + 1] >> 2;
 			}
 			put_rgb(row + (size_t)x * 4u, Y, U, V);
+			sx += x_step;
+			remainder += x_remainder;
+			if (remainder >= h->rgba_w) {
+				++sx;
+				remainder -= h->rgba_w;
+			}
 		}
 	}
 	if (h->w != w || h->h != hh) {
@@ -1110,13 +1171,27 @@ take_picture(hwdec_t *h, const SceVideodec2OutputInfo *out)
 		frame_back(h, out->buffer);
 		return 0;
 	}
+	struct timespec before, after;
+	clock_gettime(CLOCK_MONOTONIC, &before);
 	got = copy_picture(h, out);
+	clock_gettime(CLOCK_MONOTONIC, &after);
+	if (got) {
+		h->conversion_us += (int64_t)(after.tv_sec - before.tv_sec) * 1000000 +
+			(after.tv_nsec - before.tv_nsec) / 1000;
+		h->conversions++;
+	}
 	frame_back(h, out->buffer);
 	if (got) {
 		h->pictures++;
 		h->shown_pts = when;
 	}
 	return got;
+}
+
+unsigned
+hwdec_mean_conversion_us(const hwdec_t *h)
+{
+	return h && h->conversions ? (unsigned)(h->conversion_us / h->conversions) : 0;
 }
 
 int
@@ -1254,13 +1329,15 @@ hwdec_flush(hwdec_t *h)
 		int slot = next_frame(h, &frame);
 		int rc;
 		if (slot < 0)
-			break;
+			return -1;
 		memset(&out, 0, sizeof out);
 		out.size = sizeof out;
 		rc = p_flush(h->decoder, &frame, &out);
 		if (frame.accepted)
 			h->frame_held[slot] = 1;
-		if (rc || !out.valid)
+		if (rc)
+			return rc > 0 ? -rc : rc;
+		if (!out.valid)
 			break;
 		if (take_picture(h, &out) > 0)
 			return 1;

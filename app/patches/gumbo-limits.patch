@@ -1,0 +1,33 @@
+--- a/parser.c
++++ b/parser.c
+@@ -4440,6 +4440,7 @@
+ 
+   GumboToken token;
+   bool has_error = false;
++  bool limited = false;
+ 
+   do {
+     if (state->_reprocess_current_token) {
+@@ -4495,7 +4496,12 @@
+     }
+ 
+     ++loop_count;
+-    assert(loop_count < 1000000000);
++    if (loop_count > 500000 || state->_open_elements.length > 128) {
++      if (state->_reprocess_current_token)
++        ignore_token(&parser);
++      limited = true;
++      break;
++    }
+ 
+   } while ((token.type != GUMBO_TOKEN_EOF || state->_reprocess_current_token) &&
+            !(options->stop_on_first_error && has_error));
+@@ -4516,6 +4522,8 @@
+ 
+   parser_state_destroy(&parser);
+   gumbo_tokenizer_state_destroy(&parser);
++  if (limited)
++    parser._output->root = NULL;
+   return parser._output;
+ }
+ 

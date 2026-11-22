@@ -6,6 +6,7 @@
 
 #include "fs.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <dirent.h>
 #include <errno.h>
@@ -104,24 +105,6 @@ int cmp_ci(const char *a, const char *b) noexcept
     }
 }
 
-bool g_newest_first = false;
-
-int cmp_entry(const void *lhs, const void *rhs) noexcept
-{
-    const auto *a = static_cast<const Entry *>(lhs);
-    const auto *b = static_cast<const Entry *>(rhs);
-    const int ra = entry_rank(a->kind);
-    const int rb = entry_rank(b->kind);
-    if (ra != rb)
-        return ra - rb;
-    if (g_newest_first && a->kind != Kind::directory)
-    {
-        if (a->mtime != b->mtime)
-            return a->mtime > b->mtime ? -1 : 1;
-    }
-    return cmp_ci(a->name, b->name);
-}
-
 bool is_dot_or_dotdot(const char *name) noexcept
 {
     return name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0));
@@ -134,6 +117,8 @@ Kind classify_name(const char *name, bool is_dir) noexcept
         return Kind::directory;
     if (!name)
         return Kind::other;
+    if (ends_with_ci(name, ".zip"))
+        return Kind::package;
 
     static const char *const video[] = {
         ".mpg",  ".mpeg", ".mpv",  ".m1v",  ".m2v", ".mp4", ".m4v",  ".mov",
@@ -153,8 +138,9 @@ Kind classify_name(const char *name, bool is_dir) noexcept
     return Kind::other;
 }
 
-int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool include_other,
-             bool newest_first) noexcept
+static int list_directory_impl(const char *path, Entry *out, int cap, int *count, int *err,
+                               bool include_other, SortOrder order, bool folders_first,
+                               bool legacy_groups, const char *file_extension) noexcept
 {
     if (count)
         *count = 0;
@@ -167,6 +153,76 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool i
         return -1;
     }
 
+    int n = 0;
+    int leftover = 0;
+    auto before = [&](const Entry &a, const Entry &b) {
+        const bool a_dir = a.kind == Kind::directory;
+        const bool b_dir = b.kind == Kind::directory;
+        if (legacy_groups)
+        {
+            const int group = entry_rank(a.kind) - entry_rank(b.kind);
+            if (group) return group < 0;
+        }
+        if (folders_first && a_dir != b_dir)
+            return a_dir;
+        if (order != SortOrder::filename && !(legacy_groups && a_dir) && a.mtime != b.mtime)
+            return order == SortOrder::newest ? a.mtime > b.mtime : a.mtime < b.mtime;
+        const int name_order = cmp_ci(a.name, b.name);
+        return name_order ? name_order < 0 : strcmp(a.name, b.name) < 0;
+    };
+    auto collect = [&](const char *name, unsigned type) {
+        if (is_dot_or_dotdot(name)) return;
+        Entry entry{};
+        if (!copy_bounded(entry.name, sizeof entry.name, name) ||
+            !join_path(entry.path, sizeof entry.path, path, name))
+            return;
+
+        struct stat st{};
+        const bool have_stat = stat(entry.path, &st) == 0;
+        const bool is_dir = have_stat ? S_ISDIR(st.st_mode) : type == DT_DIR;
+        entry.kind = classify_name(name, is_dir);
+        if ((entry.kind == Kind::other && !include_other) ||
+            (!is_dir && file_extension && !ends_with_ci(name, file_extension))) return;
+        entry.size = have_stat ? static_cast<long long>(st.st_size) : 0;
+        entry.mtime = have_stat ? static_cast<long long>(st.st_mtime) : 0;
+
+        if (n == cap)
+        {
+            ++leftover;
+            if (!before(entry, out[0])) return;
+            std::pop_heap(out, out + n, before);
+            --n;
+        }
+        out[n++] = entry;
+        std::push_heap(out, out + n, before);
+    };
+
+#ifdef MOVIAN_HOST_PREVIEW
+    auto *directory = opendir(path);
+    if (!directory)
+    {
+        if (err) *err = errno;
+        return -1;
+    }
+    int read_error = 0;
+    for (;;)
+    {
+        errno = 0;
+        const auto *entry = readdir(directory);
+        if (!entry)
+        {
+            read_error = errno;
+            break;
+        }
+        collect(entry->d_name, entry->d_type);
+    }
+    closedir(directory);
+    if (read_error)
+    {
+        if (err) *err = read_error;
+        return -1;
+    }
+#else
     const int fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0)
     {
@@ -189,8 +245,6 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool i
         return -1;
     }
 
-    int n = 0;
-    int leftover = 0;
     for (;;)
     {
         int got = getdents(fd, buf, buf_cap);
@@ -240,51 +294,31 @@ int list_dir(const char *path, Entry *out, int cap, int *count, int *err, bool i
             char name[256];
             memcpy(name, e->d_name, static_cast<std::size_t>(namelen));
             name[namelen] = 0;
-            if (is_dot_or_dotdot(name))
-                continue;
-
-            char full[max_path + 1];
-            if (!join_path(full, sizeof full, path, name))
-                continue;
-
-            struct stat st2{};
-            const bool have_stat = stat(full, &st2) == 0;
-            bool is_dir = e->d_type == DT_DIR;
-            if (e->d_type == DT_UNKNOWN || e->d_type == DT_LNK || have_stat)
-            {
-                if (have_stat)
-                    is_dir = S_ISDIR(st2.st_mode);
-            }
-
-            const Kind kind = classify_name(name, is_dir);
-            if (kind == Kind::other && !include_other)
-                continue;
-
-            if (n >= cap)
-            {
-                ++leftover;
-                continue;
-            }
-            if (!copy_bounded(out[n].name, sizeof out[n].name, name))
-                continue;
-            if (!copy_bounded(out[n].path, sizeof out[n].path, full))
-                continue;
-            out[n].kind = kind;
-            out[n].size = have_stat ? static_cast<long long>(st2.st_size) : 0;
-            out[n].mtime = have_stat ? static_cast<long long>(st2.st_mtime) : 0;
-            ++n;
+            collect(name, e->d_type);
         }
     }
 
     free(buf);
     close(fd);
-    g_newest_first = newest_first;
-    if (n > 1)
-        qsort(out, static_cast<std::size_t>(n), sizeof(Entry), cmp_entry);
+#endif
+    std::sort_heap(out, out + n, before);
     if (count)
         *count = n;
     if (err)
         *err = leftover > 0 ? leftover : 0;
     return 0;
+}
+int list_directory(const char *path, Entry *out, int cap, int *count, int *err,
+                   bool include_other, SortOrder order, bool folders_first,
+                   const char *file_extension) noexcept
+{
+    return list_directory_impl(path, out, cap, count, err, include_other, order, folders_first, false, file_extension);
+}
+
+int list_dir(const char *path, Entry *out, int cap, int *count, int *err,
+             bool include_other, bool newest_first) noexcept
+{
+    return list_directory_impl(path, out, cap, count, err, include_other,
+                               newest_first ? SortOrder::newest : SortOrder::filename, true, true, nullptr);
 }
 } // namespace movian::fs

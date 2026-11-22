@@ -23,6 +23,7 @@ void hwdec_reset(hwdec_t *h);
 int hwdec_flush(hwdec_t *h);
 int hwdec_shown_width(const hwdec_t *h);
 int hwdec_shown_height(const hwdec_t *h);
+unsigned hwdec_mean_conversion_us(const hwdec_t *h);
 /* Display-order PTS of the last copied picture, microseconds, or -1. */
 int64_t hwdec_shown_pts(const hwdec_t *h);
 /* Visible size from SPS / VUI crop in Annex-B headers (VLC packetizer). */

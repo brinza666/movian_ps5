@@ -69,8 +69,19 @@ Do not list a library here until `app/build.sh` compiles against it.
 ## Native playback test release
 
 - FFmpeg 6.1.2 is statically linked for demux, format adaptation, software
-  video/audio decoding and libswresample. Exact inputs and flags are in
+  video/audio decoding, libswresample and libswscale. Exact inputs and flags are in
   the test build recipe. The release includes the FFmpeg source tarball.
+- [VideoLAN dav1d 1.5.4](https://code.videolan.org/videolan/dav1d/-/tree/1.5.4)
+  provides software AV1 decoding under the BSD 2-Clause license. Its
+  copyright and license are in `app/assets/licenses/dav1d.txt`.
+- [Duktape 2.7.0](https://duktape.org/download) is compiled into the
+  native plugin host. Its MIT license is packaged as
+  `assets/licenses/duktape.txt`.
+- [miniz 3.0.2](https://github.com/richgel999/miniz/tree/3.0.2) reads local
+  plugin ZIPs. Its license is packaged as `assets/licenses/miniz.txt`.
+- [Gumbo Parser 0.14.1](https://codeberg.org/gumbo-parser/gumbo-parser/src/tag/0.14.1)
+  parses HTML for plugins under Apache-2.0. The packaged license is
+  `assets/licenses/gumbo.txt`. The build applies a local nesting and token limit.
 - The [VLC Videodec2 import stub](https://github.com/ZiZc3/VLC/blob/7f104abb5a88dd675b60261769dc86d5dfb0a0d4/ps5/stubs/videodec2_link_stub.c)
   is used at link time. It is not packaged. Videodec2 is supplied by the console.
 - The included HEVC test fixture is a generated color pattern and sine tone.

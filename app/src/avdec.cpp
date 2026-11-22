@@ -8,18 +8,23 @@
  */
 
 #include "avdec.hpp"
+#include "diagnostics.hpp"
 #include "audio.hpp"
+#include "torrent.hpp"
 
 #include "hwdec.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <pthread.h>
 #include <strings.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef MOVIAN_HAVE_FFMPEG
@@ -29,14 +34,15 @@ extern "C"
 #include <libavcodec/bsf.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/dict.h>
 #include <libavutil/frame.h>
 #include <libavutil/log.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
+#include <libswscale/swscale.h>
 int sceKernelMapFlexibleMemory(void **address, std::size_t length, int protection, int flags);
-int sceKernelMunmap(void *address, std::size_t length);
 }
 #endif
 
@@ -48,6 +54,13 @@ namespace
 {
 #ifdef MOVIAN_HAVE_FFMPEG
 AVFormatContext *g_fmt = nullptr;
+AVIOContext *g_torrent_io = nullptr;
+const torrent::VerifiedFile *g_torrent_input = nullptr;
+std::uint64_t g_torrent_offset = 0;
+bool g_reading_packet = false;
+std::atomic<bool> g_peer_buffering{false};
+std::atomic<double> g_pending_seek{-1};
+double g_seek_picture = -1;
 AVCodecContext *g_vcodec = nullptr;
 AVCodecContext *g_acodec = nullptr;
 AVPacket *g_pkt = nullptr;
@@ -56,15 +69,54 @@ AVFrame *g_aframe = nullptr;
 std::uint32_t *g_front = nullptr;
 std::uint32_t *g_back = nullptr;
 void *g_picture_mapping = nullptr;
-std::size_t g_picture_mapping_size = 0;
 hwdec_t *g_hw = nullptr;
 AVBSFContext *g_video_bsf = nullptr;
 int g_hw_demux_result = 0;
 bool g_sw_demux_eof = false;
 int g_w = 0;
 int g_h = 0;
+int g_src_w = 0;
+int g_src_h = 0;
+SwsContext *g_scaler = nullptr;
 int g_vindex = -1;
 int g_aindex = -1;
+// Open/close and the pickers run on the UI thread. Snapshot the streams before
+// decoding starts so a picker never reads a demuxer concurrently with AVIO.
+constexpr int max_picker_tracks = 128;
+struct TrackList
+{
+    Track tracks[max_picker_tracks]{};
+    int count = 0;
+};
+TrackList g_audio_tracks;
+TrackList g_subtitle_tracks;
+
+void snapshot_tracks() noexcept
+{
+    for (unsigned i = 0; i < g_fmt->nb_streams; ++i)
+    {
+        const auto *stream = g_fmt->streams[i];
+        const auto type = stream->codecpar->codec_type;
+        if (type != AVMEDIA_TYPE_AUDIO && type != AVMEDIA_TYPE_SUBTITLE)
+            continue;
+        auto &list = type == AVMEDIA_TYPE_AUDIO ? g_audio_tracks : g_subtitle_tracks;
+        if (list.count >= max_picker_tracks)
+            continue;
+        const auto *title = av_dict_get(stream->metadata, "title", nullptr, 0);
+        const auto *language = av_dict_get(stream->metadata, "language", nullptr, 0);
+        auto &track = list.tracks[list.count++];
+        track.stream = static_cast<int>(i);
+        track.supported = type == AVMEDIA_TYPE_AUDIO && avcodec_find_decoder(stream->codecpar->codec_id);
+        if (title && title->value[0])
+            std::snprintf(track.title, sizeof track.title, "%s", title->value);
+        else
+            std::snprintf(track.title, sizeof track.title, "%s %d",
+                          type == AVMEDIA_TYPE_AUDIO ? "Audio" : "Subtitle", list.count);
+        std::snprintf(track.language, sizeof track.language, "%s", language ? language->value : "");
+        std::snprintf(track.format, sizeof track.format, "%s", avcodec_get_name(stream->codecpar->codec_id));
+    }
+}
+
 SwrContext *g_resampler = nullptr;
 AVChannelLayout g_pcm_input_layout{};
 int g_pcm_input_rate = 0;
@@ -72,7 +124,13 @@ AVSampleFormat g_pcm_input_format = AV_SAMPLE_FMT_NONE;
 bool g_pcm_reported = false;
 unsigned long long g_pcm_frames = 0;
 bool g_ended = false;
+bool g_torrent_error = false;
 unsigned g_hw_presented = 0;
+unsigned g_sw_presented = 0;
+unsigned g_sw_errors = 0;
+unsigned g_hw_calls = 0;
+std::uint64_t g_hw_first_us = 0;
+std::uint64_t g_hw_total_us = 0;
 double g_clock = 0;
 double g_pts = 0;
 double g_duration = 0;
@@ -83,11 +141,22 @@ int g_pcm_cap = 0;
 char g_codec[24] = "";
 char g_mode[8] = "SW";
 int pull_one() noexcept;
+bool seek_locked(double seconds) noexcept;
+pthread_mutex_t g_picture_lock = PTHREAD_MUTEX_INITIALIZER;
+
+std::uint64_t monotonic_us() noexcept
+{
+    timespec now{};
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return static_cast<std::uint64_t>(now.tv_sec) * 1000000 + now.tv_nsec / 1000;
+}
 void record_decode(const char *event, int value_a, int value_b, unsigned frames) noexcept
 {
+    diagnostics::record("decoder", "%s codec=%s a=%d b=%d frames=%u", event, g_codec,
+                        value_a, value_b, frames);
     if (auto *log = std::fopen("/download0/hevc-test-decode.log", "a"))
     {
-        std::fprintf(log, "v15 %s codec=%s a=%d b=%d frames=%u\n", event, g_codec, value_a, value_b, frames);
+        std::fprintf(log, "v52 %s codec=%s a=%d b=%d frames=%u\n", event, g_codec, value_a, value_b, frames);
         std::fclose(log);
     }
 }
@@ -112,12 +181,12 @@ const AVInputFormat *mpeg_program_stream(const char *path) noexcept
         return nullptr;
 
     // Only override autodetection when the file starts with an MPEG pack.
-    auto *file = std::fopen(path, "rb");
-    if (!file)
+    const int fd = ::open(path, O_RDONLY);
+    if (fd < 0)
         return nullptr;
     unsigned char header[4]{};
-    const auto size = std::fread(header, 1, sizeof header, file);
-    std::fclose(file);
+    const auto size = ::read(fd, header, sizeof header);
+    ::close(fd);
     return size == sizeof header && header[0] == 0 && header[1] == 0 &&
                    header[2] == 1 && header[3] == 0xba
                ? av_find_input_format("mpeg")
@@ -129,16 +198,114 @@ void present() noexcept
     if (g_hw && ++g_hw_presented == 1)
         record_decode("first hardware frame", hwdec_shown_width(g_hw),
                       hwdec_shown_height(g_hw), g_hw_presented);
+    if (g_seek_picture >= 0)
+    {
+        record_decode("torrent picture after seek", static_cast<int>(g_seek_picture),
+                      static_cast<int>(g_pts), g_hw ? g_hw_presented : g_sw_presented + 1);
+        g_seek_picture = -1;
+    }
+    pthread_mutex_lock(&g_picture_lock);
     std::uint32_t *t = g_front;
     g_front = g_back;
     g_back = t;
     if (g_hw && g_back)
         hwdec_bind(g_hw, reinterpret_cast<std::uint8_t *>(g_back), g_w, g_h);
+    pthread_mutex_unlock(&g_picture_lock);
 }
 pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_t g_thread{};
 bool g_thread_on = false;
 std::atomic<bool> g_run{false};
+
+int torrent_read(void *, std::uint8_t *buffer, int size)
+{
+    const auto total = g_torrent_input->size();
+    if (!total)
+        return AVERROR(EIO);
+    const auto started = monotonic_us();
+    const auto deadline = started + 30000000;
+    auto end_wait = [&](const char *result) {
+        g_peer_buffering = false;
+        const auto elapsed = (monotonic_us() - started) / 1000;
+        if (elapsed >= 250)
+            diagnostics::record("buffer", "%s offset=%llu wait_ms=%llu", result,
+                                static_cast<unsigned long long>(g_torrent_offset),
+                                static_cast<unsigned long long>(elapsed));
+    };
+    using Result = torrent::VerifiedFile::ReadResult;
+    for (;;)
+    {
+        if (g_reading_packet && g_pending_seek.load(std::memory_order_relaxed) >= 0)
+        {
+            end_wait("seek requested");
+            return AVERROR_EXIT;
+        }
+        std::size_t count = 0;
+        const auto state = g_torrent_input->read(g_torrent_offset, buffer, size, count);
+        if (state == Result::eof || state == Result::failed)
+        {
+            end_wait(state == Result::eof ? "eof" : "peer input failed");
+            return state == Result::eof ? AVERROR_EOF : AVERROR(EIO);
+        }
+        if (state == Result::data && count)
+        {
+            end_wait("verified bytes ready");
+            g_torrent_offset += count;
+            return static_cast<int>(count);
+        }
+        if (!g_reading_packet)
+            return AVERROR(EAGAIN);
+        if (!g_run.load(std::memory_order_relaxed))
+        {
+            end_wait("playback closed");
+            return AVERROR_EXIT;
+        }
+        if (monotonic_us() >= deadline)
+        {
+            end_wait("peer input timed out");
+            return AVERROR(ETIMEDOUT);
+        }
+        g_peer_buffering = true;
+        usleep(20000);
+    }
+}
+
+std::int64_t torrent_seek(void *, std::int64_t offset, int how)
+{
+    const auto total = static_cast<std::int64_t>(g_torrent_input->size());
+    if (!total)
+        return AVERROR(EIO);
+    how &= ~AVSEEK_FORCE;
+    if (how == AVSEEK_SIZE)
+        return total;
+    const auto base = how == SEEK_SET ? 0 :
+                      how == SEEK_CUR ? static_cast<std::int64_t>(g_torrent_offset) :
+                      how == SEEK_END ? total : -1;
+    if (base < 0 || offset < -base || offset > total - base)
+        return AVERROR(EINVAL);
+    g_torrent_offset = base + offset;
+    return static_cast<std::int64_t>(g_torrent_offset);
+}
+
+int read_packet()
+{
+    if (!g_torrent_input)
+        return av_read_frame(g_fmt, g_pkt);
+    g_reading_packet = true;
+    // Only the decode worker enters libavformat on a progressive input
+    // after open. The UI can still draw and close while a piece is pending.
+    pthread_mutex_unlock(&g_lock);
+    const int result = av_read_frame(g_fmt, g_pkt);
+    pthread_mutex_lock(&g_lock);
+    g_reading_packet = false;
+    if (g_pending_seek.load(std::memory_order_relaxed) >= 0 && result < 0)
+    {
+        g_torrent_io->error = 0;
+        g_torrent_io->eof_reached = 0;
+        return AVERROR(EAGAIN);
+    }
+    return result;
+}
 
 void *decode_loop(void *) noexcept
 {
@@ -146,7 +313,10 @@ void *decode_loop(void *) noexcept
     {
         int r = 0;
         pthread_mutex_lock(&g_lock);
-        if (g_fmt && !g_ended && g_pts + 0.0005 < g_clock)
+        const double pending = g_pending_seek.exchange(-1);
+        if (pending >= 0)
+            seek_locked(pending);
+        else if (g_fmt && !g_ended && g_pts + 0.0005 < g_clock)
             r = pull_one();
         pthread_mutex_unlock(&g_lock);
         if (r != 1)
@@ -183,64 +353,6 @@ void copy_text(char *dst, int cap, const char *src) noexcept
     if (!dst || cap <= 0)
         return;
     std::snprintf(dst, static_cast<std::size_t>(cap), "%s", src ? src : "");
-}
-
-int clip8(int v) noexcept
-{
-    return v < 0 ? 0 : v > 255 ? 255 : v;
-}
-
-void yuv420_to_rgba(const AVFrame *f) noexcept
-{
-    if (!f || !g_back || g_w <= 0 || g_h <= 0)
-        return;
-    const int sw = f->width;
-    const int sh = f->height;
-    if (sw < 2 || sh < 2)
-        return;
-    int stepx = sw / g_w;
-    int stepy = sh / g_h;
-    if (stepx < 1)
-        stepx = 1;
-    if (stepy < 1)
-        stepy = 1;
-    const bool jpeg = f->format == AV_PIX_FMT_YUVJ420P;
-    for (int y = 0; y < g_h; ++y)
-    {
-        const int sy = y * stepy;
-        const std::uint8_t *yp = f->data[0] + sy * f->linesize[0];
-        const std::uint8_t *up = f->data[1] + (sy / 2) * f->linesize[1];
-        const std::uint8_t *vp = f->data[2] + (sy / 2) * f->linesize[2];
-        std::uint32_t *dst = g_back + y * g_w;
-        for (int x = 0; x < g_w; ++x)
-        {
-            const int sx = x * stepx;
-            const int Y = yp[sx];
-            const int U = up[sx / 2];
-            const int V = vp[sx / 2];
-            int r, g, b;
-            if (jpeg)
-            {
-                const int d = U - 128;
-                const int e = V - 128;
-                r = (256 * Y + 359 * e) >> 8;
-                g = (256 * Y - 88 * d - 183 * e) >> 8;
-                b = (256 * Y + 454 * d) >> 8;
-            }
-            else
-            {
-                const int c = Y - 16;
-                const int d = U - 128;
-                const int e = V - 128;
-                r = (298 * c + 409 * e + 128) >> 8;
-                g = (298 * c - 100 * d - 208 * e + 128) >> 8;
-                b = (298 * c + 516 * d + 128) >> 8;
-            }
-            dst[x] = 0xff000000u | (static_cast<std::uint32_t>(clip8(b)) << 16) |
-                     (static_cast<std::uint32_t>(clip8(g)) << 8) |
-                     static_cast<std::uint32_t>(clip8(r));
-        }
-    }
 }
 
 void reset_resampler() noexcept
@@ -338,7 +450,7 @@ void finish_audio() noexcept
         convert_pcm(nullptr);
     if (auto *log = std::fopen("/download0/hevc-test-decode.log", "a"))
     {
-        std::fprintf(log, "v15 %s PCM EOF codec=%s frames=%llu\n",
+        std::fprintf(log, "v52 %s PCM EOF codec=%s frames=%llu\n",
                      g_acodec->codec_id == AV_CODEC_ID_EAC3 ? "E-AC-3" : "audio",
                      g_codec, g_pcm_frames);
         std::fclose(log);
@@ -356,7 +468,7 @@ int open_codec(AVCodecContext **ctx, int index) noexcept
         return -1;
     if (avcodec_parameters_to_context(*ctx, st->codecpar) < 0)
         return -1;
-    (*ctx)->thread_count = 1;
+    (*ctx)->thread_count = st->codecpar->codec_id == AV_CODEC_ID_AV1 ? 4 : 1;
     if (avcodec_open2(*ctx, codec, nullptr) < 0)
         return -1;
     return 0;
@@ -365,6 +477,8 @@ int open_codec(AVCodecContext **ctx, int index) noexcept
 int end_hardware(int result) noexcept
 {
     g_ended = true;
+    g_torrent_error = g_torrent_input && g_hw_demux_result < 0 &&
+                      g_hw_demux_result != AVERROR_EOF;
     record_decode("hardware drain", g_hw_demux_result, result, g_hw_presented);
     return -1;
 }
@@ -392,7 +506,11 @@ int hw_pull() noexcept
             const int64_t ts = g_pkt->pts != AV_NOPTS_VALUE ? g_pkt->pts : g_pkt->dts;
             const int64_t pts_us = ts == AV_NOPTS_VALUE ? -1 : av_rescale_q(ts, g_tb, AV_TIME_BASE_Q);
             const double step = g_pkt->duration > 0 ? av_q2d(g_tb) * g_pkt->duration : 1.0 / 30.0;
+            const auto started = monotonic_us();
+            if (g_hw_calls++ == 0)
+                g_hw_first_us = started;
             const int decoded = hwdec_feed(g_hw, g_pkt->data, g_pkt->size, pts_us);
+            g_hw_total_us += monotonic_us() - started;
             av_packet_unref(g_pkt);
             if (decoded < 0)
                 return end_hardware(decoded);
@@ -403,7 +521,7 @@ int hw_pull() noexcept
         if (filtered != AVERROR(EAGAIN) || g_hw_demux_result == AVERROR_EOF)
             return end_hardware(filtered);
 
-        g_hw_demux_result = av_read_frame(g_fmt, g_pkt);
+        g_hw_demux_result = read_packet();
         if (g_hw_demux_result == AVERROR_EOF)
         {
             finish_audio();
@@ -442,6 +560,7 @@ int sw_pull() noexcept
         const int received = avcodec_receive_frame(g_vcodec, g_vframe);
         if (received == 0)
         {
+            g_sw_errors = 0;
             int64_t p = g_vframe->best_effort_timestamp;
             if (p == AV_NOPTS_VALUE)
                 p = g_vframe->pts;
@@ -449,20 +568,42 @@ int sw_pull() noexcept
                 g_pts = av_q2d(g_tb) * static_cast<double>(p);
             else
                 g_pts += 1.0 / 30.0;
-            if (g_vframe->format == AV_PIX_FMT_YUV420P || g_vframe->format == AV_PIX_FMT_YUVJ420P)
-                yuv420_to_rgba(g_vframe);
+            g_scaler = sws_getCachedContext(g_scaler, g_vframe->width, g_vframe->height,
+                                            static_cast<AVPixelFormat>(g_vframe->format),
+                                            g_w, g_h, AV_PIX_FMT_RGBA, SWS_FAST_BILINEAR,
+                                            nullptr, nullptr, nullptr);
+            std::uint8_t *planes[4] = {reinterpret_cast<std::uint8_t *>(g_back)};
+            const int strides[4] = {g_w * 4};
+            const bool copied = g_scaler &&
+                sws_scale(g_scaler, g_vframe->data, g_vframe->linesize, 0,
+                          g_vframe->height, planes, strides) == g_h;
             av_frame_unref(g_vframe);
-            present();
+            if (copied)
+            {
+                present();
+                if (++g_sw_presented == 1)
+                    record_decode("first software frame", g_w, g_h, g_sw_presented);
+            }
+            else
+            {
+                record_decode("software conversion failed", g_w, g_h, 0);
+                g_ended = true;
+                return -1;
+            }
             return 1;
         }
-        if (received != AVERROR(EAGAIN) || g_sw_demux_eof)
+        const bool recoverable = received == AVERROR_INVALIDDATA && !g_sw_demux_eof &&
+                                 ++g_sw_errors <= 16;
+        if (recoverable && g_sw_errors == 1)
+            record_decode("software packet rejected", received, 0, g_sw_presented);
+        if ((received != AVERROR(EAGAIN) && !recoverable) || g_sw_demux_eof)
         {
             g_ended = true;
-            record_decode("software drain", received, 0, 0);
+            record_decode("software drain", received, 0, g_sw_presented);
             return -1;
         }
 
-        const int rr = av_read_frame(g_fmt, g_pkt);
+        const int rr = read_packet();
         if (rr == AVERROR(EAGAIN))
             return 0;
         if (rr == AVERROR_EOF)
@@ -475,6 +616,7 @@ int sw_pull() noexcept
         if (rr < 0)
         {
             g_ended = true;
+            g_torrent_error = g_torrent_input != nullptr;
             record_decode("software read failed", rr, 0, 0);
             return -1;
         }
@@ -501,20 +643,23 @@ bool alloc_picture(int w, int h, char *why, int why_cap) noexcept
         copy_text(why, why_cap, "bad video size");
         return false;
     }
-    if (w > 3840)
-        w = 3840;
-    if (h > 2160)
-        h = 2160;
+    g_src_w = w;
+    g_src_h = h;
+    // The native Canvas is 1920x1080. Keep decoder surfaces at source
+    // resolution and convert just the on-screen pixels.
+    if (w > 1920 || h > 1080)
+    {
+        const double scale = std::min(1920.0 / w, 1080.0 / h);
+        w = std::max(1, static_cast<int>(w * scale));
+        h = std::max(1, static_cast<int>(h * scale));
+    }
     constexpr std::size_t page_mask = 16 * 1024 - 1;
     const std::size_t image_size = static_cast<std::size_t>(w) * h * sizeof(std::uint32_t);
     const std::size_t image_span = (image_size + page_mask) & ~page_mask;
-    const std::size_t mapping_size = image_span * 2;
     // The title has one active player. Reuse its flexible memory across opens.
-    if (mapping_size > g_picture_mapping_size)
+    if (!g_picture_mapping)
     {
-        constexpr std::size_t hd_capacity = 16 * 1024 * 1024;
-        constexpr std::size_t uhd_capacity = 64 * 1024 * 1024;
-        const std::size_t capacity = mapping_size <= hd_capacity ? hd_capacity : uhd_capacity;
+        constexpr std::size_t capacity = 16 * 1024 * 1024;
         void *mapping = nullptr;
         const int result = sceKernelMapFlexibleMemory(&mapping, capacity, 0x03, 0);
         if (result != 0 || !mapping)
@@ -523,14 +668,7 @@ bool alloc_picture(int w, int h, char *why, int why_cap) noexcept
             copy_text(why, why_cap, "video buffer mapping failed");
             return false;
         }
-        if (g_picture_mapping)
-        {
-            const int unmapped = sceKernelMunmap(g_picture_mapping, g_picture_mapping_size);
-            record_decode("old picture mapping unmap", unmapped,
-                          static_cast<int>(g_picture_mapping_size), 0);
-        }
         g_picture_mapping = mapping;
-        g_picture_mapping_size = capacity;
         record_decode("picture mapping allocated", 0, static_cast<int>(capacity), 0);
     }
     g_w = w;
@@ -607,6 +745,7 @@ bool try_hardware(const AVStream *st) noexcept
     copy_text(g_mode, static_cast<int>(sizeof g_mode), "HW");
     g_hw_presented = 0;
     record_decode("hardware decoder ready", w, h, 0);
+    record_decode("hardware display buffer", g_w, g_h, 0);
     return true;
 }
 #endif
@@ -621,7 +760,8 @@ bool available() noexcept
 #endif
 }
 
-bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
+bool open(const char *path, char *why, int why_cap, PcmFn pcm,
+          const torrent::VerifiedFile *stream) noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
     close();
@@ -632,8 +772,33 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
         copy_text(why, why_cap, "empty path");
         return false;
     }
-    if (avformat_open_input(&g_fmt, path, mpeg_program_stream(path), nullptr) < 0)
+    const bool needs_probe = !stream || stream->complete();
+    const AVInputFormat *input_hint = !stream ? mpeg_program_stream(path) :
+        needs_probe ? nullptr : av_find_input_format(stream->uses_cache() ? "matroska" : "mov");
+    if (stream)
     {
+        constexpr int buffer_size = 32 * 1024;
+        auto *buffer = static_cast<std::uint8_t *>(av_malloc(buffer_size));
+        g_fmt = avformat_alloc_context();
+        if (buffer && g_fmt && (needs_probe || input_hint))
+            g_torrent_io = avio_alloc_context(buffer, buffer_size, 0, nullptr,
+                                             torrent_read, nullptr, torrent_seek);
+        if (!g_torrent_io)
+        {
+            av_free(buffer);
+            avformat_free_context(g_fmt);
+            g_fmt = nullptr;
+            copy_text(why, why_cap, "Could not initialize progressive input");
+            return false;
+        }
+        g_torrent_input = stream;
+        g_fmt->pb = g_torrent_io;
+        g_fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
+    }
+    const int opened = avformat_open_input(&g_fmt, path, input_hint, nullptr);
+    if (opened < 0)
+    {
+        record_decode("input open failed", opened, input_hint != nullptr, 0);
         copy_text(why, why_cap, "FFmpeg could not open the file");
         close();
         return false;
@@ -643,7 +808,8 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
      * streams (VLC packetizes from extra data, not from a CPU decoder). */
     g_fmt->probesize = 1 << 20;
     g_fmt->max_analyze_duration = AV_TIME_BASE;
-    if (avformat_find_stream_info(g_fmt, nullptr) < 0 && g_fmt->nb_streams == 0)
+    if ((needs_probe && avformat_find_stream_info(g_fmt, nullptr) < 0 && g_fmt->nb_streams == 0) ||
+        (!needs_probe && g_fmt->nb_streams == 0))
     {
         copy_text(why, why_cap, "no streams");
         close();
@@ -653,6 +819,8 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
     g_aindex = av_find_best_stream(g_fmt, AVMEDIA_TYPE_AUDIO, -1, g_vindex, nullptr, 0);
     if (g_vindex < 0)
     {
+        record_decode("no video stream", g_vindex, input_hint != nullptr,
+                      g_fmt->nb_streams);
         copy_text(why, why_cap, "no video stream");
         close();
         return false;
@@ -682,12 +850,14 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
             g_aindex = -1;
         }
     }
+    snapshot_tracks();
     g_tb = st->time_base;
     g_duration = g_fmt->duration > 0 ? static_cast<double>(g_fmt->duration) / AV_TIME_BASE : 0;
     g_pcm = pcm;
     g_clock = 0;
     g_pts = 0;
     g_ended = false;
+    g_torrent_error = false;
 
     if (id == AV_CODEC_ID_HEVC || supports_hardware_h264(st->codecpar))
     {
@@ -723,10 +893,6 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
     }
     int w = g_vcodec->width;
     int h = g_vcodec->height;
-    if (w > 1920)
-        w = 1920;
-    if (h > 1080)
-        h = 1080;
     if (!alloc_picture(w, h, why, why_cap))
     {
         close();
@@ -744,8 +910,27 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm) noexcept
 #else
     (void)path;
     (void)pcm;
+    (void)stream;
     if (why && why_cap > 0)
         std::snprintf(why, static_cast<std::size_t>(why_cap), "FFmpeg not linked in this binary");
+    return false;
+#endif
+}
+
+bool progressive() noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    return g_torrent_input != nullptr;
+#else
+    return false;
+#endif
+}
+
+bool seekable() noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    return !g_torrent_input || g_torrent_input->uses_cache() || g_torrent_input->complete();
+#else
     return false;
 #endif
 }
@@ -760,6 +945,14 @@ void close() noexcept
     pthread_mutex_lock(&g_lock);
     if (g_hw)
     {
+        if (g_hw_calls)
+        {
+            record_decode("hardware timing ms and mean feed us",
+                          static_cast<int>((monotonic_us() - g_hw_first_us) / 1000),
+                          static_cast<int>(g_hw_total_us / g_hw_calls), g_hw_presented);
+            record_decode("mean hardware conversion us", hwdec_mean_conversion_us(g_hw),
+                          0, g_hw_presented);
+        }
         hwdec_close(g_hw);
         g_hw = nullptr;
     }
@@ -775,7 +968,19 @@ void close() noexcept
         avcodec_free_context(&g_vcodec);
     if (g_fmt)
         avformat_close_input(&g_fmt);
+    if (g_torrent_io)
+    {
+        av_freep(&g_torrent_io->buffer);
+        avio_context_free(&g_torrent_io);
+    }
+    g_torrent_input = nullptr;
+    g_torrent_offset = 0;
+    g_peer_buffering = false;
+    g_pending_seek = -1;
+    g_seek_picture = -1;
     reset_resampler();
+    sws_freeContext(g_scaler);
+    g_scaler = nullptr;
     g_pcm_reported = false;
     g_pcm_frames = 0;
     std::free(g_pcm_buf);
@@ -784,10 +989,17 @@ void close() noexcept
     g_pcm_buf = nullptr;
     g_pcm_cap = 0;
     g_hw_demux_result = 0;
+    g_sw_presented = 0;
+    g_sw_errors = 0;
+    g_hw_calls = 0;
+    g_hw_total_us = 0;
     g_sw_demux_eof = false;
     g_w = g_h = 0;
+    g_src_w = g_src_h = 0;
     g_vindex = g_aindex = -1;
+    g_audio_tracks.count = g_subtitle_tracks.count = 0;
     g_ended = false;
+    g_torrent_error = false;
     g_clock = g_pts = g_duration = 0;
     g_pcm = nullptr;
     if (had_media)
@@ -807,22 +1019,24 @@ bool active() noexcept
 #endif
 }
 
-bool ended() noexcept
+EndState end_state() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
     pthread_mutex_lock(&g_lock);
-    const bool result = g_fmt && g_ended;
+    auto result = EndState::pending;
+    if (g_fmt && g_ended && !g_reading_packet && g_pending_seek.load() < 0)
+        result = g_torrent_error ? EndState::torrent_error : EndState::eof;
     pthread_mutex_unlock(&g_lock);
     return result;
 #else
-    return false;
+    return EndState::pending;
 #endif
 }
 
 int width() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    return g_w;
+    return g_src_w;
 #else
     return 0;
 #endif
@@ -831,7 +1045,7 @@ int width() noexcept
 int height() noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    return g_h;
+    return g_src_h;
 #else
     return 0;
 #endif
@@ -861,10 +1075,10 @@ double duration() noexcept
 void with_picture(PictureFn draw, void *context) noexcept
 {
 #ifdef MOVIAN_HAVE_FFMPEG
-    pthread_mutex_lock(&g_lock);
+    pthread_mutex_lock(&g_picture_lock);
     if (g_front)
         draw(context, g_front, g_w, g_h);
-    pthread_mutex_unlock(&g_lock);
+    pthread_mutex_unlock(&g_picture_lock);
 #else
     (void)draw;
     (void)context;
@@ -899,7 +1113,8 @@ bool tick(double dt) noexcept
     if (dt > 0.25)
         dt = 0.25;
     pthread_mutex_lock(&g_lock);
-    g_clock += dt;
+    if (!g_peer_buffering)
+        g_clock += dt;
     pthread_mutex_unlock(&g_lock);
     return true;
 #else
@@ -908,16 +1123,29 @@ bool tick(double dt) noexcept
 #endif
 }
 
-void seek(double seconds) noexcept
-{
 #ifdef MOVIAN_HAVE_FFMPEG
-    if (!g_fmt)
-        return;
-    if (seconds < 0)
-        seconds = 0;
-    pthread_mutex_lock(&g_lock);
+namespace
+{
+bool seek_locked(double seconds) noexcept
+{
+    g_seek_picture = -1;
     const int64_t ts = static_cast<int64_t>(seconds * static_cast<double>(AV_TIME_BASE));
-    if (av_seek_frame(g_fmt, -1, ts, AVSEEK_FLAG_BACKWARD) >= 0)
+    if (g_torrent_input)
+    {
+        g_torrent_io->error = 0;
+        g_torrent_io->eof_reached = 0;
+        g_reading_packet = true;
+        pthread_mutex_unlock(&g_lock);
+    }
+    const int result = av_seek_frame(g_fmt, -1, ts, AVSEEK_FLAG_BACKWARD);
+    if (g_torrent_input)
+    {
+        pthread_mutex_lock(&g_lock);
+        g_reading_packet = false;
+        record_decode(result >= 0 ? "torrent seek complete" : "torrent seek failed",
+                      static_cast<int>(seconds), result, 0);
+    }
+    if (result >= 0)
     {
         audio::clear();
         g_pcm_frames = 0;
@@ -932,14 +1160,107 @@ void seek(double seconds) noexcept
             hwdec_reset(g_hw);
         g_hw_demux_result = 0;
         g_sw_demux_eof = false;
+        g_sw_errors = 0;
         g_ended = false;
+        g_torrent_error = false;
+        if (g_torrent_input) g_seek_picture = seconds;
         g_clock = seconds;
         g_pts = seconds;
         pull_one();
     }
+    return result >= 0;
+}
+}
+#endif
+
+void seek(double seconds) noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    if (!g_fmt || !seekable())
+        return;
+    if (seconds < 0)
+        seconds = 0;
+    if (g_torrent_input)
+    {
+        g_pending_seek.store(seconds, std::memory_order_relaxed);
+        return;
+    }
+    pthread_mutex_lock(&g_lock);
+    seek_locked(seconds);
     pthread_mutex_unlock(&g_lock);
 #else
     (void)seconds;
+#endif
+}
+
+int track_count(TrackKind kind) noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    return (kind == TrackKind::audio ? g_audio_tracks : g_subtitle_tracks).count;
+#else
+    (void)kind;
+    return 0;
+#endif
+}
+
+bool track(TrackKind kind, int row, Track &value) noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    const auto &list = kind == TrackKind::audio ? g_audio_tracks : g_subtitle_tracks;
+    if (row >= 0 && row < list.count)
+    {
+        value = list.tracks[row];
+        return true;
+    }
+#else
+    (void)kind;
+    (void)row;
+    (void)value;
+#endif
+    return false;
+}
+
+int selected_audio_track() noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    return g_aindex;
+#else
+    return -1;
+#endif
+}
+
+bool select_audio_track(int stream) noexcept
+{
+#ifdef MOVIAN_HAVE_FFMPEG
+    pthread_mutex_lock(&g_lock);
+    bool selected = false;
+    if (g_fmt && !g_torrent_input && !g_ended && stream >= 0 &&
+        static_cast<unsigned>(stream) < g_fmt->nb_streams &&
+        g_fmt->streams[stream]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+    {
+        AVCodecContext *next = nullptr;
+        if (stream == g_aindex)
+            selected = true;
+        else if (open_codec(&next, stream) == 0)
+        {
+            avcodec_free_context(&g_acodec);
+            g_acodec = next;
+            g_aindex = stream;
+            reset_resampler();
+            audio::clear();
+            g_pcm_frames = 0;
+            g_pcm_reported = false;
+            record_decode("audio track selected", stream, next->codec_id, 0);
+            selected = true;
+        }
+        else
+            avcodec_free_context(&next);
+    }
+    pthread_mutex_unlock(&g_lock);
+    return selected;
+#else
+    (void)stream;
+    return false;
 #endif
 }
 } // namespace movian::avdec

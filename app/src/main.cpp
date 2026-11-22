@@ -9,6 +9,7 @@
  */
 
 #include "audio.hpp"
+#include "diagnostics.hpp"
 #include "font.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
@@ -20,6 +21,7 @@
 namespace {
 void checkpoint(const char *message)
 {
+    movian::diagnostics::record("startup", "%s", message);
     std::fprintf(stderr, "[movian-hevc-test] %s\n", message);
     std::fflush(stderr);
     if (auto *file = std::fopen(MOVIAN_DOWNLOAD0 "/hevc-test-startup.log", "a")) {
@@ -31,13 +33,13 @@ void checkpoint(const char *message)
 
 int main()
 {
-    checkpoint("v15 entered main");
+    checkpoint("v52 entered main");
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
         movian::screen::notify("Movian: fonts missing from title folder");
-    checkpoint("v15 fonts attempted");
+    checkpoint("v52 fonts attempted");
     (void)movian::pad::init();
-    checkpoint("v15 pad initialized");
+    checkpoint("v52 pad initialized");
     movian::ui::load();
-    checkpoint("v15 UI loaded; waiting for Cross");
+    checkpoint("v52 UI loaded; waiting for Cross");
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

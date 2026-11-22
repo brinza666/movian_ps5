@@ -11,6 +11,10 @@ WORK=${MOVIAN_FFMPEG_BUILD_ROOT:-$ROOT/.deps}
 SRC=$WORK/ffmpeg-$VER
 TARBALL=$WORK/ffmpeg-$VER.tar.xz
 PREFIX=$ROOT/.deps/ffmpeg-ps5
+DAV1D_VER=1.5.4
+DAV1D_SHA256=686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5
+DAV1D_SRC=$WORK/dav1d-$DAV1D_VER
+DAV1D_PREFIX=$WORK/dav1d-ps5
 JOBS=$(nproc 2>/dev/null || echo 2)
 
 [[ -x $SDK/bin/prospero-clang ]] || {
@@ -19,6 +23,35 @@ JOBS=$(nproc 2>/dev/null || echo 2)
 }
 
 mkdir -p "$WORK" "$ROOT/.deps"
+
+if [[ ! -f $DAV1D_PREFIX/lib/libdav1d.a ]]; then
+    dav1d_tar=$WORK/dav1d-$DAV1D_VER.tar.xz
+    if [[ ! -f $dav1d_tar ]]; then
+        curl -fsSL -o "$dav1d_tar" \
+            "https://download.videolan.org/pub/videolan/dav1d/$DAV1D_VER/dav1d-$DAV1D_VER.tar.xz"
+    fi
+    echo "$DAV1D_SHA256  $dav1d_tar" | sha256sum -c -
+    if [[ ! -d $DAV1D_SRC ]]; then
+        tar -C "$WORK" -xf "$dav1d_tar"
+    fi
+    cat > "$WORK/dav1d-cross.ini" <<EOF
+[binaries]
+c = '$SDK/bin/prospero-clang'
+ar = '$SDK/bin/prospero-ar'
+strip = '$SDK/bin/prospero-strip'
+
+[host_machine]
+system = 'freebsd'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+EOF
+    meson setup "$WORK/dav1d-build" "$DAV1D_SRC" --cross-file "$WORK/dav1d-cross.ini" \
+        --prefix "$DAV1D_PREFIX" --libdir lib --default-library static \
+        -Db_staticpic=true -Denable_asm=false -Denable_tools=false -Denable_tests=false
+    meson compile -C "$WORK/dav1d-build"
+    meson install -C "$WORK/dav1d-build"
+fi
 if [[ ! -d $SRC ]]; then
     if [[ ! -f $TARBALL ]]; then
         curl -fsSL -o "$TARBALL" \
@@ -32,9 +65,9 @@ cd "$SRC"
 # Reconfigure when the parser/bsf set changes. HEVC parser only (no software
 # HEVC decoder: that crashed this title). VLC packetizes from extra data;
 # FFmpeg still needs the parser to name hev1/hvc1 streams.
-if [[ ! -f ffbuild/config.mak ]] || ! grep -q 'CONFIG_EAC3_DECODER 1' config_components.h 2>/dev/null; then
+if [[ ! -f ffbuild/config.mak ]] || ! grep -q '#define CONFIG_LIBDAV1D_DECODER 1' config_components.h 2>/dev/null; then
     make distclean >/dev/null 2>&1 || true
-    ./configure \
+    PKG_CONFIG_LIBDIR="$DAV1D_PREFIX/lib/pkgconfig" ./configure \
         --prefix="$PREFIX" \
         --cc="$SDK/bin/prospero-clang" \
         --ar="$SDK/bin/prospero-ar" \
@@ -52,8 +85,9 @@ if [[ ! -f ffbuild/config.mak ]] || ! grep -q 'CONFIG_EAC3_DECODER 1' config_com
         --disable-x86asm --disable-inline-asm --disable-autodetect \
         --disable-everything \
         --enable-demuxer=mpegps,mpegts,mov,matroska,avi,mp3,aac \
-        --enable-decoder=mpeg1video,mpeg2video,h264,aac,eac3,mp2,mp3,pcm_s16le \
-        --enable-parser=mpegvideo,h264,hevc,aac,ac3,mpegaudio \
+        --enable-libdav1d --pkg-config-flags=--static \
+        --enable-decoder=mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9,libdav1d,rawvideo,aac,ac3,eac3,mp2,mp3,opus,vorbis,pcm_s16le \
+        --enable-parser=mpegvideo,mpeg4video,h264,hevc,vp8,vp9,av1,aac,ac3,mpegaudio,opus,vorbis \
         --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb \
         --enable-protocol=file \
         --extra-cflags="-O2 -fPIC" \
@@ -61,4 +95,5 @@ if [[ ! -f ffbuild/config.mak ]] || ! grep -q 'CONFIG_EAC3_DECODER 1' config_com
 fi
 make -j"$JOBS"
 make install
+install -m 644 "$DAV1D_PREFIX/lib/libdav1d.a" "$PREFIX/lib/libdav1d.a"
 echo "ffmpeg static libs in $PREFIX"

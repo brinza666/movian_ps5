@@ -21,6 +21,7 @@ enum class Kind : unsigned char
     directory,
     video,
     audio,
+    package,
     other,
 };
 
@@ -32,6 +33,12 @@ struct Entry
     long long size = 0;
     long long mtime = 0;
 };
+
+enum class SortOrder { filename, newest, oldest };
+
+int list_directory(const char *path, Entry *out, int cap, int *count, int *err,
+                   bool include_other, SortOrder order, bool folders_first,
+                   const char *file_extension = nullptr) noexcept;
 
 // Walks one directory. Hidden names (leading '.') are skipped. Returns 0 when
 // the directory opened, -1 when it did not. *err is 0 on success, else errno

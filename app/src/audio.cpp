@@ -5,6 +5,7 @@
  */
 
 #include "audio.hpp"
+#include "diagnostics.hpp"
 
 #include <atomic>
 #include <cstddef>
@@ -195,9 +196,11 @@ bool drained() noexcept
 void log_drain() noexcept
 {
     const RingGuard lock;
+    diagnostics::record("audio", "drain submitted=%llu nonzero=%llu dropped=%llu result=%#x",
+                        g_submitted, g_nonzero, g_dropped, static_cast<unsigned>(g_output_error));
     if (auto *log = std::fopen("/download0/hevc-test-decode.log", "a"))
     {
-        std::fprintf(log, "v15 AudioOut drain submitted=%llu nonzero=%llu dropped=%llu rc=%#x ready=%d\n",
+        std::fprintf(log, "v52 AudioOut drain submitted=%llu nonzero=%llu dropped=%llu rc=%#x ready=%d\n",
                      g_submitted, g_nonzero, g_dropped, static_cast<unsigned>(g_output_error),
                      g_ready.load(std::memory_order_relaxed));
         std::fclose(log);

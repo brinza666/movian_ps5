@@ -19,9 +19,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 #define PL_MPEG_IMPLEMENTATION
 #include "pl_mpeg.h"
@@ -44,13 +46,27 @@ movian::image::Image g_picture{};
 std::uint64_t g_last_ms = 0;
 std::atomic<bool> g_paused{false};
 bool g_ended = false;
-bool g_osd = false;
-int g_osd_row = 0;
+bool g_torrent_error = false;
+enum class Panel { hidden, transport, audio, subtitles, settings, video, sound, caption };
+enum class Control { audio, previous, rewind, pause, forward, next, subtitles, settings };
+constexpr const char *control_labels[]{
+    "Audio tracks", "Previous", "Rewind", "Play / Pause", "Seek forward", "Next", "Subtitles", "Settings"
+};
+constexpr int default_control = static_cast<int>(Control::pause);
+constexpr int visible_tracks = 7;
+
+Panel g_panel = Panel::hidden;
+int g_control = default_control;
+int g_panel_row = 0;
+int g_first_track = 0;
+double g_seek_preview = 0;
+bool g_scrubbing = false;
 int g_src_w = 0;
 int g_src_h = 0;
 int g_src_rate = 0;
 double g_duration = 0;
 std::uint64_t g_saved_ms = 0;
+std::uint64_t g_opened_ms = 0;
 
 bool ends_with_ci(const char *name, const char *ext) noexcept
 {
@@ -139,10 +155,11 @@ void on_audio(plm_t *, plm_samples_t *samples, void *) noexcept
 
 void format_time(char *dst, int cap, double seconds) noexcept
 {
-    if (seconds < 0)
-        seconds = 0;
-    const int t = static_cast<int>(seconds);
-    std::snprintf(dst, static_cast<std::size_t>(cap), "%d:%02d", t / 60, t % 60);
+    const auto t = std::isfinite(seconds) ? static_cast<unsigned>(std::clamp(seconds, 0.0, 35999999.0)) : 0U;
+    if (t >= 3600)
+        std::snprintf(dst, static_cast<std::size_t>(cap), "%u:%02u:%02u", t / 3600, t / 60 % 60, t % 60);
+    else
+        std::snprintf(dst, static_cast<std::size_t>(cap), "%u:%02u", t / 60, t % 60);
 }
 
 double seek_step() noexcept
@@ -168,11 +185,20 @@ void on_ffmpeg_pcm(const float *interleaved, int frames, int rate) noexcept
     resample_push(interleaved, frames, rate);
 }
 
-void seek_by(double delta) noexcept
+bool can_seek() noexcept
+{
+    return active() && (!g_use_ffmpeg || avdec::seekable());
+}
+
+void seek_to(double t) noexcept
 {
     if (!g_plm && !g_use_ffmpeg)
         return;
-    double t = (g_use_ffmpeg ? avdec::time() : plm_get_time(g_plm)) + delta;
+    if (!can_seek())
+    {
+        screen::notify("Seeking is unavailable during progressive playback");
+        return;
+    }
     if (t < 0)
         t = 0;
     if (g_duration > 0 && t > g_duration)
@@ -181,6 +207,7 @@ void seek_by(double delta) noexcept
     {
         avdec::seek(t);
         g_ended = false;
+        g_torrent_error = false;
     }
     else
     {
@@ -191,99 +218,146 @@ void seek_by(double delta) noexcept
     persist_resume();
 }
 
-constexpr int osd_row_count = 7;
-
-const char *osd_title(int row) noexcept
+void seek_by(double delta) noexcept
 {
-    switch (row)
+    seek_to(time() + delta);
+}
+
+void reset_overlay() noexcept
+{
+    g_panel = Panel::hidden;
+    g_control = default_control;
+    g_panel_row = 0;
+    g_first_track = 0;
+    g_scrubbing = false;
+}
+
+int picker_count() noexcept
+{
+    if (g_panel == Panel::subtitles)
+        return 1 + avdec::track_count(avdec::TrackKind::subtitle);
+    return std::max(1, avdec::track_count(avdec::TrackKind::audio));
+}
+
+void move_picker(int row) noexcept
+{
+    g_panel_row = std::clamp(row, 0, picker_count() - 1);
+    if (g_panel_row < g_first_track)
+        g_first_track = g_panel_row;
+    if (g_panel_row >= g_first_track + visible_tracks)
+        g_first_track = g_panel_row - visible_tracks + 1;
+}
+
+void open_control(Control control, bool (*skip)(int, bool)) noexcept
+{
+    g_panel_row = 0;
+    g_first_track = 0;
+    switch (control)
     {
-    case 0:
-        return "Pause / play";
-    case 1:
-        return "Mute";
-    case 2:
-        return "Volume";
-    case 3:
-        return "Seek step";
-    case 4:
-        return "Repeat";
-    case 5:
-        return "Shuffle";
-    default:
-        return "Bookmark this file";
+    case Control::audio:
+    {
+        g_panel = Panel::audio;
+        const int selected = avdec::selected_audio_track();
+        avdec::Track track{};
+        for (int row = 0; avdec::track(avdec::TrackKind::audio, row, track); ++row)
+        {
+            if (track.stream == selected)
+            {
+                move_picker(row);
+                break;
+            }
+        }
+        break;
+    }
+    case Control::previous:
+        if (!skip || !skip(-1, true))
+            seek_to(0);
+        break;
+    case Control::rewind: seek_by(-seek_step()); break;
+    case Control::pause: toggle_pause(); break;
+    case Control::forward: seek_by(seek_step()); break;
+    case Control::next:
+        if (!skip || !skip(1, true))
+            screen::notify("There is no next video in the queue");
+        break;
+    case Control::subtitles: g_panel = Panel::subtitles; break;
+    case Control::settings: g_panel = Panel::settings; break;
     }
 }
 
-void osd_value(int row, char *dst, int cap) noexcept
+constexpr const char *settings_rows[]{"Video settings", "Audio settings", "Subtitle settings"};
+constexpr const char *video_rows[]{"Seek step", "Repeat", "Shuffle", "Bookmark this file", "Video adjustments"};
+constexpr const char *sound_rows[]{"Mute", "Volume", "Audio delay"};
+constexpr const char *caption_rows[]{"Subtitle delay", "Subtitle size", "Subtitle position"};
+
+std::pair<const char *const *, int> rows_for(Panel panel) noexcept
 {
-    switch (row)
+    switch (panel)
     {
-    case 0:
-        copy_text(dst, cap, g_ended ? "ended" : g_paused ? "paused" : "playing");
-        break;
-    case 1:
-        copy_text(dst, cap, audio::muted() ? "on" : "off");
-        break;
-    case 2:
-        std::snprintf(dst, static_cast<std::size_t>(cap), "%d%%", audio::volume());
-        break;
-    case 3:
-        std::snprintf(dst, static_cast<std::size_t>(cap), "%ds", settings::get().seek_step);
-        break;
-    case 4:
-        copy_text(dst, cap, settings::repeat_label());
-        break;
-    case 5:
-        copy_text(dst, cap, settings::get().shuffle ? "on" : "off");
-        break;
-    default:
-        copy_text(dst, cap, settings::is_bookmarked(g_path) ? "saved" : "not saved");
-        break;
+    case Panel::video: return {video_rows, std::size(video_rows)};
+    case Panel::sound: return {sound_rows, std::size(sound_rows)};
+    case Panel::caption: return {caption_rows, std::size(caption_rows)};
+    default: return {settings_rows, std::size(settings_rows)};
     }
 }
 
-void osd_activate() noexcept
+void change_setting(int direction, bool activate) noexcept
 {
-    switch (g_osd_row)
+    if (g_panel == Panel::settings)
     {
-    case 0:
-        g_paused = !g_paused;
-        if (g_paused)
-            audio::clear();
-        g_last_ms = screen::now_ms();
-        break;
-    case 1:
+        if (activate)
+        {
+            constexpr Panel pages[]{Panel::video, Panel::sound, Panel::caption};
+            g_panel = pages[g_panel_row];
+            g_panel_row = 0;
+        }
+        return;
+    }
+    if (g_panel == Panel::sound && g_panel_row == 0)
         audio::set_mute(!audio::muted());
-        screen::notify(audio::muted() ? "Muted" : "Unmuted");
-        break;
-    case 2:
-        settings::cycle_volume(1);
+    else if (g_panel == Panel::sound && g_panel_row == 1)
+    {
+        settings::cycle_volume(direction);
         audio::set_volume(settings::get().volume);
-        screen::notify("Volume");
-        break;
-    case 3:
-        settings::cycle_seek(1);
-        screen::notify("Seek step");
-        break;
-    case 4:
-        settings::cycle_repeat(1);
-        screen::notify("Repeat");
-        break;
-    case 5:
+    }
+    else if (g_panel == Panel::video && g_panel_row == 0)
+        settings::cycle_seek(direction);
+    else if (g_panel == Panel::video && g_panel_row == 1)
+        settings::cycle_repeat(direction);
+    else if (g_panel == Panel::video && g_panel_row == 2)
+    {
         settings::get().shuffle = !settings::get().shuffle;
         settings::save();
-        screen::notify(settings::get().shuffle ? "Shuffle on" : "Shuffle off");
-        break;
-    default:
-        if (!g_path[0])
-            break;
-        if (settings::toggle_bookmark(g_path, g_title))
-            screen::notify("Bookmarked");
-        else
-            screen::notify("Bookmark removed");
-        break;
     }
+    else if (g_panel == Panel::video && g_panel_row == 3)
+        settings::toggle_bookmark(g_path, g_title);
+    else if (activate)
+        screen::notify("This playback setting is pending on PS5");
 }
+
+void activate_track() noexcept
+{
+    avdec::Track track{};
+    if (g_panel == Panel::subtitles)
+    {
+        if (g_panel_row == 0)
+            g_panel = Panel::transport;
+        else
+            screen::notify("Subtitle rendering is pending on PS5");
+        return;
+    }
+    if (!avdec::track(avdec::TrackKind::audio, g_panel_row, track))
+        screen::notify(g_src_rate > 0 ? "Using the default audio track" : "No audio tracks available");
+    else if (track.stream == avdec::selected_audio_track())
+        screen::notify("Audio track already selected");
+    else if (!track.supported)
+        screen::notify("No decoder for this audio track");
+    else if (g_use_ffmpeg && avdec::progressive())
+        screen::notify("Audio track switching during torrent playback is pending");
+    else if (!avdec::select_audio_track(track.stream))
+        screen::notify("Could not switch to this audio track");
+}
+
 } // namespace
 
 Kind classify(const char *path) noexcept
@@ -300,7 +374,8 @@ Kind classify(const char *path) noexcept
     return Kind::none;
 }
 
-bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
+bool open(const char *path, char *why, int why_cap, bool from_start,
+          const torrent::VerifiedFile *stream) noexcept
 {
     close();
     if (!path || !path[0])
@@ -322,7 +397,7 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
         if (!audio::init())
             fprintf(stderr, "[movian] player: audio init failed\n");
         audio::set_volume(settings::get().volume);
-        if (!avdec::open(path, why, why_cap, on_ffmpeg_pcm))
+        if (!avdec::open(path, why, why_cap, on_ffmpeg_pcm, stream))
             return false;
         g_use_ffmpeg = true;
         g_src_w = avdec::width();
@@ -332,13 +407,13 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
         copy_text(g_title, static_cast<int>(sizeof g_title), basename_of(path));
         g_paused = false;
         g_ended = false;
-        g_osd = false;
-        g_osd_row = 0;
+        g_torrent_error = false;
+        reset_overlay();
         g_last_ms = screen::now_ms();
-        g_saved_ms = g_last_ms;
+        g_saved_ms = g_opened_ms = g_last_ms;
         g_error[0] = 0;
         double resume_at = 0;
-        if (!from_start && settings::get().resume && settings::resume_for(path, &resume_at, nullptr) &&
+        if (!stream && !from_start && settings::get().resume && settings::resume_for(path, &resume_at, nullptr) &&
             resume_at > 1.0)
             avdec::seek(resume_at);
         return true;
@@ -384,10 +459,10 @@ bool open(const char *path, char *why, int why_cap, bool from_start) noexcept
     copy_text(g_title, static_cast<int>(sizeof g_title), basename_of(path));
     g_paused = false;
     g_ended = false;
-    g_osd = false;
-    g_osd_row = 0;
+    g_torrent_error = false;
+    reset_overlay();
     g_last_ms = screen::now_ms();
-    g_saved_ms = g_last_ms;
+    g_saved_ms = g_opened_ms = g_last_ms;
     g_error[0] = 0;
     if (!audio::init())
     {
@@ -430,8 +505,8 @@ void close() noexcept
     g_title[0] = 0;
     g_paused = false;
     g_ended = false;
-    g_osd = false;
-    g_osd_row = 0;
+    g_torrent_error = false;
+    reset_overlay();
     g_src_w = g_src_h = g_src_rate = 0;
     g_duration = 0;
 }
@@ -470,7 +545,7 @@ double duration() noexcept
 
 bool ended() noexcept
 {
-    return (g_plm || g_use_ffmpeg) && g_ended;
+    return (g_plm || g_use_ffmpeg) && g_ended && !g_torrent_error;
 }
 
 int width() noexcept
@@ -483,70 +558,111 @@ int height() noexcept
     return g_src_h;
 }
 
-bool handle(unsigned pressed) noexcept
+void toggle_pause() noexcept
 {
-    if (!g_plm && !g_use_ffmpeg)
-        return false;
-    bool dirty = pressed != 0;
-    if (pressed & pad::options)
+    if (!active()) return;
+    if (g_ended)
     {
-        g_osd = !g_osd;
+        if (!can_seek()) return;
+        seek_to(0);
+        g_paused = false;
+    }
+    else
+        g_paused = !g_paused;
+    if (g_paused) audio::clear();
+    g_last_ms = screen::now_ms();
+    persist_resume();
+}
+
+void seek_step_by(int direction) noexcept
+{
+    if (active()) seek_by(direction * seek_step());
+}
+
+bool handle(unsigned pressed, bool (*skip)(int, bool)) noexcept
+{
+    if (!active() || !pressed)
+        return false;
+    if (pressed & pad::triangle)
+    {
+        if (g_panel == Panel::hidden)
+        {
+            g_panel = Panel::transport;
+            g_control = default_control;
+        }
+        else
+            reset_overlay();
         return true;
     }
-    if (g_osd)
+    if (g_panel != Panel::hidden && (pressed & pad::circle))
+    {
+        if (g_panel == Panel::transport && g_scrubbing)
+            g_scrubbing = false;
+        else if (g_panel == Panel::transport)
+            reset_overlay();
+        else if (g_panel == Panel::video || g_panel == Panel::sound || g_panel == Panel::caption)
+        {
+            g_panel_row = g_panel == Panel::video ? 0 : g_panel == Panel::sound ? 1 : 2;
+            g_panel = Panel::settings;
+        }
+        else
+            g_panel = Panel::transport;
+        return true;
+    }
+    if (g_panel == Panel::transport)
     {
         if (pressed & pad::up)
-            g_osd_row = (g_osd_row + osd_row_count - 1) % osd_row_count;
+        {
+            if (can_seek() && g_duration > 0 && !g_scrubbing)
+            {
+                g_scrubbing = true;
+                g_seek_preview = std::clamp(time(), 0.0, g_duration);
+            }
+            else if (!g_scrubbing)
+                screen::notify("Seeking is unavailable for this video");
+        }
         if (pressed & pad::down)
-            g_osd_row = (g_osd_row + 1) % osd_row_count;
-        if (pressed & pad::left)
+            g_scrubbing = false;
+
+        const int direction = !!(pressed & pad::right) - !!(pressed & pad::left);
+        if (g_scrubbing)
         {
-            if (g_osd_row == 2)
+            const double step = std::min(seek_step(), g_duration / 20.0);
+            g_seek_preview = std::clamp(g_seek_preview + direction * step, 0.0, g_duration);
+            if (pressed & pad::cross)
             {
-                settings::cycle_volume(-1);
-                audio::set_volume(settings::get().volume);
-            }
-            else if (g_osd_row == 3)
-                settings::cycle_seek(-1);
-            else if (g_osd_row == 4)
-                settings::cycle_repeat(-1);
-            else if (g_osd_row == 5)
-            {
-                settings::get().shuffle = !settings::get().shuffle;
-                settings::save();
+                seek_to(g_seek_preview);
+                g_scrubbing = false;
             }
         }
-        if (pressed & pad::right)
+        else
         {
-            if (g_osd_row == 2)
-            {
-                settings::cycle_volume(1);
-                audio::set_volume(settings::get().volume);
-            }
-            else if (g_osd_row == 3)
-                settings::cycle_seek(1);
-            else if (g_osd_row == 4)
-                settings::cycle_repeat(1);
-            else if (g_osd_row == 5)
-            {
-                settings::get().shuffle = !settings::get().shuffle;
-                settings::save();
-            }
+            g_control = std::clamp(g_control + direction, 0, static_cast<int>(std::size(control_labels)) - 1);
+            if (pressed & pad::cross)
+                open_control(static_cast<Control>(g_control), skip);
         }
+        return true;
+    }
+    if (g_panel == Panel::audio || g_panel == Panel::subtitles)
+    {
+        const int delta = !!(pressed & pad::down) - !!(pressed & pad::up) +
+                          visible_tracks * (!!(pressed & pad::r2) - !!(pressed & pad::l2));
+        move_picker(g_panel_row + delta);
         if (pressed & pad::cross)
-            osd_activate();
-        if (pressed & pad::circle)
-            g_osd = false;
-        return dirty;
+            activate_track();
+        return true;
+    }
+    if (g_panel != Panel::hidden)
+    {
+        const int count = rows_for(g_panel).second;
+        const int delta = !!(pressed & pad::down) - !!(pressed & pad::up);
+        g_panel_row = (g_panel_row + delta + count) % count;
+        if (pressed & (pad::cross | pad::left | pad::right))
+            change_setting((pressed & pad::left) ? -1 : 1, (pressed & pad::cross) != 0);
+        return true;
     }
     if (pressed & pad::cross)
-    {
-        g_paused = !g_paused;
-        if (g_paused)
-            audio::clear();
-        g_last_ms = screen::now_ms();
-        persist_resume();
-    }
+        toggle_pause();
     if (pressed & pad::left)
         seek_by(-seek_step());
     if (pressed & pad::right)
@@ -571,7 +687,7 @@ bool handle(unsigned pressed) noexcept
         close();
         return true;
     }
-    return dirty;
+    return true;
 }
 
 bool tick() noexcept
@@ -594,12 +710,20 @@ bool tick() noexcept
         if (g_use_ffmpeg)
         {
             avdec::tick(dt);
-            if (avdec::ended() && audio::drained())
+            const auto end = avdec::end_state();
+            if (end != avdec::EndState::pending && audio::drained())
             {
                 g_ended = true;
                 g_paused = true;
                 audio::log_drain();
-                settings::clear_resume();
+                g_torrent_error = end == avdec::EndState::torrent_error;
+                if (g_torrent_error)
+                {
+                    persist_resume();
+                    screen::notify("Torrent playback interrupted. Reopen the torrent to retry.");
+                }
+                else
+                    settings::clear_resume();
             }
         }
         else
@@ -650,57 +774,163 @@ void draw(screen::Canvas &c) noexcept
     else
         draw_picture(c, g_picture);
 
-    c.rect(0, 0, screen::width, 64, Color::surface, 180);
-    c.text(48.f, 44.f, g_title[0] ? g_title : "MPEG-1", font::semibold, 24, Color::text);
-    char badge[48];
-    std::snprintf(badge, sizeof badge, "%s %s  %dx%d",
-                  g_use_ffmpeg ? avdec::mode() : "SW",
-                  g_use_ffmpeg ? (avdec::codec_name()[0] ? avdec::codec_name() : "FFmpeg") : "MPEG-1",
-                  g_src_w, g_src_h);
-    c.text(1480.f, 44.f, badge, font::mono_medium, 16, Color::accent);
-
-    const double t = time();
-    const double d = g_duration > 0 ? g_duration : 1;
-    char left[16], right[16];
-    format_time(left, sizeof left, t);
-    format_time(right, sizeof right, g_duration);
-    c.rect(0, 960, screen::width, 120, Color::surface, 200);
-    c.round_rect(80, 992, 1760, 10, 4, Color::line);
-    const int filled = static_cast<int>(1760.0 * (t / d));
-    c.round_rect(80, 992, filled < 4 ? 4 : filled, 10, 4, Color::accent);
-    c.text(80.f, 1040.f, left, font::mono_medium, 18, Color::muted);
-    c.text(1760.f, 1040.f, right, font::mono_medium, 18, Color::muted);
-    const char *state = g_ended ? "ended" : g_paused ? "paused" : "playing";
-    c.text(900.f, 1040.f, state, font::medium, 18, Color::text);
-    char hint[96];
-    std::snprintf(hint, sizeof hint,
-                  "Cross pause    L1/R1 prev/next    Left/Right %ds    Options menu    Circle back",
-                  settings::get().seek_step);
-    c.text(48.f, 1070.f, hint, font::regular, 16, Color::faint);
-
-    if (g_osd)
+    if (g_panel != Panel::hidden && g_panel != Panel::transport)
     {
-        c.round_rect(520, 140, 880, 740, 18, Color::surface, 230);
-        c.round_frame(520, 140, 880, 740, 18, 2, Color::accent, 200);
-        c.text(560.f, 200.f, "Playback", font::semibold, 28, Color::text);
-        char info[80];
-        std::snprintf(info, sizeof info, "%dx%d  %s  repeat %s  shuffle %s", g_src_w, g_src_h,
-                      g_ended ? "ended" : g_paused ? "paused" : "playing", settings::repeat_label(),
-                      settings::get().shuffle ? "on" : "off");
-        c.text(560.f, 238.f, info, font::regular, 16, Color::muted);
-        for (int i = 0; i < osd_row_count; ++i)
+        constexpr int x = 1020, y = 60, w = 840, line = 58;
+        const bool picker = g_panel == Panel::audio || g_panel == Panel::subtitles;
+        const auto [rows, settings_count] = rows_for(g_panel);
+        const char *heading = g_panel == Panel::audio ? "Audio / Video" :
+                             g_panel == Panel::subtitles ? "Subtitles" :
+                             g_panel == Panel::settings ? "Playback settings" :
+                             settings_rows[g_panel == Panel::video ? 0 : g_panel == Panel::sound ? 1 : 2];
+        const int count = picker ? picker_count() : settings_count;
+        const int first = picker ? g_first_track : 0;
+        const int end = std::min(count, first + visible_tracks);
+        const int height = 138 + (end - first) * line;
+        c.round_rect(x, y, w, height, 16, Color::surface, 242);
+        c.round_frame(x, y, w, height, 16, 2, Color::line);
+        c.text(x + 34.f, y + 54.f, heading, font::semibold, 30, Color::text);
+        if (count > visible_tracks)
         {
-            const int y = 270 + i * 78;
-            const bool on = i == g_osd_row;
-            if (on)
-                c.round_rect(590, y, 740, 60, 12, Color::hover);
-            c.text(620.f, static_cast<float>(y + 38), osd_title(i), font::medium, 22,
-                   on ? Color::text : Color::muted);
-            char value[32];
-            osd_value(i, value, static_cast<int>(sizeof value));
-            c.text(1080.f, static_cast<float>(y + 38), value, font::mono_medium, 20, Color::accent);
+            char page[24];
+            std::snprintf(page, sizeof page, "%d / %d", g_panel_row + 1, count);
+            c.text(x + 710.f, y + 52.f, page, font::mono_medium, 18, Color::muted);
+        }
+        for (int row = first; row < end; ++row)
+        {
+            const int top = y + 78 + (row - first) * line;
+            const bool focused = row == g_panel_row;
+            if (focused)
+                c.round_rect(x + 16, top, w - 32, line - 4, 10, Color::hover);
+            char value[40]{};
+            char description[112]{};
+            const char *label = nullptr;
+            bool selected = false;
+            avdec::Track track{};
+            if (g_panel == Panel::audio)
+            {
+                if (avdec::track(avdec::TrackKind::audio, row, track))
+                {
+                    label = track.title;
+                    selected = track.stream == avdec::selected_audio_track();
+                    std::snprintf(description, sizeof description, "%s  %s%s",
+                                  track.language[0] ? track.language : "Undetermined", track.format,
+                                  track.supported ? "" : "  (pending)");
+                }
+                else
+                {
+                    selected = g_src_rate > 0;
+                    label = selected ? "Default audio" : "No audio tracks available";
+                }
+            }
+            else if (g_panel == Panel::subtitles)
+            {
+                if (row == 0)
+                {
+                    selected = true;
+                    label = "Off";
+                    if (count == 1)
+                        copy_text(description, sizeof description, "No embedded subtitles found");
+                }
+                else if (avdec::track(avdec::TrackKind::subtitle, row - 1, track))
+                {
+                    label = track.title;
+                    std::snprintf(description, sizeof description, "%s  %s  (pending)",
+                                  track.language[0] ? track.language : "Undetermined", track.format);
+                }
+            }
+            else
+            {
+                label = rows[row];
+                if (g_panel == Panel::video)
+                {
+                    if (row == 0) std::snprintf(value, sizeof value, "%ds", settings::get().seek_step);
+                    if (row == 1) copy_text(value, sizeof value, settings::repeat_label());
+                    if (row == 2) copy_text(value, sizeof value, settings::get().shuffle ? "On" : "Off");
+                    if (row == 3) copy_text(value, sizeof value, settings::is_bookmarked(g_path) ? "Saved" : "Add");
+                    if (row == 4) copy_text(value, sizeof value, "Pending");
+                }
+                else if (g_panel == Panel::sound)
+                {
+                    if (row == 0) copy_text(value, sizeof value, audio::muted() ? "On" : "Off");
+                    if (row == 1) std::snprintf(value, sizeof value, "%d%%", audio::volume());
+                    if (row == 2) copy_text(value, sizeof value, "Pending");
+                }
+                else if (g_panel == Panel::caption)
+                    copy_text(value, sizeof value, "Pending");
+            }
+            if (selected)
+                c.rect(x + 30, top + 20, 10, 10, Color::accent);
+            c.clip(x + 60, top, description[0] ? 382 : w - 110, line);
+            c.text(x + 60.f, top + 34.f, label ? label : "", font::medium, 22, Color::text);
+            c.unclip();
+            if (description[0])
+            {
+                c.clip(x + 465, top, w - 485, line);
+                c.text(x + 465.f, top + 34.f, description, font::regular, 17, Color::muted);
+                c.unclip();
+            }
+            if (value[0])
+                c.text(x + 650.f, top + 34.f, value, font::mono_medium, 18, Color::accent);
+        }
+        c.text(x + 34.f, y + height - 23.f, "Cross select    Circle back", font::regular, 18, Color::muted);
+        return;
+    }
+
+    const bool transport = g_panel == Panel::transport;
+    if (!transport && !g_paused && !g_ended && !g_torrent_error &&
+        screen::now_ms() - g_opened_ms > 2600)
+        return;
+
+    constexpr int bar_x = 60, bar_w = 1800;
+    const int bar_y = transport ? 928 : 1008;
+    const double shown = g_scrubbing ? g_seek_preview : time();
+    const double fraction = g_duration > 0 && std::isfinite(shown) ?
+                            std::clamp(shown / g_duration, 0.0, 1.0) : 0.0;
+    const int filled = static_cast<int>(bar_w * fraction);
+    c.rect(0, bar_y - 68, screen::width, screen::height - bar_y + 68, Color::surface, 235);
+    char badge[64];
+    std::snprintf(badge, sizeof badge, "%s %s  %dx%d",
+                  g_use_ffmpeg ? avdec::mode() : "SW", g_use_ffmpeg ? avdec::codec_name() : "MPEG-1",
+                  g_src_w, g_src_h);
+    const float badge_x = 1860.f - screen::Canvas::text_width(badge, font::mono_medium, 18);
+    c.clip(60, bar_y - 68, static_cast<int>(badge_x) - 96, 65);
+    c.text(60.f, bar_y - 25.f, g_title, font::semibold, 24, Color::text);
+    c.unclip();
+    c.text(badge_x, bar_y - 25.f, badge, font::mono_medium, 18, Color::accent);
+
+    c.round_rect(bar_x, bar_y, bar_w, 6, 3, Color::line);
+    if (filled > 0)
+        c.round_rect(bar_x, bar_y, filled, 6, 3, Color::accent);
+    c.round_rect(bar_x + filled - 7, bar_y - 4, 14, 14, 7, g_scrubbing ? Color::accent : Color::text);
+    char elapsed[16], total[16];
+    format_time(elapsed, sizeof elapsed, shown);
+    format_time(total, sizeof total, g_duration);
+    if (g_duration <= 0)
+        copy_text(total, sizeof total, "--:--");
+    c.text(60.f, bar_y + 43.f, elapsed, font::mono_medium, 19, Color::text);
+    c.text(1860.f - screen::Canvas::text_width(total, font::mono_medium, 19),
+           bar_y + 43.f, total, font::mono_medium, 19, Color::text);
+
+    if (transport)
+    {
+        constexpr int control_x[]{145, 423, 610, 797, 984, 1171, 1410, 1600};
+        for (int i = 0; i < static_cast<int>(std::size(control_labels)); ++i)
+        {
+            const bool focused = !g_scrubbing && i == g_control;
+            if (focused)
+                c.round_rect(control_x[i], 946, 176, 48, 10, Color::hover);
+            const char *label = i == default_control ? (playing() ? "Pause" : "Play") : control_labels[i];
+            c.text(control_x[i] + 88.f - screen::Canvas::text_width(label, font::medium, 20) / 2.f,
+                   977.f, label, font::medium, 20, focused ? Color::text : Color::muted);
         }
     }
-    (void)g_error;
+    const char *hint = g_torrent_error ? "Torrent interrupted" : g_ended ? "Playback ended" :
+        g_scrubbing ? "Left / Right adjust    Cross seek    Circle cancel" :
+        transport ? "Up seek bar    Cross select    Circle hide" :
+        g_paused ? "Paused    Cross resume    Triangle controls" :
+        "Cross pause    Triangle controls    Options sidebar    Circle back";
+    const float hint_x = 960.f - screen::Canvas::text_width(hint, font::regular, 18) / 2.f;
+    c.text(hint_x, transport ? 1044.f : 1051.f, hint, font::regular, 18, Color::muted);
 }
 } // namespace movian::player

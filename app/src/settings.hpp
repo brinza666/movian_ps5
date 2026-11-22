@@ -6,13 +6,19 @@
  */
 
 #pragma once
+#include "fs.hpp"
 
 namespace movian::settings
 {
 constexpr int max_path = 383;
 constexpr int max_title = 95;
 constexpr int max_bookmarks = 24;
-constexpr int repo_preset_count = 4;
+constexpr int repo_preset_count = 5;
+inline constexpr int seek_steps[] = {5, 10, 30, 60};
+inline constexpr int volume_presets[] = {50, 75, 100};
+inline constexpr char mprepo_short_url[] = "https://bit.ly/mprepo";
+inline constexpr char mprepo_direct_url[] =
+    "https://drive.google.com/uc?export=download&id=1w6BS1LGx31IExt6fNGsf4HYZWugI_1k8";
 
 struct Data
 {
@@ -20,6 +26,7 @@ struct Data
     int seek_step = 10; // 5, 10, 30, or 60 seconds
     bool clock_24h = true;
     bool debug_log = true;
+    bool remote_diagnostics = false;
     bool hw_decode = true; // libSceVideodec2 when the module loads; else software H.264
     bool show_all = false;
     bool auto_next = true;
@@ -27,8 +34,29 @@ struct Data
     int repeat = 0; // 0 off, 1 one, 2 folder
     bool shuffle = false;
     int volume = 100; // 50 / 75 / 100
-    int repo_preset = 1; // cycle; nothing is fetched in this build
+    int repo_preset = 1; // bit.ly/mprepo
+    bool torrent_trackers = true;
+    bool torrent_progressive = true;
+    int torrent_cache_path = 0; // RAM, internal storage, USB
+    unsigned torrent_cache_mib = 0; // Auto
+    unsigned torrent_read_ahead = 100;
+    int torrent_preload = -1; // Auto
+    unsigned torrent_connections = 4;
+    unsigned torrent_requests = 16;
+    unsigned torrent_block_timeout = 6;
+    unsigned torrent_retrackers = 1; // Add configured retrackers
 };
+
+struct BrowserPrefs
+{
+    bool grid = false;
+    fs::SortOrder sort = fs::SortOrder::filename;
+    bool folders_first = true;
+    bool supported_only = true;
+};
+
+[[nodiscard]] BrowserPrefs browser_prefs(const char *path) noexcept;
+void save_browser_prefs(const char *path, BrowserPrefs prefs) noexcept;
 
 struct Resume
 {
@@ -45,6 +73,7 @@ void save() noexcept;
 
 [[nodiscard]] const char *repo_url() noexcept;
 [[nodiscard]] const char *repo_label() noexcept;
+[[nodiscard]] const char *repo_label(int preset) noexcept;
 void cycle_repo(int delta) noexcept;
 void cycle_seek(int delta) noexcept;
 void cycle_volume(int delta) noexcept;

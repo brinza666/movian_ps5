@@ -3,8 +3,8 @@
  *
  * Honest about what this build does: DualSense navigation, four Movian
  * places, a real directory listing of /download0, /data/movian, and USB,
- * MPEG-1 (pl_mpeg), H.264/AAC (FFmpeg), HEVC on Videodec2 only. Plugins
- * and BitTorrent are not in this binary.
+ * MPEG-1, FFmpeg playback and Videodec2. The Plugins tab hosts bundled
+ * JavaScript services.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -12,20 +12,31 @@
 #include "ui.hpp"
 
 #include "audio.hpp"
+#include "diagnostics.hpp"
 #include "avdec.hpp"
 #include "fs.hpp"
 #include "hwdec.h"
+#include "keyboard.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
 #include "player.hpp"
+#include "plugins.hpp"
 #include "settings.hpp"
+#include "settings_menu.hpp"
+#include "torrent.hpp"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstring>
+#include <atomic>
 #include <cstdint>
+#include <iterator>
+#include <span>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <pthread.h>
 
 namespace movian::ui
 {
@@ -46,19 +57,44 @@ const char *const place_name[place_count] = {"Home", "Videos", "BitTorrent", "Pl
 const char *const place_blurb[place_count] = {
     "Sources, continue watching, and settings.",
     "Local files, USB, and network folders.",
-    "Magnets and .torrent files — play while downloading.",
-    "JavaScript plugins (Movian API v2) from a repository.",
+    "Open .torrent files and download from a direct peer.",
+    "Installed JavaScript services.",
 };
 
 Place g_place = Place::home;
-int g_home_row = 0;
+enum class HomeAction { plugins, network, settings, library, title_data, usb, resume, bookmarks };
+
+struct HomeTile
+{
+    HomeAction action;
+    const char *title;
+    const char *detail;
+};
+
+constexpr HomeTile home_tiles[] = {
+    {HomeAction::plugins, "Plugins", "Installed services and repository"},
+    {HomeAction::network, "Local network", "Shares and media servers"},
+    {HomeAction::settings, "Settings", "Playback and preferences"},
+    {HomeAction::library, "Movian library", "Browse files in /data/movian"},
+    {HomeAction::title_data, "Title data", "Files in the Movian title"},
+    {HomeAction::usb, "USB", "Browse the first USB device"},
+    {HomeAction::resume, "Continue watching", ""},
+    {HomeAction::bookmarks, "Bookmarks", "Saved videos and folders"},
+};
+constexpr int home_columns = 5;
+constexpr int last_home_tile = static_cast<int>(std::size(home_tiles)) - 1;
+int g_home_tile = 0;
+bool g_home_search_focused = false;
+bool g_home_keyboard = false;
+char g_home_query[keyboard::max_length * 4 + 1]{};
 std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "sandboxed-hevc-test";
+constexpr const char *kVersion = "v53";
 constexpr const char *kTitleId = "PPSA99456";
 constexpr const char *kBookmarksUri = "bookmarks:";
+constexpr const char *kSearchUri = "movian:local-search";
 
 // ---- Videos browser --------------------------------------------------------
 constexpr int max_entries = 80;
@@ -69,9 +105,14 @@ constexpr int list_y = 280;
 constexpr int list_w = 1776;
 constexpr int list_h = 680;
 constexpr int rows_in_view = list_h / row_h;
+constexpr int library_columns = 5;
+constexpr int library_grid_rows = 4;
+constexpr int library_grid_page = library_columns * library_grid_rows;
 
 #ifdef MOVIAN_HOST_PREVIEW
 constexpr const char *kUsb0 = "usb0";
+#else
+constexpr const char *kUsb0 = "/mnt/usb0";
 #endif
 
 struct BrowseLevel
@@ -80,6 +121,7 @@ struct BrowseLevel
     char title[48];
     int selected;
     int first;
+    char focused_path[fs::max_path + 1];
 };
 
 enum class RowKind : unsigned char
@@ -113,25 +155,203 @@ enum class Overlay
 {
     none,
     settings,
+    setting_detail,
+    sidebar,
+    plugin_details,
+    browser_choice,
+    menu_info,
+    home_network,
+    torrent_settings,
     item,
 };
 
 Overlay g_overlay = Overlay::none;
+int g_settings_category = 0;
 int g_settings_row = 0;
+int g_setting_choice = 0;
+bool g_settings_in_category = false;
+int g_torrent_settings_row = 0;
 int g_item_row = 0;
+int g_sidebar_row = 0;
+bool g_settings_from_sidebar = false;
+Overlay g_menu_parent = Overlay::none;
+const char *g_menu_info_title = "";
+constexpr int menu_info_lines = 8;
+char g_menu_lines[menu_info_lines][192]{};
+
+enum class MenuAction
+{
+    stop, previous, rewind, pause, forward, next, queue, repeat, shuffle,
+    page_layout, include_library, sort_on, folders_first, supported_only, metadata_mode,
+    seen_all, unseen_all, erase_playback, bookmark, paste, reload,
+    volume, media, system, log, sleep, home, settings, screensaver, suspend, exit,
+    start, resume, play_list, clipboard, copy, remove, unseen, seen, cast, open, file_info, path,
+    plugin_open, plugin_settings, plugin_install, plugin_update, plugin_remove, plugin_changelog
+};
+
+struct MenuEntry
+{
+    MenuAction id;
+    const char *label;
+};
+
+// The installed WSL sidebar defines transport first, then page and global actions.
+constexpr MenuEntry sidebar_entries[] = {
+    {MenuAction::stop, "Stop"}, {MenuAction::previous, "Previous"}, {MenuAction::rewind, "Rewind"},
+    {MenuAction::pause, "Play / Pause"}, {MenuAction::forward, "Fast forward"}, {MenuAction::next, "Next"},
+    {MenuAction::queue, "Play queue"}, {MenuAction::repeat, "Repeat"}, {MenuAction::shuffle, "Shuffle"},
+    {MenuAction::page_layout, "Page layout"}, {MenuAction::include_library, "Include in library"},
+    {MenuAction::sort_on, "Sort on"}, {MenuAction::folders_first, "Sort folders first"},
+    {MenuAction::supported_only, "Show only supported files"}, {MenuAction::metadata_mode, "Metadata mode"},
+    {MenuAction::seen_all, "Mark all as seen"}, {MenuAction::unseen_all, "Mark all as unseen"},
+    {MenuAction::erase_playback, "Erase all playback info"},
+    {MenuAction::bookmark, "Bookmark page"}, {MenuAction::paste, "Paste"}, {MenuAction::reload, "Reload page"},
+    {MenuAction::volume, "Master volume"}, {MenuAction::media, "Media info"},
+    {MenuAction::system, "System info"}, {MenuAction::log, "View log"},
+    {MenuAction::sleep, "Activate sleep timer"},
+    {MenuAction::home, "Home"}, {MenuAction::settings, "Settings"},
+    {MenuAction::screensaver, "Screensaver"}, {MenuAction::suspend, "Suspend"}, {MenuAction::exit, "Exit"},
+};
+MenuEntry g_sidebar_visible[std::size(sidebar_entries)]{};
+int g_sidebar_count = 0;
+int g_browser_choice = 0;
+constexpr MenuEntry video_item_entries[] = {
+    {MenuAction::start, "Play from beginning"}, {MenuAction::resume, "Continue playback"},
+    {MenuAction::play_list, "Play until end of list"}, {MenuAction::copy, "Copy to location"},
+    {MenuAction::remove, "Delete"}, {MenuAction::unseen, "Mark as unseen"}, {MenuAction::seen, "Mark as seen"},
+    {MenuAction::cast, "Video cast"}, {MenuAction::bookmark, "Bookmark"},
+    {MenuAction::file_info, "File info"}, {MenuAction::path, "Show path"},
+};
+constexpr MenuEntry item_entries[] = {
+    {MenuAction::queue, "Queue"}, {MenuAction::bookmark, "Bookmark"}, {MenuAction::clipboard, "Copy to clipboard"},
+    {MenuAction::copy, "Copy to location"}, {MenuAction::remove, "Delete"}, {MenuAction::open, "Open"},
+    {MenuAction::file_info, "File info"}, {MenuAction::path, "Show path"},
+};
 char g_item_path[fs::max_path + 1] = "";
 char g_item_title[96] = "";
 bool g_item_folder = false;
 bool g_item_file = false;
 
-constexpr int setting_count = 13;
-constexpr int item_action_count = 5;
+constexpr int torrent_setting_count = 8;
 
 char g_queue[max_entries][fs::max_path + 1];
 char g_queue_title[max_entries][96];
 int g_queue_n = 0;
 int g_queue_i = 0;
 bool g_auto_advanced = false;
+
+plugins::Plugin g_installed_plugins[plugins::max_installed]{};
+int g_installed_count = 0;
+int g_plugin_catalog_selection = 0;
+int g_active_plugin = 0;
+bool g_plugin_import = false;
+fs::Entry g_plugin_zips[max_entries];
+int g_plugin_zip_count = 0;
+int g_plugin_zip_selection = 0;
+struct ZipLevel { char path[fs::max_path + 1]; int selection; };
+ZipLevel g_zip_stack[max_depth]{};
+int g_zip_depth = 0;
+bool g_repo_categories = false;
+int g_repo_category = 0;
+constexpr int repo_columns = 5;
+constexpr int plugin_page_limit = 8;
+enum class PluginDetail { installed, repository, local };
+PluginDetail g_plugin_detail{};
+plugins::Plugin g_detail_plugin{};
+plugins::Item g_detail_item{};
+int g_plugin_detail_row = 0;
+constexpr MenuEntry installed_actions[] = {
+    {MenuAction::plugin_open, "Open"}, {MenuAction::plugin_settings, "Settings"},
+    {MenuAction::plugin_update, "Check for updates"}, {MenuAction::plugin_remove, "Uninstall"},
+    {MenuAction::plugin_changelog, "Changelog"},
+};
+constexpr MenuEntry package_actions[] = {
+    {MenuAction::plugin_install, "Install"}, {MenuAction::plugin_changelog, "Changelog"},
+};
+std::span<const MenuEntry> plugin_detail_actions() noexcept
+{
+    return g_plugin_detail == PluginDetail::installed ? std::span<const MenuEntry>(installed_actions)
+                                                      : std::span<const MenuEntry>(package_actions);
+}
+bool open_zip_details(const char *path) noexcept;
+
+plugins::Page g_plugin_pages[plugin_page_limit];
+char g_plugin_page_urls[plugin_page_limit][1024]{};
+int g_plugin_selection[plugin_page_limit]{};
+bool g_plugin_page_repo[plugin_page_limit]{};
+unsigned g_plugin_repo_offset[plugin_page_limit]{};
+int g_plugin_depth = 0;
+struct PluginJob
+{
+    enum class Action { page, repository, repository_refresh, install, install_local, catalog, login };
+    pthread_t thread{};
+    std::atomic<bool> ready{false};
+    bool busy = false;
+    bool success = false;
+    bool dismissed = false;
+    Action action = Action::page;
+    int target = 0;
+    plugins::Plugin plugin{};
+    char url[1024]{};
+    unsigned offset = 0;
+    plugins::Category category = plugins::Category::all;
+    char username[256]{};
+    char password[256]{};
+    char error[160]{};
+    plugins::Page page{};
+    plugins::Plugin installed[plugins::max_installed]{};
+    int installed_count = 0;
+};
+PluginJob g_plugin_job;
+struct ArtworkJob
+{
+    pthread_t thread{};
+    std::atomic<bool> ready{false};
+    bool busy = false;
+    char url[512]{};
+    plugins::Plugin plugin{};
+    image::Image result{};
+};
+ArtworkJob g_artwork_job;
+image::Image g_plugin_artwork{};
+char g_artwork_url[512]{};
+char g_artwork_plugin[64]{};
+std::uint64_t g_artwork_idle = 0;
+char g_plugin_text_key[64]{};
+enum class LoginInput { none, username, password };
+LoginInput g_login_input = LoginInput::none;
+char g_login_origin[264]{};
+
+void clear_login(PluginJob &job) noexcept
+{
+    volatile char *username = job.username;
+    volatile char *password = job.password;
+    for (std::size_t i = 0; i < sizeof job.username; ++i) username[i] = 0;
+    for (std::size_t i = 0; i < sizeof job.password; ++i) password[i] = 0;
+}
+bool g_plugin_catalog_loaded = false;
+fs::Entry g_torrent_sources[24];
+int g_torrent_source_count = 0;
+int g_torrent_selected = 0;
+bool g_torrent_scanned = false;
+char g_torrent_descriptor[384]{};
+char g_torrent_hash[41]{};
+torrent::Metadata g_torrent_metadata{};
+struct TorrentJob
+{
+    pthread_t thread{};
+    std::atomic<bool> ready{false}, cancel{false};
+    std::atomic<unsigned> progress{0};
+    torrent::VerifiedFile stream;
+    torrent::CacheStorage storage = torrent::CacheStorage::ram;
+    torrent::TransferOptions options{};
+    bool busy = false;
+    bool ok = false;
+    bool playback_attempted = false;
+    bool playback_started = false;
+    char descriptor[384]{}, peer[96]{}, path[384]{}, error[128]{};
+} g_torrent_job;
+bool g_torrent_peer_input = false;
 
 void append_log(const char *line) noexcept
 {
@@ -301,7 +521,23 @@ void ensure_queue(const char *playing) noexcept
         rebuild_queue_from_parent(playing);
 }
 
-bool play_path(const char *path, const char *title, bool from_start) noexcept; // defined below after helpers
+bool open_torrent_descriptor(const char *path) noexcept
+{
+    if (!torrent::inspect(path, g_torrent_metadata))
+    {
+        screen::notify("Unsupported or damaged torrent file");
+        return false;
+    }
+    copy_text(g_torrent_descriptor, sizeof g_torrent_descriptor, path);
+    g_torrent_selected = 0;
+    g_torrent_hash[0] = 0;
+    g_place = Place::bittorrent;
+    append_log("v53 opened torrent file list");
+    return true;
+}
+
+bool play_path(const char *path, const char *title, bool from_start,
+               const torrent::VerifiedFile *stream = nullptr) noexcept;
 
 bool play_delta(int delta, bool wrap) noexcept
 {
@@ -346,20 +582,24 @@ bool play_delta(int delta, bool wrap) noexcept
     return play_path(g_queue[g_queue_i], g_queue_title[g_queue_i], true);
 }
 
-bool play_path(const char *path, const char *title, bool from_start) noexcept
+bool play_path(const char *path, const char *title, bool from_start,
+               const torrent::VerifiedFile *stream) noexcept
 {
     if (!path || !path[0])
         return false;
+    const char *extension = std::strrchr(path, '.');
+    if (!stream && extension && !strcasecmp(extension, ".torrent"))
+        return open_torrent_descriptor(path);
     char why[128];
     const player::Kind pk = player::classify(path);
     if (pk == player::Kind::mpeg1 || pk == player::Kind::ffmpeg)
     {
         char event[fs::max_path + 64];
-        snprintf(event, sizeof event, "v15 open video %s", path);
+        snprintf(event, sizeof event, "v53 open video %s", path);
         append_log(event);
     }
     if ((pk == player::Kind::mpeg1 || pk == player::Kind::ffmpeg) &&
-        player::open(path, why, sizeof why, from_start))
+        player::open(path, why, sizeof why, from_start, stream))
     {
         snprintf(g_status, sizeof g_status, "playing %s", title && title[0] ? title : path);
         append_log(g_status);
@@ -367,7 +607,10 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
                                   : (pk == player::Kind::ffmpeg ? avdec::mode() : "MPEG-1"));
         g_overlay = Overlay::none;
         g_auto_advanced = false;
-        ensure_queue(path);
+        if (stream)
+            g_queue_n = 0;
+        else
+            ensure_queue(path);
         return true;
     }
     if (pk == player::Kind::mpeg1)
@@ -392,39 +635,6 @@ bool play_path(const char *path, const char *title, bool from_start) noexcept
         screen::notify("Not a video");
     }
     return false;
-}
-
-const char *setting_title(int row) noexcept
-{
-    switch (row)
-    {
-    case 0:
-        return "Resume playback";
-    case 1:
-        return "Play next when a file ends";
-    case 2:
-        return "Repeat";
-    case 3:
-        return "Shuffle folder";
-    case 4:
-        return "Seek step";
-    case 5:
-        return "Volume";
-    case 6:
-        return "24-hour clock";
-    case 7:
-        return "Debug log";
-    case 8:
-        return "Hardware decode";
-    case 9:
-        return "Show all files";
-    case 10:
-        return "Newest files first";
-    case 11:
-        return "Plugin repository";
-    default:
-        return "About";
-    }
 }
 
 void setting_value(int row, char *dst, std::size_t cap) noexcept
@@ -467,13 +677,39 @@ void setting_value(int row, char *dst, std::size_t cap) noexcept
         copy_text(dst, cap, d.newest_first ? "newest" : "A–Z");
         break;
     case 11:
+        copy_text(dst, cap, "Installed services");
+        break;
+    case 12:
         copy_text(dst, cap, settings::repo_label());
+        break;
+    case 13:
+        copy_text(dst, cap, d.torrent_trackers ? "on" : "off");
+        break;
+    case 14:
+        copy_text(dst, cap, d.torrent_progressive ? "on" : "off");
+        break;
+    case 15:
+        copy_text(dst, cap, d.torrent_cache_path == 2 ? "USB" :
+                            d.torrent_cache_path == 1 ? "PS5 storage (HDD)" : "RAM");
+        break;
+    case 16:
+        copy_text(dst, cap, d.remote_diagnostics ?
+            (diagnostics::lan_enabled() ? "LAN port 42000" : "FTP log") : "off");
+        break;
+    case 17:
+        copy_text(dst, cap, "Cache and peers");
+        break;
+    case 19:
+        snprintf(dst, cap, "%d saved", settings::bookmark_count());
         break;
     default:
         copy_text(dst, cap, kVersion);
         break;
     }
 }
+
+void enter_videos() noexcept;
+void push_folder(const char *path, const char *title) noexcept;
 
 void setting_nudge(int row, int delta) noexcept
 {
@@ -536,8 +772,50 @@ void setting_nudge(int row, int delta) noexcept
         screen::notify(d.newest_first ? "Newest first" : "Name A–Z");
         break;
     case 11:
+        g_overlay = Overlay::none;
+        g_place = Place::plugins;
+        g_plugin_import = false;
+        g_plugin_depth = 0;
+        g_repo_categories = false;
+        g_plugin_catalog_selection = g_installed_count ? 1 : 0;
+        screen::notify("Select a plugin, then press Square for settings");
+        break;
+    case 12:
         settings::cycle_repo(delta == 0 ? 1 : delta);
-        screen::notify("Repo URL stored — not fetched yet");
+        break;
+    case 13:
+        d.torrent_trackers = !d.torrent_trackers;
+        settings::save();
+        break;
+    case 14:
+        d.torrent_progressive = !d.torrent_progressive;
+        settings::save();
+        break;
+    case 15:
+        d.torrent_cache_path = (d.torrent_cache_path + (delta < 0 ? 2 : 1)) % 3;
+        settings::save();
+        break;
+    case 16:
+        if (diagnostics::enable(!d.remote_diagnostics))
+        {
+            d.remote_diagnostics = !d.remote_diagnostics;
+            settings::save();
+            screen::notify(!d.remote_diagnostics ? "Remote diagnostics off" :
+                diagnostics::lan_enabled() ? "Remote diagnostics listening on port 42000" :
+                                             "Remote diagnostics on through FTP");
+        }
+        else
+            screen::notify("Could not start LAN or FTP diagnostics");
+        break;
+    case 17:
+        g_torrent_settings_row = 0;
+        g_overlay = Overlay::torrent_settings;
+        break;
+    case 19:
+        g_overlay = Overlay::none;
+        g_place = Place::videos;
+        enter_videos();
+        push_folder(kBookmarksUri, "Bookmarks");
         break;
     default:
         screen::notify("Movian PS5 native title");
@@ -545,35 +823,69 @@ void setting_nudge(int row, int delta) noexcept
     }
 }
 
-const char *item_action_title(int row) noexcept
+void nudge_torrent_setting(int row, int delta) noexcept
 {
+    auto &d = settings::get();
     switch (row)
     {
     case 0:
-        return g_item_folder ? "Open" : "Play";
+        setting_nudge(15, delta);
+        return;
     case 1:
-        return "Play from beginning";
-    case 2:
-        return settings::is_bookmarked(g_item_path) ? "Remove bookmark" : "Bookmark";
-    case 3:
-        return "File info";
-    default:
-        return "Show path";
+    {
+        constexpr unsigned sizes[] = {0, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512};
+        const auto limit = torrent::cache_limit_mib(static_cast<torrent::CacheStorage>(d.torrent_cache_path));
+        const auto current = std::min(d.torrent_cache_mib, limit);
+        const auto *end = std::upper_bound(std::begin(sizes), std::end(sizes), limit);
+        const auto *position = std::lower_bound(std::begin(sizes), end, current);
+        if (delta > 0)
+        {
+            position = std::upper_bound(std::begin(sizes), end, current);
+            if (position == end) --position;
+        }
+        else if (position != std::begin(sizes))
+            --position;
+        d.torrent_cache_mib = *position;
+        break;
     }
+    case 2:
+        d.torrent_read_ahead = std::clamp(static_cast<int>(d.torrent_read_ahead) + 5 * delta, 5, 100);
+        break;
+    case 3:
+        if (d.torrent_preload < 0)
+            d.torrent_preload = delta > 0 ? 0 : -1;
+        else
+            d.torrent_preload = std::clamp(d.torrent_preload + 5 * delta, -1, 100);
+        break;
+    case 4:
+        d.torrent_connections = std::clamp(static_cast<int>(d.torrent_connections) + delta, 1, 8);
+        break;
+    case 5:
+        d.torrent_requests = std::clamp(static_cast<int>(d.torrent_requests) + 4 * delta, 4, 32);
+        break;
+    case 6:
+        d.torrent_block_timeout = std::clamp(static_cast<int>(d.torrent_block_timeout) + delta, 3, 30);
+        break;
+    case 7:
+        d.torrent_retrackers = (d.torrent_retrackers + (delta < 0 ? 3 : 1)) % 4;
+        break;
+    }
+    settings::save();
 }
 
-bool item_action_enabled(int row) noexcept
+std::span<const MenuEntry> context_entries() noexcept
 {
-    if (row == 0)
-        return g_item_folder || g_item_file;
-    if (row == 1)
-    {
-        const player::Kind k = player::classify(g_item_path);
-        return g_item_file && (k == player::Kind::mpeg1 || k == player::Kind::ffmpeg);
-    }
-    if (row == 2 || row == 3)
-        return g_item_path[0] != 0;
-    return g_item_path[0] != 0;
+    return g_item_file && fs::classify_name(g_item_path, false) == fs::Kind::video
+        ? std::span<const MenuEntry>(video_item_entries) : std::span<const MenuEntry>(item_entries);
+}
+
+void menu_info(const char *title, const char *message = "") noexcept
+{
+    g_menu_parent = g_overlay;
+    g_menu_info_title = title;
+    std::memset(g_menu_lines, 0, sizeof g_menu_lines);
+    copy_text(g_menu_lines[0], sizeof g_menu_lines[0], message);
+    g_overlay = Overlay::menu_info;
 }
 
 const char *kind_label(fs::Kind k) noexcept
@@ -586,33 +898,44 @@ const char *kind_label(fs::Kind k) noexcept
         return "video";
     case fs::Kind::audio:
         return "audio";
+    case fs::Kind::package:
+        return "plugin ZIP";
     default:
         return "file";
     }
 }
 
+bool browser_grid() noexcept
+{
+    return settings::browser_prefs(g_stack[g_depth].path).grid;
+}
+
 void keep_in_view() noexcept
 {
-    BrowseLevel &lv = g_stack[g_depth];
+    auto &lv = g_stack[g_depth];
     if (g_row_count <= 0)
     {
-        lv.selected = 0;
-        lv.first = 0;
+        lv.selected = lv.first = 0;
+        lv.focused_path[0] = 0;
         return;
     }
-    if (lv.selected < 0)
-        lv.selected = 0;
-    if (lv.selected >= g_row_count)
-        lv.selected = g_row_count - 1;
-    if (lv.selected < lv.first)
-        lv.first = lv.selected;
-    if (lv.selected >= lv.first + rows_in_view)
-        lv.first = lv.selected - rows_in_view + 1;
-    const int last_first = g_row_count > rows_in_view ? g_row_count - rows_in_view : 0;
-    if (lv.first > last_first)
-        lv.first = last_first;
-    if (lv.first < 0)
-        lv.first = 0;
+    lv.selected = std::clamp(lv.selected, 0, g_row_count - 1);
+    copy_text(lv.focused_path, sizeof lv.focused_path, g_rows[lv.selected].path);
+    if (browser_grid())
+    {
+        const int row = lv.selected / library_columns;
+        const int last = (g_row_count - 1) / library_columns;
+        int first = std::clamp(lv.first / library_columns, 0, std::max(0, last - library_grid_rows + 1));
+        if (row < first) first = row;
+        if (row >= first + library_grid_rows) first = row - library_grid_rows + 1;
+        lv.first = first * library_columns;
+    }
+    else
+    {
+        if (lv.selected < lv.first) lv.first = lv.selected;
+        if (lv.selected >= lv.first + rows_in_view) lv.first = lv.selected - rows_in_view + 1;
+        lv.first = std::clamp(lv.first, 0, std::max(0, g_row_count - rows_in_view));
+    }
 }
 
 void add_message_row(const char *title, const char *detail) noexcept
@@ -695,8 +1018,9 @@ void load_directory(const char *path) noexcept
     fs::Entry entries[max_entries];
     int n = 0;
     int err = 0;
-    if (fs::list_dir(path, entries, max_entries, &n, &err, settings::get().show_all,
-                     settings::get().newest_first) != 0)
+    const auto prefs = settings::browser_prefs(path);
+    if (fs::list_directory(path, entries, max_entries, &n, &err, !prefs.supported_only,
+                           prefs.sort, prefs.folders_first) != 0)
     {
         char title[96];
         snprintf(title, sizeof title, "Cannot open %s", path);
@@ -748,7 +1072,7 @@ void load_videos_root() noexcept
         {"Title data", MOVIAN_DOWNLOAD0, "settings, log, test clips", false},
         {"Movian library", MOVIAN_DATA_DIR, "FTP extra media if the sandbox can see /data", false},
 #ifndef MOVIAN_HOST_PREVIEW
-        {"USB 0", "/mnt/usb0", "often hidden until a helper lifts the sandbox", false},
+        {"USB 0", kUsb0, "first USB device", false},
         {"USB 1", "/mnt/usb1", "second stick", true},
         {"USB 2", "/mnt/usb2", "third stick", true},
         {"USB 3", "/mnt/usb3", "fourth stick", true},
@@ -834,15 +1158,76 @@ void load_bookmarks() noexcept
     snprintf(g_status, sizeof g_status, "Bookmarks  %d", n);
 }
 
+bool matches_search(const char *name, const char *query) noexcept
+{
+    const auto *end = name + std::strlen(name);
+    auto lower_ascii = [](unsigned char ch) {
+        return ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch;
+    };
+    return std::search(name, end, query, query + std::strlen(query),
+                       [&](char a, char b) { return lower_ascii(a) == lower_ascii(b); }) != end;
+}
+
+void load_search_results() noexcept
+{
+    g_row_count = 0;
+    g_truncated = 0;
+    constexpr const char *roots[] = {MOVIAN_DATA_DIR, MOVIAN_DOWNLOAD0, kUsb0
+#ifndef MOVIAN_HOST_PREVIEW
+        , "/mnt/usb1", "/mnt/usb2", "/mnt/usb3", "/mnt/ext0", "/mnt/ext1"
+#endif
+    };
+    fs::Entry entries[max_entries];
+    for (const char *root : roots)
+    {
+        int count = 0;
+        int err = 0;
+        if (fs::list_dir(root, entries, max_entries, &count, &err, settings::get().show_all,
+                         settings::get().newest_first) != 0)
+            continue;
+        g_truncated += std::max(0, err);
+        for (int i = 0; i < count; ++i)
+        {
+            const auto &entry = entries[i];
+            if (!matches_search(entry.name, g_home_query))
+                continue;
+            if (g_row_count == max_entries)
+            {
+                ++g_truncated;
+                continue;
+            }
+            if (entry.kind == fs::Kind::directory)
+                add_folder_row(entry.name, root, entry.path, true);
+            else
+                add_file_row(entry);
+        }
+    }
+    if (!g_row_count)
+        add_message_row("No local matches", "Search checks the top level of available local sources.");
+    if (g_truncated)
+        snprintf(g_status, sizeof g_status, "Search limited by folder or result size");
+    else
+        snprintf(g_status, sizeof g_status, "Search results for %.70s", g_home_query);
+}
+
 void reload_videos() noexcept
 {
-    const BrowseLevel &lv = g_stack[g_depth];
+    BrowseLevel &lv = g_stack[g_depth];
     if (lv.path[0] == 0)
         load_videos_root();
     else if (std::strcmp(lv.path, kBookmarksUri) == 0)
         load_bookmarks();
+    else if (std::strcmp(lv.path, kSearchUri) == 0)
+        load_search_results();
     else
         load_directory(lv.path);
+    if (lv.focused_path[0])
+        for (int i = 0; i < g_row_count; ++i)
+            if (std::strcmp(g_rows[i].path, lv.focused_path) == 0)
+            {
+                lv.selected = i;
+                break;
+            }
     keep_in_view();
     g_scroll = static_cast<float>(lv.first * row_h);
     g_videos_dirty = false;
@@ -855,8 +1240,17 @@ void enter_videos() noexcept
     copy_text(g_stack[0].title, sizeof g_stack[0].title, "Videos");
     g_stack[0].selected = 0;
     g_stack[0].first = 0;
+    g_stack[0].focused_path[0] = 0;
     g_selected_note[0] = 0;
     g_videos_dirty = true;
+}
+
+void open_home_folder(const char *path, const char *title) noexcept
+{
+    enter_videos();
+    copy_text(g_stack[0].path, sizeof g_stack[0].path, path);
+    copy_text(g_stack[0].title, sizeof g_stack[0].title, title);
+    g_place = Place::videos;
 }
 
 void push_folder(const char *path, const char *title) noexcept
@@ -868,6 +1262,7 @@ void push_folder(const char *path, const char *title) noexcept
     copy_text(g_stack[g_depth].title, sizeof g_stack[g_depth].title, title);
     g_stack[g_depth].selected = 0;
     g_stack[g_depth].first = 0;
+    g_stack[g_depth].focused_path[0] = 0;
     g_selected_note[0] = 0;
     g_videos_dirty = true;
 }
@@ -896,54 +1291,60 @@ void open_item_menu(const Row &r) noexcept
     g_overlay = Overlay::item;
 }
 
-void run_item_action(int row) noexcept
+void run_item_action(const MenuEntry &entry) noexcept
 {
-    if (!item_action_enabled(row))
-        return;
-    if (row == 0)
+    switch (entry.id)
     {
+    case MenuAction::start:
+    case MenuAction::resume:
+        play_path(g_item_path, g_item_title, entry.id == MenuAction::start);
+        return;
+    case MenuAction::open:
         if (g_item_folder)
         {
             push_folder(g_item_path, g_item_title);
             g_overlay = Overlay::none;
-            return;
         }
-        play_path(g_item_path, g_item_title, false);
-        return;
-    }
-    if (row == 1)
-    {
-        play_path(g_item_path, g_item_title, true);
-        return;
-    }
-    if (row == 2)
-    {
-        if (settings::toggle_bookmark(g_item_path, g_item_title))
-            screen::notify("Bookmarked");
+        else if (g_item_file)
+        {
+            if (play_path(g_item_path, g_item_title, false))
+                g_overlay = Overlay::none;
+        }
         else
-            screen::notify("Bookmark removed");
-        g_videos_dirty = true;
-        g_overlay = Overlay::none;
+            menu_info(entry.label, "This source has no item to open.");
         return;
-    }
-    if (row == 3)
+    case MenuAction::bookmark:
+        if (g_item_path[0])
+        {
+            const bool removing = settings::is_bookmarked(g_item_path);
+            settings::toggle_bookmark(g_item_path, g_item_title);
+            screen::notify(removing ? "Bookmark removed" : "Bookmark updated");
+            g_videos_dirty = true;
+            g_overlay = Overlay::none;
+        }
+        return;
+    case MenuAction::file_info:
     {
         struct stat st{};
-        char bytes[24] = "?";
-        char when[16] = "";
+        char bytes[24] = "Size unavailable";
+        char when[16]{};
         if (stat(g_item_path, &st) == 0)
         {
             format_bytes(bytes, sizeof bytes, static_cast<long long>(st.st_size));
             format_mtime(when, sizeof when, static_cast<long long>(st.st_mtime));
         }
-        snprintf(g_selected_note, sizeof g_selected_note, "%s  %s  %s", g_item_path, bytes, when);
-        screen::notify(bytes);
-        g_overlay = Overlay::none;
+        menu_info(entry.label, g_item_title);
+        snprintf(g_menu_lines[1], sizeof g_menu_lines[1], "%s  %s", bytes, when);
+        copy_text(g_menu_lines[2], sizeof g_menu_lines[2], g_item_path);
         return;
     }
-    snprintf(g_selected_note, sizeof g_selected_note, "%s", g_item_path);
-    screen::notify(g_item_path);
-    g_overlay = Overlay::none;
+    case MenuAction::path:
+        menu_info(entry.label, g_item_path);
+        return;
+    default:
+        menu_info(entry.label, "This item action is planned for a later PS5 build.");
+        return;
+    }
 }
 
 void select_row() noexcept
@@ -968,6 +1369,12 @@ void select_row() noexcept
     }
     if (r.kind == RowKind::file)
     {
+        const char *extension = std::strrchr(r.path, '.');
+        if (extension && !strcasecmp(extension, ".zip"))
+        {
+            open_zip_details(r.path);
+            return;
+        }
         play_path(r.path, r.title, false);
         snprintf(g_status, sizeof g_status, "selected %s", r.title);
         char line[160];
@@ -1056,13 +1463,26 @@ void draw_footer(screen::Canvas &c) noexcept
 {
     c.rect(0, 1008, screen::width, 72, Color::surface);
     c.rect(0, 1008, screen::width, 2, Color::line);
-    const char *hint = g_overlay == Overlay::settings
-                           ? "Cross toggle    Left/Right change    Options / Circle close"
-                           : g_overlay == Overlay::item
+    const char *hint = g_overlay == Overlay::sidebar
+                           ? "Cross select    Circle close    Left / Right adjust volume"
+                           : g_overlay == Overlay::browser_choice
+                                 ? "Cross select    Circle cancel"
+                           : g_overlay == Overlay::menu_info
+                                 ? "Cross / Circle back"
+                           : g_overlay == Overlay::settings
+                           ? (g_settings_in_category ? "Cross select    Left/Right adjust    Circle categories"
+                                                     : "Cross open category    Circle back")
+                           : g_overlay == Overlay::setting_detail
+                                 ? "Cross select    Circle cancel"
+                           : g_overlay == Overlay::home_network
+                                 ? "Cross / Circle  Back"
+                           : g_overlay == Overlay::item || g_overlay == Overlay::plugin_details
                                  ? "Cross action    Circle close"
                                  : g_place == Place::videos
-                                       ? "Cross play    Square item    Options settings    Circle back"
-                                       : "L1 / R1 places    Cross open    Options settings    Circle back";
+                                       ? "Cross play    Square item    Options sidebar    Circle back"
+                                       : g_place == Place::home
+                                           ? "L1 / R1 places    Cross open    Triangle HEVC test    Options sidebar"
+                                           : "L1 / R1 places    Cross open    Options sidebar    Circle back";
     c.text(48.f, 1052.f, hint, font::regular, 18, Color::muted);
     c.text(1480.f, 1052.f, kVersion, font::mono_medium, 16, Color::faint);
 }
@@ -1075,35 +1495,49 @@ void draw_card(screen::Canvas &c, int x, int y, int w, int h, const char *title,
         c.round_frame(x, y, w, h, 16, 3, Color::accent);
     c.text(static_cast<float>(x + 28), static_cast<float>(y + 48), title, font::semibold, 26,
            Color::text);
-    c.text(static_cast<float>(x + 28), static_cast<float>(y + 92), body, font::regular, 18,
+    char body_fit[160];
+    c.text(static_cast<float>(x + 28), static_cast<float>(y + 92),
+           fit(body, w - 56, body_fit, sizeof body_fit, font::regular, 18), font::regular, 18,
            Color::muted);
 }
 
 void draw_home(screen::Canvas &c) noexcept
 {
-    c.text(48.f, 160.f, "Home", font::semibold, 40, Color::text);
-    c.text(48.f, 208.f, "Continue watching, folders, settings. MPEG-1 / H.264 / HEVC on the chip.",
-           font::regular, 20, Color::muted);
+    c.text(64.f, 168.f, "Home", font::semibold, 44, Color::text);
 
+    c.round_rect(64, 209, 1792, 76, 12, g_home_search_focused ? Color::hover : Color::surface);
+    if (g_home_search_focused)
+        c.round_frame(64, 209, 1792, 76, 12, 3, Color::accent);
+    c.ring(110.f, 245.f, 12.f, 3.f, Color::accent);
+    const float handle[] = {119.f, 254.f, 129.f, 264.f};
+    c.polyline(handle, 2, 3.f, Color::accent);
+    char query[sizeof g_home_query];
+    const char *prompt = g_home_query[0] ? g_home_query : "Search local media";
+    c.text(155.f, 258.f, fit(prompt, 1560, query, sizeof query, font::medium, 27),
+           font::medium, 27, g_home_query[0] ? Color::text : Color::muted);
+
+    const auto resume = settings::last_resume();
     char resume_body[96];
-    format_resume_detail(resume_body, sizeof resume_body, settings::last_resume());
-    char bm_body[96];
-    snprintf(bm_body, sizeof bm_body, "%d saved — Square on a Videos row to add one",
-             settings::bookmark_count());
-    const char *titles[4] = {"Continue watching", "Videos", "Bookmarks", "Settings"};
-    const char *bodies[4] = {
-        resume_body,
-        "/download0, /data/movian, USB — Triangle reloads after a helper",
-        bm_body,
-        "Resume, seek, volume, clock, debug log, plugin repo URL",
-    };
-    for (int i = 0; i < 4; ++i)
+    format_resume_detail(resume_body, sizeof resume_body, resume);
+    for (int i = 0; i <= last_home_tile; ++i)
     {
-        const int col = i % 2;
-        const int row = i / 2;
-        draw_card(c, 48 + col * 920, 250 + row * 280, 880, 250, titles[i], bodies[i],
-                  g_home_row == i);
+        const auto &tile = home_tiles[i];
+        const int col = i % home_columns;
+        const int row = i / home_columns;
+        draw_card(c, 64 + col * 363, 333 + row * 201, 340, 169, tile.title,
+                  tile.action == HomeAction::resume ? (resume.valid ? resume_body : "No saved position") : tile.detail,
+                  !g_home_search_focused && g_home_tile == i);
     }
+}
+
+void draw_home_network(screen::Canvas &c) noexcept
+{
+    c.rect(0, 90, screen::width, 918, Color::bg, 175);
+    c.round_rect(520, 410, 880, 224, 18, Color::surface2);
+    c.round_frame(520, 410, 880, 224, 18, 2, Color::line);
+    c.text(570.f, 475.f, "Local network", font::semibold, 36, Color::text);
+    c.text(570.f, 538.f, "Network browsing is planned for a later PS5 build.",
+           font::regular, 25, Color::muted);
 }
 
 void draw_placeholder(screen::Canvas &c, Place place) noexcept
@@ -1125,6 +1559,994 @@ void draw_placeholder(screen::Canvas &c, Place place) noexcept
     c.text(80.f, 640.f, g_status, font::mono_medium, 20, Color::green);
 }
 
+void *load_plugin_page(void *userdata) noexcept
+{
+    auto &job = *static_cast<PluginJob *>(userdata);
+    switch (job.action)
+    {
+    case PluginJob::Action::page:
+        job.success = plugins::open(job.plugin, job.url, job.page, job.error, sizeof job.error);
+        break;
+    case PluginJob::Action::repository:
+    case PluginJob::Action::repository_refresh:
+        job.success = plugins::repository(job.url, job.offset, job.page, job.error, sizeof job.error,
+                                           job.action == PluginJob::Action::repository_refresh, job.category);
+        break;
+    case PluginJob::Action::install:
+        job.success = plugins::install_remote(job.url, job.error, sizeof job.error);
+        break;
+    case PluginJob::Action::install_local:
+        job.success = plugins::install(job.url, job.error, sizeof job.error);
+        break;
+    case PluginJob::Action::catalog:
+        job.installed_count = plugins::catalog(job.installed);
+        job.success = true;
+        break;
+    case PluginJob::Action::login:
+        job.success = plugins::kinozal_login(job.url, job.username, job.password, job.error, sizeof job.error);
+        clear_login(job);
+        break;
+    }
+    if (job.success && (job.action == PluginJob::Action::install ||
+                        job.action == PluginJob::Action::install_local))
+        job.installed_count = plugins::catalog(job.installed);
+    job.ready.store(true, std::memory_order_release);
+    return nullptr;
+}
+
+void open_plugin_job(PluginJob::Action action, const char *url, bool replace = false,
+                     unsigned offset = 0) noexcept
+{
+    auto &job = g_plugin_job;
+    const int target = g_plugin_depth - (replace ? 1 : 0);
+    if (job.busy || target < 0 || target >= plugin_page_limit)
+        return;
+    job.plugin = g_installed_plugins[g_active_plugin];
+    job.action = action;
+    job.dismissed = false;
+    job.offset = offset;
+    job.category = static_cast<plugins::Category>(g_repo_category);
+    copy_text(job.url, sizeof job.url, url ? url : "");
+    job.error[0] = 0;
+    job.target = target;
+    job.ready.store(false, std::memory_order_relaxed);
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr))
+    {
+        screen::notify("Could not start plugin");
+        return;
+    }
+    pthread_attr_setstacksize(&attr, 512 * 1024);
+    job.busy = pthread_create(&job.thread, &attr, load_plugin_page, &job) == 0;
+    pthread_attr_destroy(&attr);
+    if (!job.busy)
+    {
+        if (action == PluginJob::Action::catalog)
+            g_plugin_catalog_loaded = true;
+        screen::notify("Could not start plugin");
+    }
+    else if (action == PluginJob::Action::catalog)
+        append_log("v53 plugin catalog started");
+}
+
+void open_plugin_page(const char *url, bool replace = false) noexcept
+{
+    open_plugin_job(PluginJob::Action::page, url, replace);
+}
+
+void apply_installed_catalog(const PluginJob &job) noexcept
+{
+    const bool zip_selected = g_plugin_catalog_selection == g_installed_count + 1;
+    char selected[64]{}, active[64]{};
+    if (g_plugin_catalog_selection > 0 && g_plugin_catalog_selection <= g_installed_count)
+        copy_text(selected, sizeof selected, g_installed_plugins[g_plugin_catalog_selection - 1].id);
+    if (g_active_plugin < g_installed_count)
+        copy_text(active, sizeof active, g_installed_plugins[g_active_plugin].id);
+    g_installed_count = job.installed_count;
+    g_plugin_catalog_selection = zip_selected ? g_installed_count + 1 : 0;
+    g_active_plugin = 0;
+    for (int i = 0; i < g_installed_count; ++i)
+    {
+        g_installed_plugins[i] = job.installed[i];
+        if (*selected && !std::strcmp(selected, job.installed[i].id)) g_plugin_catalog_selection = i + 1;
+        if (*active && !std::strcmp(active, job.installed[i].id)) g_active_plugin = i;
+    }
+    g_plugin_catalog_loaded = true;
+}
+
+bool finish_plugin_page() noexcept
+{
+    auto &job = g_plugin_job;
+    if (!job.busy || !job.ready.load(std::memory_order_acquire))
+        return false;
+    pthread_join(job.thread, nullptr);
+    job.busy = false;
+    if (job.action == PluginJob::Action::catalog)
+    {
+        apply_installed_catalog(job);
+        char event[64];
+        snprintf(event, sizeof event, "v53 plugin catalog ready count=%d", g_installed_count);
+        append_log(event);
+    }
+    else if (job.dismissed && job.action != PluginJob::Action::install &&
+             job.action != PluginJob::Action::install_local)
+    {
+        append_log("v53 dismissed plugin page result");
+    }
+    else if (!job.success)
+    {
+        screen::notify(job.error);
+        append_log(job.error);
+    }
+    else if (job.action == PluginJob::Action::install ||
+             job.action == PluginJob::Action::install_local)
+    {
+        apply_installed_catalog(job);
+        screen::notify("Plugin installed");
+        append_log(job.action == PluginJob::Action::install ? "v53 installed repository plugin"
+                                                           : "v53 installed local plugin ZIP");
+    }
+    else if (job.action == PluginJob::Action::login)
+    {
+        screen::notify("Signed in to KinoZal.TV for this session");
+        append_log("v53 KinoZal.TV signed in");
+    }
+    else
+    {
+        if (job.target >= g_plugin_depth)
+            g_plugin_selection[job.target] = 0;
+        g_plugin_pages[job.target] = job.page;
+        g_plugin_page_repo[job.target] = job.action == PluginJob::Action::repository ||
+                                         job.action == PluginJob::Action::repository_refresh;
+        g_plugin_repo_offset[job.target] = job.offset;
+        copy_text(g_plugin_page_urls[job.target], sizeof g_plugin_page_urls[job.target], job.url);
+        g_plugin_depth = job.target + 1;
+        if (g_plugin_selection[job.target] >= job.page.count)
+            g_plugin_selection[job.target] = 0;
+        append_log(job.page.title);
+        if (job.action == PluginJob::Action::repository ||
+            job.action == PluginJob::Action::repository_refresh)
+            append_log("v53 repository page ready");
+    }
+    return true;
+}
+
+void *load_plugin_artwork(void *data) noexcept
+{
+    auto &job = *static_cast<ArtworkJob *>(data);
+    plugins::artwork(job.plugin, job.url, job.result);
+    job.ready.store(true, std::memory_order_release);
+    return nullptr;
+}
+
+const plugins::Plugin *selected_installed() noexcept
+{
+    if (g_place != Place::plugins || g_plugin_import || g_repo_categories || g_plugin_depth != 0 ||
+        g_plugin_catalog_selection < 1 || g_plugin_catalog_selection > g_installed_count)
+        return nullptr;
+    return &g_installed_plugins[g_plugin_catalog_selection - 1];
+}
+
+const plugins::Plugin &artwork_owner() noexcept
+{
+    static const plugins::Plugin empty{};
+    if (g_overlay == Overlay::plugin_details)
+        return g_plugin_detail == PluginDetail::repository ? empty : g_detail_plugin;
+    if (const auto *plugin = selected_installed()) return *plugin;
+    if (g_place == Place::plugins && g_plugin_depth > 0 && !g_plugin_page_repo[g_plugin_depth - 1])
+        return g_installed_plugins[g_active_plugin];
+    return empty;
+}
+
+const char *selected_plugin_icon() noexcept
+{
+    if (g_overlay == Overlay::plugin_details)
+        return g_plugin_detail == PluginDetail::repository ? g_detail_item.icon : g_detail_plugin.icon;
+    if (const auto *plugin = selected_installed()) return plugin->icon;
+    if (g_place != Place::plugins || g_plugin_import || g_plugin_depth <= 0)
+        return "";
+    const auto &page = g_plugin_pages[g_plugin_depth - 1];
+    return page.count ? page.items[g_plugin_selection[g_plugin_depth - 1]].icon : "";
+}
+
+bool update_plugin_artwork(unsigned pressed) noexcept
+{
+    auto &job = g_artwork_job;
+    const char *wanted = selected_plugin_icon();
+    const auto &plugin = artwork_owner();
+    bool dirty = false;
+    if (job.busy && job.ready.load(std::memory_order_acquire))
+    {
+        pthread_join(job.thread, nullptr);
+        job.busy = false;
+        image::unload(g_plugin_artwork);
+        if (!std::strcmp(wanted, job.url) && !std::strcmp(plugin.id, job.plugin.id))
+        {
+            append_log(job.result.loaded() ? "v53 plugin artwork decoded" : "v53 plugin artwork unavailable");
+            g_plugin_artwork = job.result;
+            job.result = {};
+            copy_text(g_artwork_url, sizeof g_artwork_url, wanted);
+            copy_text(g_artwork_plugin, sizeof g_artwork_plugin, plugin.id);
+        }
+        image::unload(job.result);
+        dirty = true;
+    }
+    if (pressed)
+        g_artwork_idle = screen::now_ms();
+    if (!job.busy && !g_plugin_job.busy && *wanted && screen::now_ms() - g_artwork_idle >= 250 &&
+        (std::strcmp(wanted, g_artwork_url) || std::strcmp(plugin.id, g_artwork_plugin)))
+    {
+        job.plugin = plugin;
+        copy_text(job.url, sizeof job.url, wanted);
+        job.ready.store(false, std::memory_order_relaxed);
+        pthread_attr_t attr;
+        if (pthread_attr_init(&attr) == 0)
+        {
+            pthread_attr_setstacksize(&attr, 512 * 1024);
+            job.busy = pthread_create(&job.thread, &attr, load_plugin_artwork, &job) == 0;
+            pthread_attr_destroy(&attr);
+        }
+        if (!job.busy)
+        {
+            copy_text(g_artwork_url, sizeof g_artwork_url, wanted);
+            copy_text(g_artwork_plugin, sizeof g_artwork_plugin, plugin.id);
+        }
+    }
+    return dirty;
+}
+
+int scan_local_packages(const char *extension, fs::Entry *out, int capacity) noexcept
+{
+    constexpr const char *roots[] = {MOVIAN_DATA_DIR, MOVIAN_DOWNLOAD0};
+    int total = 0;
+    fs::Entry files[max_entries];
+    for (const char *root : roots)
+    {
+        int count = 0;
+        fs::list_dir(root, files, max_entries, &count, nullptr, true);
+        for (int i = 0; i < count && total < capacity; ++i)
+        {
+            const char *ext = std::strrchr(files[i].name, '.');
+            if (ext && !strcasecmp(ext, extension) && files[i].kind != fs::Kind::directory)
+                out[total++] = files[i];
+        }
+    }
+    return total;
+}
+
+void scan_plugin_zips() noexcept
+{
+    g_plugin_zip_count = 0;
+    if (!g_zip_depth)
+    {
+        g_plugin_zips[0] = {"Movian library", MOVIAN_DATA_DIR, fs::Kind::directory};
+        g_plugin_zips[1] = {"Title data", MOVIAN_DOWNLOAD0, fs::Kind::directory};
+        g_plugin_zips[2] = {"USB", "", fs::Kind::directory};
+        copy_text(g_plugin_zips[2].path, sizeof g_plugin_zips[2].path, kUsb0);
+        g_plugin_zip_count = 3;
+    }
+    else
+    {
+        fs::list_directory(g_zip_stack[g_zip_depth].path, g_plugin_zips, max_entries, &g_plugin_zip_count,
+                           nullptr, true, fs::SortOrder::filename, true, ".zip");
+    }
+    g_plugin_zip_selection = std::clamp(g_zip_stack[g_zip_depth].selection, 0, std::max(0, g_plugin_zip_count - 1));
+}
+
+void begin_zip_picker() noexcept
+{
+    g_zip_depth = 0;
+    g_zip_stack[0].selection = 0;
+    g_plugin_import = true;
+    scan_plugin_zips();
+}
+
+bool open_zip_details(const char *path) noexcept
+{
+    if (!plugins::inspect_package(path, g_detail_plugin))
+    {
+        menu_info("Plugin package", "This ZIP has no supported Movian plugin manifest.");
+        return false;
+    }
+    g_plugin_detail = PluginDetail::local;
+    g_plugin_detail_row = 0;
+    g_overlay = Overlay::plugin_details;
+    return true;
+}
+
+void run_plugin_detail(const MenuEntry &entry) noexcept
+{
+    if (entry.id == MenuAction::plugin_open || entry.id == MenuAction::plugin_settings)
+    {
+        g_overlay = Overlay::none;
+        open_plugin_page(entry.id == MenuAction::plugin_settings ? "#settings" : nullptr);
+    }
+    else if (entry.id == MenuAction::plugin_install)
+    {
+        if (g_plugin_job.busy) return;
+        g_overlay = Overlay::none;
+        if (g_plugin_detail == PluginDetail::local)
+            open_plugin_job(PluginJob::Action::install_local, g_detail_plugin.archive);
+        else
+            open_plugin_job(PluginJob::Action::install, g_detail_item.url, true);
+    }
+    else
+        menu_info(entry.label, "This plugin action is planned for a later PS5 build.");
+}
+
+void move_plugin_selection(unsigned pressed, int &selected, int count) noexcept
+{
+    if (count <= 0)
+        return;
+    if (pressed & pad::up)
+        selected = (selected + count - 1) % count;
+    if (pressed & pad::down)
+        selected = (selected + 1) % count;
+}
+
+void update_plugins(unsigned pressed) noexcept
+{
+    if (g_plugin_job.busy && (pressed & pad::circle) && !g_plugin_job.dismissed)
+    {
+        g_plugin_job.dismissed = true;
+        if (g_plugin_job.action == PluginJob::Action::catalog)
+            g_place = Place::home;
+        return;
+    }
+    if (pressed & pad::circle)
+    {
+        if (g_plugin_import && g_zip_depth > 0)
+        {
+            --g_zip_depth;
+            scan_plugin_zips();
+        }
+        else if (g_plugin_import)
+            g_plugin_import = false;
+        else if (g_plugin_depth > 0)
+            --g_plugin_depth;
+        else if (g_repo_categories)
+            g_repo_categories = false;
+        else
+            g_place = Place::home;
+        return;
+    }
+    if (g_plugin_job.busy)
+        return;
+    if (!g_plugin_catalog_loaded && g_plugin_depth == 0 && !g_plugin_import && !g_repo_categories)
+    {
+        open_plugin_job(PluginJob::Action::catalog, nullptr);
+        return;
+    }
+    if (g_plugin_import)
+    {
+        if (pressed & pad::triangle) scan_plugin_zips();
+        move_plugin_selection(pressed, g_plugin_zip_selection, g_plugin_zip_count);
+        g_zip_stack[g_zip_depth].selection = g_plugin_zip_selection;
+        if (g_plugin_zip_count && (pressed & pad::cross))
+        {
+            const auto &entry = g_plugin_zips[g_plugin_zip_selection];
+            if (entry.kind == fs::Kind::directory)
+            {
+                if (g_zip_depth + 1 == max_depth) screen::notify("Folder nesting limit reached");
+                else
+                {
+                    ++g_zip_depth;
+                    copy_text(g_zip_stack[g_zip_depth].path, sizeof g_zip_stack[g_zip_depth].path, entry.path);
+                    g_zip_stack[g_zip_depth].selection = 0;
+                    scan_plugin_zips();
+                }
+            }
+            else open_zip_details(entry.path);
+        }
+        return;
+    }
+    if (g_plugin_depth == 0)
+    {
+        if (g_repo_categories)
+        {
+            const int last = static_cast<int>(std::size(plugins::category_names)) - 1;
+            if ((pressed & pad::left) && g_repo_category % repo_columns) --g_repo_category;
+            if ((pressed & pad::right) && g_repo_category % repo_columns < repo_columns - 1)
+                g_repo_category = std::min(last, g_repo_category + 1);
+            if ((pressed & pad::up) && g_repo_category >= repo_columns) g_repo_category -= repo_columns;
+            if ((pressed & pad::down) && g_repo_category < repo_columns)
+                g_repo_category = std::min(last, g_repo_category + repo_columns);
+            if (pressed & pad::cross)
+            {
+                if (settings::repo_url()[0])
+                    open_plugin_job(PluginJob::Action::repository, settings::repo_url());
+                else
+                    menu_info("Plugin repository", "Choose a repository in Settings → General.");
+            }
+            return;
+        }
+        move_plugin_selection(pressed, g_plugin_catalog_selection, g_installed_count + 2);
+        if (pressed & pad::triangle)
+            begin_zip_picker();
+        else if (pressed & (pad::cross | pad::square))
+        {
+            if (g_plugin_catalog_selection == 0 && (pressed & pad::cross))
+                g_repo_categories = true;
+            else if (g_plugin_catalog_selection == g_installed_count + 1 && (pressed & pad::cross))
+                begin_zip_picker();
+            else if (const auto *plugin = selected_installed())
+            {
+                g_active_plugin = g_plugin_catalog_selection - 1;
+                if (pressed & pad::square) open_plugin_page("#settings");
+                else
+                {
+                    g_detail_plugin = *plugin;
+                    g_plugin_detail = PluginDetail::installed;
+                    g_plugin_detail_row = 0;
+                    g_overlay = Overlay::plugin_details;
+                }
+            }
+        }
+        return;
+    }
+    const auto &page = g_plugin_pages[g_plugin_depth - 1];
+    if (page.count == 0)
+        return;
+    int &selected = g_plugin_selection[g_plugin_depth - 1];
+    move_plugin_selection(pressed, selected, page.count);
+    if ((pressed & pad::triangle) && !strcmp(page.items[selected].type, "video"))
+    {
+        char request[sizeof page.items[selected].url];
+        snprintf(request, sizeof request, "#hooks:video:%s", page.items[selected].title);
+        open_plugin_page(request);
+        return;
+    }
+    const bool repository = g_plugin_page_repo[g_plugin_depth - 1];
+    if ((pressed & pad::square) && !repository)
+    {
+        open_plugin_page("#settings");
+        return;
+    }
+    if (pressed & (repository ? pad::cross | pad::square : pad::cross))
+    {
+        const auto &item = page.items[selected];
+        if (!std::strcmp(item.type, "package"))
+        {
+            g_detail_item = item;
+            g_plugin_detail = PluginDetail::repository;
+            g_plugin_detail_row = 0;
+            g_overlay = Overlay::plugin_details;
+        }
+        else if (!std::strcmp(item.type, "repo"))
+            open_plugin_job(PluginJob::Action::repository, settings::repo_url(),
+                            g_plugin_depth >= plugin_page_limit,
+                            static_cast<unsigned>(strtoul(item.url, nullptr, 10)));
+        else if (!std::strcmp(item.type, "repo-refresh"))
+            open_plugin_job(PluginJob::Action::repository_refresh, settings::repo_url(), true,
+                            g_plugin_repo_offset[g_plugin_depth - 1]);
+        else if (!std::strcmp(item.type, "next"))
+            open_plugin_page(item.url, true);
+        else if (!std::strncmp(item.url, "magnet:", 7))
+        {
+            if (torrent::magnet_hash(item.url, g_torrent_hash))
+            {
+                g_torrent_descriptor[0] = 0;
+                g_torrent_selected = 0;
+                g_place = Place::bittorrent;
+                append_log("v53 opened BitTorrent magnet");
+            }
+            else
+                screen::notify("Unsupported magnet format");
+        }
+        else if (!std::strcmp(item.type, "torrent-file"))
+        {
+            char path[384];
+            if (plugins::torrent_path(g_installed_plugins[g_active_plugin], path, sizeof path))
+                open_torrent_descriptor(path);
+        }
+        else if (const auto prefix = std::strlen(g_installed_plugins[g_active_plugin].id);
+                 prefix && !std::strncmp(item.url, g_installed_plugins[g_active_plugin].id, prefix) &&
+                 !std::strncmp(item.url + prefix, ":torrent:", 9))
+            open_plugin_page(item.url);
+        else if (!std::strncmp(item.url, "torrent:", 8))
+            screen::notify("This torrent link needs a local descriptor or an embedded plugin redirect");
+        else if (!std::strcmp(item.type, "directory") || !std::strcmp(item.type, "movie") ||
+                 !std::strcmp(item.type, "hook") ||
+                 (!std::strcmp(item.type, "video") &&
+                  !std::strncmp(item.url, g_installed_plugins[g_active_plugin].id,
+                                std::strlen(g_installed_plugins[g_active_plugin].id))))
+            open_plugin_page(item.url);
+        else if (!std::strcmp(item.type, "option") || !std::strcmp(item.type, "consent") ||
+                 !std::strcmp(item.type, "page-option"))
+        {
+            if (plugins::set_option(g_installed_plugins[g_active_plugin], item.url))
+                open_plugin_page(!std::strcmp(item.type, "option") ? "#settings" :
+                                 !std::strcmp(item.type, "page-option") ? g_plugin_page_urls[g_plugin_depth - 1] :
+                                 nullptr, true);
+            else
+                screen::notify("Could not save plugin setting");
+        }
+        else if (!std::strcmp(item.type, "text"))
+        {
+            snprintf(g_plugin_text_key, sizeof g_plugin_text_key, "%.62s", item.url);
+            if (!keyboard::open(item.title, "Enter a value", item.detail, 60))
+            {
+                g_plugin_text_key[0] = 0;
+                screen::notify("Keyboard unavailable");
+            }
+        }
+        else if (!std::strcmp(item.type, "account") &&
+                 !std::strcmp(g_installed_plugins[g_active_plugin].id, "KinoZal.TV"))
+        {
+            clear_login(g_plugin_job);
+            char title[288];
+            if (!plugins::kinozal_login_origin(g_login_origin))
+            {
+                append_log("KinoZal.TV sign-in target rejected");
+                screen::notify("Select the KinoZal.TV domain and HTTPS in plugin settings");
+                return;
+            }
+            snprintf(title, sizeof title, "Username for %s", g_login_origin);
+            if (keyboard::open(title, "Username", "", 60))
+                g_login_input = LoginInput::username;
+            else
+            {
+                append_log("KinoZal.TV username keyboard did not open");
+                screen::notify("Keyboard unavailable");
+            }
+        }
+        else if (std::strcmp(item.type, "video") == 0 &&
+                 std::strcmp(item.url, "file:///app0/assets/hevc-test.mp4") == 0)
+            play_path(MOVIAN_APP0 "/assets/hevc-test.mp4", item.title, true);
+        else
+            menu_info(item.title, "This plugin action is planned for a later PS5 build.");
+    }
+}
+
+void *download_torrent(void *opaque) noexcept
+{
+    auto &job = *static_cast<TorrentJob *>(opaque);
+    job.ok = torrent::download(job.descriptor, job.peer, job.path, job.cancel,
+                               job.progress, job.error, sizeof job.error, job.stream, job.storage, job.options);
+    job.ready.store(true, std::memory_order_release);
+    return nullptr;
+}
+
+void start_torrent_download(const char *peer) noexcept
+{
+    auto &job = g_torrent_job;
+    if (g_torrent_metadata.stream_only && !settings::get().torrent_progressive)
+    {
+        screen::notify("Enable playback during download for this torrent");
+        return;
+    }
+    copy_text(job.descriptor, sizeof job.descriptor, g_torrent_descriptor);
+    copy_text(job.peer, sizeof job.peer, peer);
+    job.ready = false;
+    job.cancel = false;
+    job.progress = 0;
+    const auto &d = settings::get();
+    job.storage = static_cast<torrent::CacheStorage>(d.torrent_cache_path);
+    job.options = {{d.torrent_cache_mib, d.torrent_read_ahead, d.torrent_preload},
+                   d.torrent_connections, d.torrent_requests, d.torrent_block_timeout,
+                   static_cast<torrent::RetrackersMode>(d.torrent_retrackers)};
+    diagnostics::record("torrent", "start cache=%d source=%s", static_cast<int>(job.storage),
+                        peer[0] ? "direct peer" : "tracker");
+    job.playback_attempted = false;
+    job.playback_started = false;
+    job.stream.reset();
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr) == 0)
+    {
+        pthread_attr_setstacksize(&attr, 512 * 1024);
+        job.busy = pthread_create(&job.thread, &attr, download_torrent, &job) == 0;
+        pthread_attr_destroy(&attr);
+    }
+    if (job.busy)
+        append_log(peer[0] ? "v53 direct peer transfer started" : "v53 tracker discovery started");
+    else
+        screen::notify("Could not start peer download");
+}
+
+bool finish_torrent_download() noexcept
+{
+    auto &job = g_torrent_job;
+    if (!job.busy)
+        return false;
+    const bool in_torrent = g_place == Place::bittorrent && !player::active() &&
+                            !std::strcmp(job.descriptor, g_torrent_descriptor);
+    if (job.playback_started && job.stream.uses_cache() && !player::active())
+        job.cancel = true;
+    if (!job.ready.load(std::memory_order_acquire))
+    {
+        if (!in_torrent || job.playback_attempted || job.cancel || !settings::get().torrent_progressive ||
+            !(job.stream.uses_cache() ? job.stream.can_start_mkv() : job.stream.can_start_mp4()))
+            return false;
+        job.playback_attempted = true;
+        job.playback_started = play_path(job.path, g_torrent_metadata.title, true, &job.stream);
+        if (job.playback_started)
+            append_log("v53 peer playback started before download completed");
+        else if (job.stream.uses_cache())
+            job.cancel = true;
+        return true;
+    }
+    pthread_join(job.thread, nullptr);
+    job.busy = false;
+    const bool used_cache = job.stream.uses_cache();
+    if ((!job.ok || used_cache) && !avdec::progressive())
+        job.stream.reset();
+    if (!job.ok)
+    {
+        append_log(job.error);
+        screen::notify(job.error);
+        return true;
+    }
+    if (used_cache)
+        return true;
+    append_log("v53 direct peer verified download");
+    if (in_torrent && !job.playback_started)
+        play_path(job.path, g_torrent_metadata.title, true, &job.stream);
+    else
+        screen::notify("Verified torrent ready");
+    return true;
+}
+
+void update_torrents(unsigned pressed) noexcept
+{
+    if (g_torrent_job.busy && (pressed & pad::circle))
+    {
+        g_torrent_job.cancel = true;
+        return;
+    }
+    if (pressed & pad::circle)
+    {
+        if (g_torrent_descriptor[0] || g_torrent_hash[0])
+        {
+            g_torrent_descriptor[0] = 0;
+            g_torrent_hash[0] = 0;
+            g_torrent_selected = 0;
+        }
+        else
+            g_place = Place::home;
+        return;
+    }
+    if (g_torrent_hash[0])
+        return;
+    if (g_torrent_descriptor[0])
+    {
+        move_plugin_selection(pressed, g_torrent_selected, g_torrent_metadata.count);
+        if (!g_torrent_job.busy && (pressed & (pad::square | pad::triangle)))
+        {
+            if (!g_torrent_metadata.direct_peer)
+            {
+                screen::notify("Torrent container, size or piece layout is unsupported");
+                return;
+            }
+            char peer[sizeof g_torrent_job.peer]{};
+            char sidecar[sizeof g_torrent_descriptor + 6];
+            snprintf(sidecar, sizeof sidecar, "%s.peer", g_torrent_descriptor);
+            if (auto *file = std::fopen(sidecar, "r"))
+            {
+                if (std::fgets(peer, sizeof peer, file))
+                    peer[std::strcspn(peer, "\r\n")] = 0;
+                std::fclose(file);
+            }
+            if (pressed & pad::triangle)
+            {
+                if (peer[0])
+                    start_torrent_download(peer);
+                else
+                    screen::notify("No saved peer for this torrent. Press Cross to use its trackers.");
+            }
+            else
+            {
+                g_torrent_peer_input = keyboard::open("Direct BitTorrent peer", "IPv4:port", peer, 24);
+                if (!g_torrent_peer_input)
+                    screen::notify("Could not open the peer address keyboard");
+            }
+            return;
+        }
+        if (!g_torrent_job.busy && (pressed & pad::cross))
+        {
+            const auto &file = g_torrent_metadata.files[g_torrent_selected];
+            char path[384];
+            if (g_torrent_job.stream.complete() &&
+                !std::strcmp(g_torrent_job.descriptor, g_torrent_descriptor))
+                play_path(g_torrent_job.path, file.path, true, &g_torrent_job.stream);
+            else if (torrent::local_path(g_torrent_descriptor, file, path) ||
+                (g_torrent_metadata.direct_peer && torrent::cached_path(g_torrent_descriptor, path)))
+                play_path(path, file.path, false);
+            else if (g_torrent_metadata.direct_peer && settings::get().torrent_trackers)
+                start_torrent_download("");
+            else if (g_torrent_metadata.direct_peer)
+                screen::notify("Local media unavailable. Press Square to enter a peer.");
+            else
+                screen::notify("Local media unavailable. This torrent needs swarm streaming.");
+        }
+        return;
+    }
+    if (!g_torrent_scanned || (pressed & pad::triangle))
+    {
+        g_torrent_source_count = scan_local_packages(".torrent", g_torrent_sources, 24);
+        g_torrent_scanned = true;
+        g_torrent_selected = 0;
+    }
+    move_plugin_selection(pressed, g_torrent_selected, g_torrent_source_count);
+    if (g_torrent_source_count && (pressed & pad::cross))
+    {
+        const auto &entry = g_torrent_sources[g_torrent_selected];
+        open_torrent_descriptor(entry.path);
+    }
+}
+
+void draw_plugin_row(screen::Canvas &c, int row, bool selected, const char *title,
+                     const char *detail, const char *tag, int start = 245,
+                     int width = 1820) noexcept;
+
+void draw_torrents(screen::Canvas &c) noexcept
+{
+    c.text(48.f, 160.f, "BitTorrent", font::semibold, 40, Color::text);
+    if (g_torrent_hash[0])
+    {
+        c.text(48.f, 214.f, "Magnet info hash", font::regular, 21, Color::muted);
+        c.text(76.f, 300.f, g_torrent_hash, font::mono_medium, 24, Color::text);
+        c.text(76.f, 348.f, "Direct peer downloads require a .torrent file", font::regular, 22, Color::muted);
+        return;
+    }
+    const bool viewing = g_torrent_descriptor[0];
+    c.text(48.f, 214.f, viewing ? g_torrent_metadata.title : "Local torrent files",
+           font::regular, 21, Color::muted);
+    const int count = viewing ? g_torrent_metadata.count : g_torrent_source_count;
+    const int first = g_torrent_selected < 7 ? 0 : g_torrent_selected - 6;
+    for (int i = first; i < count && i < first + 7; ++i)
+    {
+        if (viewing)
+        {
+            const auto &file = g_torrent_metadata.files[i];
+            char size[48];
+            snprintf(size, sizeof size, "%llu bytes", static_cast<unsigned long long>(file.size));
+            draw_plugin_row(c, i - first, i == g_torrent_selected, file.path, size, "Local");
+        }
+        else
+            draw_plugin_row(c, i - first, i == g_torrent_selected, g_torrent_sources[i].name,
+                            g_torrent_sources[i].path, "Torrent");
+    }
+    if (!count)
+        c.text(76.f, 302.f, "No .torrent files in /data/movian or /download0",
+               font::regular, 22, Color::muted);
+    if (g_torrent_job.busy)
+    {
+        char progress[100];
+        if (g_torrent_metadata.stream_only)
+            copy_text(progress, sizeof progress, "Waiting for verified pieces     Circle  Cancel");
+        else
+            snprintf(progress, sizeof progress, "Download %u%% verified     Circle  Cancel",
+                     g_torrent_job.progress.load(std::memory_order_relaxed));
+        c.text(48.f, 930.f, progress, font::regular, 20, Color::muted);
+        return;
+    }
+    c.text(48.f, 930.f, viewing ? "Cross  Play     Square  Enter peer     Triangle  Use saved peer     Circle  Back"
+                               : "Cross  View files     Triangle  Refresh     Circle  Back",
+           font::regular, 20, Color::muted);
+}
+
+void draw_plugin_row(screen::Canvas &c, int row, bool selected,
+                     const char *title, const char *detail, const char *tag,
+                     int start, int width) noexcept
+{
+    const int y = start + 88 * row;
+    c.rect(50, y, width, 80, selected ? Color::hover : Color::surface2);
+    if (selected)
+        c.rect(50, y, 5, 80, Color::accent);
+    char title_fit[112];
+    c.text(76.f, y + 32.f, fit(title, width - 275, title_fit, sizeof title_fit, font::semibold, 26),
+           font::semibold, 26, Color::text);
+    char detail_fit[168];
+    c.text(76.f, y + 60.f, fit(detail, width - 275, detail_fit, sizeof detail_fit, font::regular, 18),
+           font::regular, 18, Color::muted);
+    c.text(50.f + width - 230, y + 43.f, tag, font::regular, 20, Color::muted);
+}
+
+const plugins::Plugin *installed_by_id(const char *id) noexcept
+{
+    if (!*id) return nullptr;
+    for (int i = 0; i < g_installed_count; ++i)
+        if (!std::strcmp(g_installed_plugins[i].id, id)) return &g_installed_plugins[i];
+    return nullptr;
+}
+
+bool draw_selected_artwork(screen::Canvas &c, int x, int y, int w, int h) noexcept
+{
+    const char *wanted = selected_plugin_icon();
+    if (!*wanted || std::strcmp(wanted, g_artwork_url) || !g_plugin_artwork.loaded() ||
+        std::strcmp(g_artwork_plugin, artwork_owner().id))
+        return false;
+    const auto &art = g_plugin_artwork;
+    const float scale = std::min(static_cast<float>(w) / art.w, static_cast<float>(h) / art.h);
+    const int width = std::max(1, static_cast<int>(art.w * scale));
+    const int height = std::max(1, static_cast<int>(art.h * scale));
+    c.image(x + (w - width) / 2, y + (h - height) / 2, width, height, art);
+    return true;
+}
+
+void draw_repository_categories(screen::Canvas &c) noexcept
+{
+    c.text(50.f, 160.f, "Plugin categories", font::semibold, 40, Color::text);
+    c.text(50.f, 214.f, settings::repo_label(), font::regular, 22, Color::muted);
+    for (int i = 0; i < static_cast<int>(std::size(plugins::category_names)); ++i)
+    {
+        const int x = 50 + i % repo_columns * 366;
+        const int y = 266 + i / repo_columns * 164;
+        draw_card(c, x, y, 344, 124, plugins::category_names[i], "", i == g_repo_category);
+    }
+    c.text(50.f, 930.f, "Cross  Browse     Circle  Back", font::regular, 20, Color::muted);
+}
+
+void draw_plugins(screen::Canvas &c) noexcept
+{
+    const auto *page = g_plugin_depth > 0 ? &g_plugin_pages[g_plugin_depth - 1] : nullptr;
+    const bool repository = page && g_plugin_page_repo[g_plugin_depth - 1];
+    if (g_repo_categories && !page && !g_plugin_job.busy)
+    {
+        draw_repository_categories(c);
+        return;
+    }
+    const char *heading = g_plugin_import ? "Install from ZIP" : page ? page->title :
+                          g_repo_categories ? "Plugin categories" : "Plugins";
+    const char *sub = g_plugin_import ? (g_zip_depth ? g_zip_stack[g_zip_depth].path : "Choose a source")
+                      : repository || g_repo_categories ? settings::repo_label()
+                      : page ? g_installed_plugins[g_active_plugin].title : "";
+    c.text(48.f, 160.f, heading, font::semibold, 40, Color::text);
+    if (*sub)
+    {
+        char shown[168];
+        c.text(48.f, 214.f, fit(sub, 1650, shown, sizeof shown, font::regular, 21),
+               font::regular, 21, Color::muted);
+    }
+    if (g_plugin_job.busy && !g_plugin_job.dismissed)
+    {
+        const auto action = g_plugin_job.action;
+        const char *status = action == PluginJob::Action::repository || action == PluginJob::Action::repository_refresh
+            ? "Loading repository…" : action == PluginJob::Action::install || action == PluginJob::Action::install_local
+            ? "Installing plugin…" : "Loading plugin…";
+        c.text(76.f, 300.f, status, font::regular, 24, Color::muted);
+        c.text(48.f, 930.f, "Circle  Back", font::regular, 20, Color::muted);
+        return;
+    }
+    if (g_plugin_import)
+    {
+        const int first = std::max(0, g_plugin_zip_selection - 6);
+        for (int i = first; i < g_plugin_zip_count && i < first + 7; ++i)
+        {
+            const auto &entry = g_plugin_zips[i];
+            draw_plugin_row(c, i - first, i == g_plugin_zip_selection, entry.name, "",
+                            entry.kind == fs::Kind::directory ? "Folder" : "ZIP");
+        }
+        if (!g_plugin_zip_count)
+            c.text(76.f, 304.f, "No folders or plugin ZIPs found", font::regular, 22, Color::muted);
+        c.text(48.f, 930.f, "Cross  Open     Triangle  Refresh     Circle  Back",
+               font::regular, 20, Color::muted);
+        return;
+    }
+    if (!page)
+    {
+        draw_plugin_row(c, 0, g_plugin_catalog_selection == 0, "Browse available plugins",
+                        settings::repo_label(), "Browse", 204);
+        c.text(72.f, 338.f, "Installed plugins", font::semibold, 29, Color::text);
+        if (!g_installed_count)
+            c.text(73.f, 384.f, "No plugins installed", font::regular, 21, Color::muted);
+        const int list_start = g_installed_count ? 356 : 432;
+        const int first = std::max(1, g_plugin_catalog_selection - 5);
+        const auto *plugin = selected_installed();
+        const bool show_art = plugin && plugin->icon[0];
+        if (show_art) draw_selected_artwork(c, 1330, 362, 495, 445);
+        for (int i = first; i <= g_installed_count + 1 && i < first + 6; ++i)
+            if (i == g_installed_count + 1)
+                draw_plugin_row(c, i - first, i == g_plugin_catalog_selection, "Install from ZIP",
+                                "Browse local files", "Local", list_start, show_art ? 1230 : 1820);
+            else
+            {
+                const auto &entry = g_installed_plugins[i - 1];
+                draw_plugin_row(c, i - first, i == g_plugin_catalog_selection, entry.title,
+                                entry.synopsis, entry.version, list_start, show_art ? 1230 : 1820);
+            }
+        c.text(48.f, 930.f, "Cross  Open     Square  Plugin settings     Triangle  ZIP picker     Circle  Back",
+               font::regular, 20, Color::muted);
+        return;
+    }
+    int start = 245;
+    int visible = 7;
+    if (repository && page->notice[0])
+    {
+        c.text(76.f, 249.f, page->notice, font::regular, 20, Color::muted);
+        start = 274;
+    }
+    else if (page->notice[0])
+    {
+        int position = 0;
+        const int length = static_cast<int>(std::strlen(page->notice));
+        for (int line = 0; position < length && line < 13; ++line)
+        {
+            const int begin = position;
+            int last_space = -1;
+            while (position < length && position - begin < 184 && page->notice[position] != '\n')
+            {
+                if (page->notice[position] == ' ')
+                    last_space = position;
+                font::next(page->notice, length, position);
+            }
+            if (position < length && page->notice[position] != '\n' && last_space > begin)
+                position = last_space;
+            char text[192];
+            snprintf(text, sizeof text, "%.*s", position - begin, page->notice + begin);
+            c.text(76.f, 276.f + 31 * line, text, font::regular, 20, Color::text);
+            while (page->notice[position] == ' ' || page->notice[position] == '\n')
+                ++position;
+        }
+        start = 690;
+        visible = 2;
+    }
+    const int selected = g_plugin_selection[g_plugin_depth - 1];
+    const int first = selected < visible ? 0 : selected - visible + 1;
+    const char *wanted = selected_plugin_icon();
+
+    const bool show_art = *wanted && (repository || !page->notice[0]);
+    if (show_art) draw_selected_artwork(c, 1310, start, 530, 590);
+    if (repository && !page->count)
+        c.text(76.f, start + 40.f, "No packages in this category", font::regular, 22, Color::muted);
+    for (int index = first; index < page->count && index < first + visible; ++index)
+    {
+        const auto &item = page->items[index];
+        const bool package = repository && !std::strcmp(item.type, "package");
+        const auto *installed = package ? installed_by_id(item.id) : nullptr;
+        const char *tag = package ? (installed ? "Installed" : item.version) :
+                           repository || !std::strcmp(item.type, "option") ? "" : item.type;
+        draw_plugin_row(c, index - first, index == selected, item.title, item.detail, tag,
+                        start, show_art ? 1220 : 1820);
+    }
+    c.text(48.f, 930.f, repository ? "Cross  Details or open     Circle  Back"
+                                   : "Cross  Select     Square  Plugin settings     Triangle  Video actions     Circle  Back",
+           font::regular, 20, Color::muted);
+}
+
+void draw_library_grid(screen::Canvas &c, const BrowseLevel &level) noexcept
+{
+    constexpr int tile_width = 338, tile_height = 153;
+    constexpr int x_step = 356, y_step = 168;
+    for (int i = level.first; i < std::min(g_row_count, level.first + library_grid_page); ++i)
+    {
+        const int relative = i - level.first;
+        const int x = 76 + (relative % library_columns) * x_step;
+        const int y = 265 + (relative / library_columns) * y_step;
+        const auto &item = g_rows[i];
+        const bool focused = i == level.selected;
+        c.round_rect(x, y, tile_width, tile_height, 12, focused ? Color::hover : Color::surface);
+        if (focused) c.round_frame(x, y, tile_width, tile_height, 12, 3, Color::accent);
+        if (item.kind == RowKind::folder)
+        {
+            c.round_rect(x + 23, y + 30, 35, 28, 4, Color::accent);
+            c.rect(x + 26, y + 25, 14, 7, Color::accent);
+        }
+        else if (item.kind == RowKind::file)
+        {
+            c.round_frame(x + 23, y + 25, 31, 34, 4, 2, Color::muted);
+            c.rect(x + 30, y + 36, 16, 2, Color::muted);
+            c.rect(x + 30, y + 44, 16, 2, Color::muted);
+        }
+        else
+            c.text(x + 24.f, y + 52.f, "!", font::semibold, 28, Color::orange);
+        char shown[160];
+        c.text(x + 23.f, y + 98.f, fit(item.title, tile_width - 46, shown, sizeof shown, font::medium, 23),
+               font::medium, 23, focused ? Color::text : Color::muted);
+        c.text(x + 23.f, y + 125.f, fit(item.detail, tile_width - 46, shown, sizeof shown, font::regular, 16),
+               font::regular, 16, Color::muted);
+    }
+    const int total_rows = (g_row_count + library_columns - 1) / library_columns;
+    if (total_rows > library_grid_rows)
+    {
+        constexpr int height = library_grid_rows * y_step - (y_step - tile_height);
+        const int thumb = height * library_grid_rows / total_rows;
+        const int offset = (height - thumb) * (level.first / library_columns) / (total_rows - library_grid_rows);
+        c.rect(1847, 265, 3, height, Color::line);
+        c.rect(1847, 265 + offset, 3, thumb, Color::accent);
+    }
+}
+
 void draw_videos(screen::Canvas &c) noexcept
 {
     if (g_videos_dirty)
@@ -1132,99 +2554,637 @@ void draw_videos(screen::Canvas &c) noexcept
 
     const BrowseLevel &lv = g_stack[g_depth];
     c.text(48.f, 160.f, lv.title, font::semibold, 40, Color::text);
-    const char *crumb = lv.path[0] ? lv.path : "Sources  ·  MPEG-1 plays  ·  other video needs FFmpeg";
+    const bool search = !std::strcmp(lv.path, kSearchUri);
+    const char *crumb = search ? g_home_query : lv.path[0] ? lv.path : "Local sources";
     char crumb_buf[160];
-    c.text(48.f, 208.f, fit(crumb, 1500, crumb_buf, sizeof crumb_buf, font::regular, 20),
+    c.text(48.f, 208.f, fit(crumb, 1440, crumb_buf, sizeof crumb_buf, font::regular, 20),
            font::regular, 20, Color::muted);
+    if (search && g_truncated)
+        c.text(1550.f, 208.f, "Some entries omitted", font::regular, 20, Color::muted);
 
     c.round_rect(48, 236, 1824, 748, 20, Color::surface2);
-    c.clip(list_x, list_y, list_w, list_h);
-    const int first = static_cast<int>(g_scroll) / row_h;
-    for (int i = first; i < g_row_count && i <= first + rows_in_view + 1; ++i)
+    if (browser_grid())
+        draw_library_grid(c, lv);
+    else
     {
-        const float y = static_cast<float>(list_y + i * row_h) - g_scroll;
-        const int top = static_cast<int>(y);
-        const bool chosen = i == lv.selected;
-        const Row &r = g_rows[i];
-        if (chosen)
-            c.round_rect(list_x, top + 4, list_w, row_h - 8, 12, Color::hover);
-        const char *mark = r.kind == RowKind::folder ? ">" : r.kind == RowKind::file ? "·" : "!";
-        Color mark_c = r.kind == RowKind::message ? Color::orange : Color::accent;
-        c.text(static_cast<float>(list_x + 16), y + 47, mark, font::semibold, 22, mark_c);
+        c.clip(list_x, list_y, list_w, list_h);
+        const int first = static_cast<int>(g_scroll) / row_h;
+        for (int i = first; i < g_row_count && i <= first + rows_in_view + 1; ++i)
+        {
+            const float y = static_cast<float>(list_y + i * row_h) - g_scroll;
+            const int top = static_cast<int>(y);
+            const bool chosen = i == lv.selected;
+            const Row &r = g_rows[i];
+            if (chosen)
+                c.round_rect(list_x, top + 4, list_w, row_h - 8, 12, Color::hover);
+            const char *mark = r.kind == RowKind::folder ? ">" : r.kind == RowKind::file ? "·" : "!";
+            Color mark_c = r.kind == RowKind::message ? Color::orange : Color::accent;
+            c.text(static_cast<float>(list_x + 16), y + 47, mark, font::semibold, 22, mark_c);
 
-        char shown[128];
-        c.text(static_cast<float>(list_x + 56), y + 36,
-               fit(r.title, list_w - 80, shown, sizeof shown, font::medium, 24), font::medium, 24,
-               chosen ? Color::text : Color::muted);
-        if (r.detail[0])
-            c.text(static_cast<float>(list_x + 56), y + 64,
-                   fit(r.detail, list_w - 80, shown, sizeof shown, font::regular, 16),
-                   font::regular, 16, Color::faint);
-    }
-    c.unclip();
+            char shown[128];
+            c.text(static_cast<float>(list_x + 56), y + 36,
+                   fit(r.title, list_w - 80, shown, sizeof shown, font::medium, 24), font::medium, 24,
+                   chosen ? Color::text : Color::muted);
+            if (r.detail[0])
+                c.text(static_cast<float>(list_x + 56), y + 64,
+                       fit(r.detail, list_w - 80, shown, sizeof shown, font::regular, 16),
+                       font::regular, 16, Color::faint);
+        }
+        c.unclip();
 
-    if (g_row_count > rows_in_view)
-    {
-        const int track_x = 48 + 1824 - 30;
-        const int track_y = list_y;
-        const int track_h = list_h;
-        c.round_rect(track_x, track_y, 6, track_h, 3, Color::line);
-        const float shown = static_cast<float>(rows_in_view) / static_cast<float>(g_row_count);
-        const int thumb_h = static_cast<int>(static_cast<float>(track_h) * shown);
-        const float most = static_cast<float>((g_row_count - rows_in_view) * row_h);
-        float at = most > 0 ? g_scroll / most : 0;
-        at = at < 0 ? 0 : at > 1 ? 1 : at;
-        const int thumb_y = track_y + static_cast<int>((track_h - thumb_h) * at);
-        c.round_rect(track_x, thumb_y, 6, thumb_h, 3, Color::muted);
+        if (g_row_count > rows_in_view)
+        {
+            const int track_x = 48 + 1824 - 30;
+            const int track_y = list_y;
+            const int track_h = list_h;
+            c.round_rect(track_x, track_y, 6, track_h, 3, Color::line);
+            const float shown = static_cast<float>(rows_in_view) / static_cast<float>(g_row_count);
+            const int thumb_h = static_cast<int>(static_cast<float>(track_h) * shown);
+            const float most = static_cast<float>((g_row_count - rows_in_view) * row_h);
+            float at = most > 0 ? g_scroll / most : 0;
+            at = at < 0 ? 0 : at > 1 ? 1 : at;
+            const int thumb_y = track_y + static_cast<int>((track_h - thumb_h) * at);
+            c.round_rect(track_x, thumb_y, 6, thumb_h, 3, Color::muted);
+        }
+
     }
 
     if (g_selected_note[0])
         c.text(72.f, 980.f, g_selected_note, font::regular, 18, Color::orange);
 }
 
-void draw_settings_overlay(screen::Canvas &c) noexcept
+const settings_menu::Row &selected_setting() noexcept
 {
-    c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
-    c.round_rect(300, 40, 1320, 1000, 20, Color::surface);
-    c.round_frame(300, 40, 1320, 1000, 20, 2, Color::accent, 180);
-    c.text(340.f, 100.f, "Settings", font::semibold, 34, Color::text);
-    c.text(340.f, 140.f, "Short M7 subset. Stored in /download0/settings.txt", font::regular, 18,
-           Color::muted);
-    for (int i = 0; i < setting_count; ++i)
+    return settings_menu::categories[g_settings_category].rows[g_settings_row];
+}
+
+int setting_choices(int action) noexcept
+{
+    switch (action)
     {
-        const int y = 170 + i * 62;
-        const bool on = i == g_settings_row;
-        if (on)
-            c.round_rect(390, y, 1140, 58, 12, Color::hover);
-        c.text(420.f, static_cast<float>(y + 38), setting_title(i), font::medium, 22,
-               on ? Color::text : Color::muted);
-        char value[64];
-        setting_value(i, value, sizeof value);
-        char shown[64];
-        c.text(980.f, static_cast<float>(y + 38),
-               fit(value, 520, shown, sizeof shown, font::mono_medium, 18), font::mono_medium, 18,
-               Color::accent);
+    case 2: case 15: return 3;
+    case 4: return std::size(settings::seek_steps);
+    case 5: return std::size(settings::volume_presets);
+    case 12: return settings::repo_preset_count;
+    default: return 0;
     }
 }
 
-void draw_item_overlay(screen::Canvas &c) noexcept
+int current_choice(int action) noexcept
 {
-    c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
-    c.round_rect(520, 180, 880, 680, 20, Color::surface);
-    c.round_frame(520, 180, 880, 680, 20, 2, Color::accent, 180);
-    c.text(560.f, 240.f, g_item_title[0] ? g_item_title : "Item", font::semibold, 28, Color::text);
-    char shown[128];
-    c.text(560.f, 280.f, fit(g_item_path, 800, shown, sizeof shown, font::regular, 16),
-           font::regular, 16, Color::muted);
-    for (int i = 0; i < item_action_count; ++i)
+    const auto &d = settings::get();
+    switch (action)
     {
-        const int y = 320 + i * 80;
-        const bool on = i == g_item_row;
-        const bool enabled = item_action_enabled(i);
-        if (on)
-            c.round_rect(550, y, 820, 68, 12, Color::hover);
-        c.text(580.f, static_cast<float>(y + 42), item_action_title(i), font::medium, 24,
-               enabled ? (on ? Color::text : Color::muted) : Color::faint);
+    case 2: return d.repeat;
+    case 4: return std::find(std::begin(settings::seek_steps), std::end(settings::seek_steps),
+                             d.seek_step) - std::begin(settings::seek_steps);
+    case 5: return std::lower_bound(std::begin(settings::volume_presets), std::end(settings::volume_presets),
+                                    d.volume) - std::begin(settings::volume_presets);
+    case 12: return d.repo_preset;
+    case 15: return d.torrent_cache_path;
+    default: return 0;
+    }
+}
+
+void apply_setting_choice(int action, int choice) noexcept
+{
+    auto &d = settings::get();
+    switch (action)
+    {
+    case 2: d.repeat = choice; break;
+    case 4: d.seek_step = settings::seek_steps[choice]; break;
+    case 5:
+        d.volume = settings::volume_presets[choice];
+        audio::set_volume(d.volume);
+        break;
+    case 12: d.repo_preset = choice; break;
+    case 15: d.torrent_cache_path = choice; break;
+    default: return;
+    }
+    settings::save();
+}
+
+void choice_label(int action, int choice, char *value, std::size_t cap) noexcept
+{
+    constexpr const char *repeat[] = {"Off", "One video", "Folder"};
+    constexpr const char *storage[] = {"RAM", "PS5 storage (HDD)", "USB"};
+    switch (action)
+    {
+    case 2: copy_text(value, cap, repeat[choice]); break;
+    case 4: snprintf(value, cap, "%d seconds", settings::seek_steps[choice]); break;
+    case 5: snprintf(value, cap, "%d%%", settings::volume_presets[choice]); break;
+    case 12: copy_text(value, cap, settings::repo_label(choice)); break;
+    case 15: copy_text(value, cap, storage[choice]); break;
+    }
+}
+
+void open_settings(bool from_sidebar = false) noexcept
+{
+    g_settings_from_sidebar = from_sidebar;
+    g_settings_in_category = false;
+    g_overlay = Overlay::settings;
+}
+
+void update_home(unsigned pressed) noexcept
+{
+    if (g_home_search_focused)
+    {
+        if (pressed & pad::down)
+            g_home_search_focused = false;
+        else if (pressed & pad::cross)
+        {
+            g_home_keyboard = keyboard::open("Search local media", "File or folder name", g_home_query,
+                                             keyboard::max_length);
+            if (!g_home_keyboard) screen::notify("Could not open the search keyboard");
+        }
+        return;
+    }
+
+    if ((pressed & pad::left) && g_home_tile % home_columns > 0)
+        --g_home_tile;
+    else if ((pressed & pad::right) && g_home_tile % home_columns < home_columns - 1 &&
+             g_home_tile < last_home_tile)
+        ++g_home_tile;
+    else if (pressed & pad::up)
+    {
+        if (g_home_tile < home_columns)
+            g_home_search_focused = true;
+        else
+            g_home_tile -= home_columns;
+    }
+    else if ((pressed & pad::down) && g_home_tile < home_columns)
+        g_home_tile = std::min(g_home_tile + home_columns, last_home_tile);
+    else if (pressed & pad::cross)
+    {
+        switch (home_tiles[g_home_tile].action)
+        {
+        case HomeAction::plugins: g_place = Place::plugins; break;
+        case HomeAction::network: g_overlay = Overlay::home_network; break;
+        case HomeAction::settings: open_settings(); break;
+        case HomeAction::library: open_home_folder(MOVIAN_DATA_DIR, "Movian library"); break;
+        case HomeAction::title_data: open_home_folder(MOVIAN_DOWNLOAD0, "Title data"); break;
+        case HomeAction::usb: open_home_folder(kUsb0, "USB"); break;
+        case HomeAction::bookmarks: open_home_folder(kBookmarksUri, "Bookmarks"); break;
+        case HomeAction::resume:
+        {
+            const auto resume = settings::last_resume();
+            if (resume.valid) play_path(resume.path, resume.title, false);
+            else screen::notify("Nothing to continue");
+            break;
+        }
+        }
+    }
+}
+
+bool local_folder_page() noexcept
+{
+    const char *path = g_stack[g_depth].path;
+    return g_place == Place::videos && path[0] && std::strcmp(path, kBookmarksUri) &&
+           std::strcmp(path, kSearchUri);
+}
+
+std::span<const char *const> browser_choices(MenuAction action) noexcept
+{
+    static constexpr const char *layouts[] = {"List", "Grid"};
+    static constexpr const char *sorts[] = {"Filename", "Newest first", "Oldest first"};
+    return action == MenuAction::page_layout ? std::span<const char *const>(layouts) :
+                                              std::span<const char *const>(sorts);
+}
+
+int current_browser_choice(MenuAction action) noexcept
+{
+    const auto prefs = settings::browser_prefs(g_stack[g_depth].path);
+    return action == MenuAction::page_layout ? prefs.grid : static_cast<int>(prefs.sort);
+}
+
+void apply_browser_choice(MenuAction action, int value) noexcept
+{
+    const char *path = g_stack[g_depth].path;
+    auto prefs = settings::browser_prefs(path);
+    switch (action)
+    {
+    case MenuAction::page_layout: prefs.grid = value == 1; g_stack[g_depth].first = 0; break;
+    case MenuAction::sort_on: prefs.sort = static_cast<fs::SortOrder>(value); break;
+    case MenuAction::folders_first: prefs.folders_first = !prefs.folders_first; break;
+    case MenuAction::supported_only: prefs.supported_only = !prefs.supported_only; break;
+    default: return;
+    }
+    settings::save_browser_prefs(path, prefs);
+    g_videos_dirty = true;
+}
+
+void open_sidebar() noexcept
+{
+    g_sidebar_row = 0;
+    g_sidebar_count = 0;
+    const bool active = player::active();
+    for (const auto &entry : sidebar_entries)
+    {
+        if (!active && entry.id <= MenuAction::shuffle)
+            continue;
+        if (entry.id == MenuAction::page_layout && (active || g_place != Place::videos))
+            continue;
+        if (entry.id >= MenuAction::include_library && entry.id <= MenuAction::erase_playback &&
+            (active || !local_folder_page()))
+            continue;
+        if (!active && g_place == Place::home &&
+            (entry.id == MenuAction::bookmark || entry.id == MenuAction::paste || entry.id == MenuAction::home))
+            continue;
+        g_sidebar_visible[g_sidebar_count++] = entry;
+    }
+    g_overlay = Overlay::sidebar;
+}
+
+void show_log() noexcept
+{
+    menu_info("Movian log");
+    auto *log = std::fopen(MOVIAN_LOG_PATH, "r");
+    if (!log)
+    {
+        copy_text(g_menu_lines[0], sizeof g_menu_lines[0], "No Movian log is available.");
+        return;
+    }
+    if (std::fseek(log, 0, SEEK_END) == 0 && std::ftell(log) > 8192)
+    {
+        std::fseek(log, -8192, SEEK_END);
+        int ch;
+        do { ch = std::fgetc(log); } while (ch != EOF && ch != '\n');
+    }
+    else
+        std::rewind(log);
+    char line[sizeof g_menu_lines[0]];
+    while (std::fgets(line, sizeof line, log))
+    {
+        line[std::strcspn(line, "\r\n")] = 0;
+        for (char *p = line; *p; ++p)
+            if (static_cast<unsigned char>(*p) < 32) *p = ' ';
+        std::memmove(g_menu_lines, g_menu_lines + 1, sizeof g_menu_lines - sizeof line);
+        copy_text(g_menu_lines[menu_info_lines - 1], sizeof line, line);
+    }
+    std::fclose(log);
+}
+
+void reload_current_page() noexcept
+{
+    if (g_place == Place::videos)
+        g_videos_dirty = true;
+    else if (g_place == Place::bittorrent && !g_torrent_job.busy && !g_torrent_descriptor[0] && !g_torrent_hash[0])
+        update_torrents(pad::triangle);
+    else if (g_place == Place::plugins && !g_plugin_job.busy)
+    {
+        if (g_plugin_import) scan_plugin_zips();
+        else if (g_plugin_depth > 0)
+        {
+            const int index = g_plugin_depth - 1;
+            if (g_plugin_page_repo[index])
+                open_plugin_job(PluginJob::Action::repository, g_plugin_page_urls[index], true,
+                                g_plugin_repo_offset[index]);
+            else open_plugin_page(g_plugin_page_urls[index], true);
+        }
+        else g_plugin_catalog_loaded = false;
+    }
+}
+
+void run_sidebar_action(const MenuEntry &entry) noexcept
+{
+    switch (entry.id)
+    {
+    case MenuAction::stop:
+    case MenuAction::previous:
+    case MenuAction::rewind:
+    case MenuAction::pause:
+    case MenuAction::forward:
+    case MenuAction::next:
+        if (!player::active())
+        {
+            menu_info(entry.label, "Start a video to use playback controls.");
+            return;
+        }
+        switch (entry.id)
+        {
+        case MenuAction::stop: player::close(); g_overlay = Overlay::none; break;
+        case MenuAction::previous: (void)play_delta(-1, true); break;
+        case MenuAction::rewind: player::seek_step_by(-1); break;
+        case MenuAction::pause: player::toggle_pause(); break;
+        case MenuAction::forward: player::seek_step_by(1); break;
+        case MenuAction::next: (void)play_delta(1, true); break;
+        default: break;
+        }
+        return;
+    case MenuAction::queue:
+    {
+        menu_info(entry.label);
+        if (g_queue_n == 0)
+            copy_text(g_menu_lines[0], sizeof g_menu_lines[0], "The play queue is empty.");
+        const int first = std::max(0, g_queue_i - 1);
+        for (int i = first; i < std::min(g_queue_n, first + menu_info_lines); ++i)
+            snprintf(g_menu_lines[i - first], sizeof g_menu_lines[0], "%s%s",
+                     i == g_queue_i ? "Current: " : "", g_queue_title[i]);
+        return;
+    }
+    case MenuAction::repeat: settings::cycle_repeat(1); return;
+    case MenuAction::shuffle: setting_nudge(3, 1); return;
+    case MenuAction::bookmark:
+    {
+        const char *path = player::active() ? player::path() :
+            g_place == Place::videos ? g_stack[g_depth].path : "";
+        if (!*path || !std::strcmp(path, kSearchUri) || !std::strcmp(path, kBookmarksUri))
+            menu_info(entry.label, "Open a folder or video to bookmark it.");
+        else
+        {
+            settings::toggle_bookmark(path, player::active() ? player::title() : g_stack[g_depth].title);
+            g_videos_dirty = true;
+        }
+        return;
+    }
+    case MenuAction::page_layout:
+    case MenuAction::sort_on:
+        g_browser_choice = current_browser_choice(entry.id);
+        g_overlay = Overlay::browser_choice;
+        return;
+    case MenuAction::folders_first:
+    case MenuAction::supported_only:
+        apply_browser_choice(entry.id, 0);
+        return;
+    case MenuAction::reload: reload_current_page(); g_overlay = Overlay::none; return;
+    case MenuAction::volume: setting_nudge(5, 1); return;
+    case MenuAction::media:
+        menu_info(entry.label, player::active() ? player::title() : "No video is playing.");
+        if (player::active())
+            snprintf(g_menu_lines[1], sizeof g_menu_lines[1], "%d × %d   %.0f s / %.0f s",
+                     player::width(), player::height(), player::time(), player::duration());
+        return;
+    case MenuAction::system:
+        menu_info(entry.label, kTitleId);
+        snprintf(g_menu_lines[1], sizeof g_menu_lines[1], "%s   %s", kVersion, hwdec_status());
+        return;
+    case MenuAction::log: show_log(); return;
+    case MenuAction::home:
+        if (player::active()) player::close();
+        g_overlay = Overlay::none;
+        g_place = Place::home;
+        return;
+    case MenuAction::settings: open_settings(true); return;
+    default:
+        menu_info(entry.label, "This action is planned for a later PS5 build.");
+        return;
+    }
+}
+
+void draw_settings_overlay(screen::Canvas &c) noexcept
+{
+    const auto &categories = settings_menu::categories;
+    const auto &category = categories[g_settings_category];
+    c.rect(0, 90, screen::width, 918, Color::bg);
+    c.text(76.f, 158.f, "Settings", font::semibold, 42, Color::text);
+    c.round_rect(68, 191, 504, 788, 12, Color::surface);
+    c.round_rect(602, 191, 1250, 788, 12, Color::surface);
+    for (int i = 0; i < static_cast<int>(categories.size()); ++i)
+    {
+        const int y = 207 + i * 53;
+        if (i == g_settings_category)
+        {
+            c.round_rect(84, y, 472, 47, 8, Color::hover);
+            if (!g_settings_in_category) c.rect(84, y + 8, 4, 31, Color::accent);
+        }
+        c.text(114.f, static_cast<float>(y + 32), categories[i].title, font::medium, 25,
+               i == g_settings_category ? Color::text : Color::muted);
+    }
+    c.text(642.f, 253.f, category.title, font::semibold, 33, Color::text);
+    constexpr int visible = 10;
+    const int size = static_cast<int>(category.rows.size());
+    const int first = std::clamp(g_settings_row - visible + 1, 0, std::max(0, size - visible));
+    for (int i = first; i < std::min(size, first + visible); ++i)
+    {
+        const auto &row = category.rows[i];
+        const int y = 276 + (i - first) * 65;
+        bool selected = g_settings_in_category && i == g_settings_row;
+        if (selected)
+        {
+            c.round_rect(628, y, 1198, 59, 10, Color::hover);
+            c.rect(628, y + 10, 4, 39, Color::accent);
+        }
+        c.text(655.f, static_cast<float>(y + 38), row.title, font::medium, 26,
+               selected ? Color::text : Color::muted);
+        char value[64]{};
+        if (row.action < 0)
+            copy_text(value, sizeof value, "Coming later");
+        else
+            setting_value(row.action, value, sizeof value);
+        char shown[64];
+        c.text(1330.f, static_cast<float>(y + 38),
+               fit(value, 450, shown, sizeof shown, font::regular, 23), font::regular, 23,
+               row.action < 0 ? Color::faint : Color::accent);
+    }
+    if (size > visible)
+    {
+        const int track = 634;
+        const int thumb = track * visible / size;
+        c.rect(1827, 281, 3, track, Color::line);
+        c.rect(1827, 281 + (track - thumb) * first / (size - visible), 3, thumb, Color::accent);
+    }
+}
+
+void draw_setting_detail(screen::Canvas &c) noexcept
+{
+    draw_settings_overlay(c);
+    const auto &row = selected_setting();
+    const int count = setting_choices(row.action);
+    const int height = count ? 172 + count * 66 : 240;
+    const int top = (screen::height - height) / 2;
+    c.rect(0, 90, screen::width, 918, Color::bg, 183);
+    c.round_rect(524, top, 872, height, 20, Color::surface2);
+    c.round_frame(524, top, 872, height, 20, 2, Color::line);
+    c.text(576.f, static_cast<float>(top + 64), row.title, font::semibold, 34, Color::text);
+    if (!count)
+    {
+        c.text(576.f, static_cast<float>(top + 130), "This setting is planned for a later PS5 build.",
+               font::regular, 25, Color::muted);
+        return;
+    }
+    const int current = current_choice(row.action);
+    for (int i = 0; i < count; ++i)
+    {
+        const int y = top + 94 + i * 66;
+        if (i == g_setting_choice)
+            c.round_rect(561, y, 798, 59, 10, Color::hover);
+        char value[64]{};
+        choice_label(row.action, i, value, sizeof value);
+        c.text(585.f, static_cast<float>(y + 40), value, font::medium, 26, Color::text);
+        if (i == current)
+            c.text(1195.f, static_cast<float>(y + 39), "Current", font::regular, 20, Color::accent);
+    }
+}
+
+void draw_torrent_settings_overlay(screen::Canvas &c) noexcept
+{
+    constexpr const char *labels[torrent_setting_count] = {
+        "Cache storage location", "Cache size", "Read-ahead cache", "Preload cache before play",
+        "Connections limit", "Concurrent requests per peer", "Peer block timeout", "Retrackers mode"
+    };
+    constexpr const char *retrackers[] = {"Original trackers", "Add retrackers",
+                                          "Replace with retrackers", "Remove trackers"};
+    const auto &d = settings::get();
+    char values[torrent_setting_count][64]{};
+    setting_value(15, values[0], sizeof values[0]);
+    const auto limit = torrent::cache_limit_mib(static_cast<torrent::CacheStorage>(d.torrent_cache_path));
+    if (d.torrent_cache_mib)
+        snprintf(values[1], sizeof values[1], "%u MiB", std::min(d.torrent_cache_mib, limit));
+    else
+        copy_text(values[1], sizeof values[1], "Auto");
+    snprintf(values[2], sizeof values[2], "%u%% ahead / %u%% behind", d.torrent_read_ahead,
+             100 - d.torrent_read_ahead);
+    if (d.torrent_preload < 0)
+        copy_text(values[3], sizeof values[3], "Auto (2 pieces)");
+    else if (d.torrent_preload == 0)
+        copy_text(values[3], sizeof values[3], "Off (first piece only)");
+    else
+        snprintf(values[3], sizeof values[3], "%d%%", d.torrent_preload);
+    snprintf(values[4], sizeof values[4], "%u", d.torrent_connections);
+    snprintf(values[5], sizeof values[5], "%u", d.torrent_requests);
+    snprintf(values[6], sizeof values[6], "%u seconds", d.torrent_block_timeout);
+    copy_text(values[7], sizeof values[7], retrackers[d.torrent_retrackers]);
+
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 140);
+    c.round_rect(300, 95, 1320, 890, 20, Color::surface);
+    c.round_frame(300, 95, 1320, 890, 20, 2, Color::accent, 180);
+    c.text(355.f, 164.f, "Torrent settings", font::semibold, 34, Color::text);
+    c.text(355.f, 207.f, "Cache and peer limits apply to the next large Matroska transfer.",
+           font::regular, 20, Color::muted);
+    for (int i = 0; i < torrent_setting_count; ++i)
+    {
+        const int y = 254 + i * 75;
+        const bool selected = i == g_torrent_settings_row;
+        if (selected) c.round_rect(350, y, 1220, 66, 11, Color::hover);
+        c.text(382.f, static_cast<float>(y + 42), labels[i], font::medium, 24,
+               selected ? Color::text : Color::muted);
+        c.text(1060.f, static_cast<float>(y + 42), values[i], font::mono_medium, 23, Color::accent);
+    }
+    if (g_torrent_settings_row == 7)
+        c.text(355.f, 891.f, "Retrackers use /data/movian/trackers.txt or the built-in defaults.",
+               font::regular, 20, Color::muted);
+    c.text(355.f, 932.f, "Up/Down select    Left/Right adjust    Triangle defaults    Circle back",
+           font::regular, 20, Color::muted);
+}
+
+void draw_action_menu(screen::Canvas &c, const char *title, const char *subtitle,
+                      std::span<const MenuEntry> entries, int selection) noexcept
+{
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 145);
+    c.round_rect(1008, 100, 852, 878, 16, Color::surface);
+    c.text(1054.f, 169.f, title, font::semibold, 38, Color::text);
+    char shown[192];
+    c.text(1054.f, 213.f, fit(subtitle, 730, shown, sizeof shown, font::regular, 20),
+           font::regular, 20, Color::muted);
+    constexpr int visible = 11;
+    const int size = static_cast<int>(entries.size());
+    const int first = std::max(0, selection - visible + 1);
+    for (int i = first; i < std::min(size, first + visible); ++i)
+    {
+        const auto &entry = entries[i];
+        const int y = 244 + (i - first) * 62;
+        if (i == selection)
+        {
+            c.round_rect(1034, y, 800, 57, 10, Color::hover);
+            c.rect(1034, y + 8, 4, 41, Color::accent);
+        }
+        const char *label = entry.label;
+        char dynamic_label[64];
+        if (entry.id == MenuAction::resume)
+        {
+            double offset = 0;
+            (void)settings::resume_for(g_item_path, &offset, nullptr);
+            const auto seconds = static_cast<unsigned>(offset);
+            snprintf(dynamic_label, sizeof dynamic_label, "Continue from %u:%02u", seconds / 60, seconds % 60);
+            label = dynamic_label;
+        }
+        char value[64]{};
+        if (entry.id == MenuAction::pause && player::active()) label = player::playing() ? "Pause" : "Play";
+        if (entries.data() == g_sidebar_visible)
+        {
+            if (entry.id == MenuAction::repeat) copy_text(value, sizeof value, settings::repeat_label());
+            if (entry.id == MenuAction::shuffle) copy_text(value, sizeof value, settings::get().shuffle ? "on" : "off");
+            if (entry.id == MenuAction::volume) snprintf(value, sizeof value, "%d%%", settings::get().volume);
+            if (entry.id == MenuAction::page_layout || entry.id == MenuAction::sort_on)
+                copy_text(value, sizeof value, browser_choices(entry.id)[current_browser_choice(entry.id)]);
+            if (entry.id == MenuAction::folders_first || entry.id == MenuAction::supported_only)
+            {
+                const auto prefs = settings::browser_prefs(g_stack[g_depth].path);
+                const bool on = entry.id == MenuAction::folders_first ? prefs.folders_first : prefs.supported_only;
+                copy_text(value, sizeof value, on ? "on" : "off");
+            }
+        }
+        c.text(1071.f, static_cast<float>(y + 37), label, font::medium, 25,
+               i == selection ? Color::text : Color::muted);
+        if (value[0])
+            c.text(1633.f, static_cast<float>(y + 36), value, font::medium, 22, Color::accent);
+    }
+    if (size > visible)
+    {
+        const int height = visible * 62;
+        const int thumb = height * visible / size;
+        c.rect(1836, 244, 3, height, Color::line);
+        c.rect(1836, 244 + (height - thumb) * first / (size - visible), 3, thumb, Color::accent);
+    }
+}
+
+void draw_plugin_details(screen::Canvas &c) noexcept
+{
+    const bool package = g_plugin_detail == PluginDetail::repository;
+    const char *title = package ? g_detail_item.title : g_detail_plugin.title;
+    const char *synopsis = package ? g_detail_item.detail : g_detail_plugin.synopsis;
+    const char *version = package ? g_detail_item.version : g_detail_plugin.version;
+    draw_action_menu(c, "Plugin details", title, plugin_detail_actions(), g_plugin_detail_row);
+    c.round_rect(50, 100, 920, 878, 16, Color::surface);
+    char shown[176];
+    c.text(96.f, 181.f, fit(title, 817, shown, sizeof shown, font::semibold, 38),
+           font::semibold, 38, Color::text);
+    if (*version)
+    {
+        char value[96];
+        snprintf(value, sizeof value, "Version %s", version);
+        c.text(96.f, 228.f, value, font::regular, 23, Color::muted);
+    }
+    if (const auto *installed = package ? installed_by_id(g_detail_item.id) : nullptr)
+    {
+        char value[96];
+        snprintf(value, sizeof value, "Installed version %s", installed->version);
+        c.text(96.f, 265.f, value, font::regular, 22, Color::muted);
+    }
+    if (!draw_selected_artwork(c, 96, 288, 818, 490) && selected_plugin_icon()[0])
+        c.text(96.f, 554.f, "Artwork preview", font::regular, 21, Color::muted);
+    c.text(96.f, 855.f, fit(synopsis, 817, shown, sizeof shown, font::regular, 21),
+           font::regular, 21, Color::muted);
+}
+
+void draw_browser_choices(screen::Canvas &c) noexcept
+{
+    const auto &entry = g_sidebar_visible[g_sidebar_row];
+    const auto choices = browser_choices(entry.id);
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 145);
+    c.round_rect(1010, 124, 850, 160 + static_cast<int>(choices.size()) * 68, 18, Color::surface);
+    c.text(1060.f, 192.f, entry.label, font::semibold, 36, Color::text);
+    for (int i = 0; i < static_cast<int>(choices.size()); ++i)
+    {
+        const int y = 229 + i * 68;
+        if (i == g_browser_choice)
+            c.round_rect(1040, y, 790, 60, 9, Color::hover);
+        c.text(1072.f, y + 39.f, choices[i], font::medium, 26, Color::text);
+        if (i == current_browser_choice(entry.id))
+            c.text(1700.f, y + 38.f, "Current", font::regular, 20, Color::accent);
+    }
+}
+
+void draw_menu_info(screen::Canvas &c) noexcept
+{
+    c.rect(0, 0, screen::width, screen::height, Color::bg, 160);
+    c.round_rect(370, 208, 1180, 672, 18, Color::surface);
+    c.text(422.f, 286.f, g_menu_info_title, font::semibold, 38, Color::text);
+    for (int i = 0; i < menu_info_lines; ++i)
+    {
+        char shown[192];
+        c.text(422.f, 350.f + i * 55.f, fit(g_menu_lines[i], 1070, shown, sizeof shown, font::regular, 23),
+               font::regular, 23, Color::muted);
     }
 }
 
@@ -1243,6 +3203,11 @@ void load() noexcept
     g_started_ms = screen::now_ms();
     mkdir(MOVIAN_DOWNLOAD0, 0777);
     settings::load();
+    if (settings::get().remote_diagnostics && !diagnostics::enable(true))
+    {
+        settings::get().remote_diagnostics = false;
+        screen::notify("Could not start LAN or FTP diagnostics");
+    }
     hwdec_force_software(settings::get().hw_decode ? 0 : 1);
     audio::set_volume(settings::get().volume);
     if (settings::get().debug_log)
@@ -1252,43 +3217,300 @@ void load() noexcept
     (void)audio::init();
     enter_videos();
     g_place = Place::home;
-    screen::notify("Press Cross to test 1080p hardware HEVC");
 }
 
 bool handle_overlay(unsigned pressed) noexcept
 {
     if (g_overlay == Overlay::none)
         return false;
-    if ((pressed & pad::circle) || (g_overlay == Overlay::settings && (pressed & pad::options)))
+    if (g_overlay == Overlay::menu_info)
     {
-        g_overlay = Overlay::none;
+        if (pressed & pad::options) g_overlay = Overlay::none;
+        else if (pressed & (pad::cross | pad::circle | pad::left)) g_overlay = g_menu_parent;
+        return true;
+    }
+    if (g_overlay == Overlay::plugin_details)
+    {
+        const auto entries = plugin_detail_actions();
+        if (pressed & (pad::circle | pad::left | pad::options))
+            g_overlay = Overlay::none;
+        else if (pressed & pad::up)
+            g_plugin_detail_row = std::max(0, g_plugin_detail_row - 1);
+        else if (pressed & pad::down)
+            g_plugin_detail_row = std::min(static_cast<int>(entries.size()) - 1, g_plugin_detail_row + 1);
+        else if (pressed & pad::cross)
+            run_plugin_detail(entries[g_plugin_detail_row]);
+        return true;
+    }
+    if (g_overlay == Overlay::browser_choice)
+    {
+        const auto &entry = g_sidebar_visible[g_sidebar_row];
+        const int last = static_cast<int>(browser_choices(entry.id).size()) - 1;
+        if (pressed & (pad::circle | pad::left))
+            g_overlay = Overlay::sidebar;
+        else if (pressed & pad::options)
+            g_overlay = Overlay::none;
+        else if (pressed & pad::cross)
+        {
+            apply_browser_choice(entry.id, g_browser_choice);
+            g_overlay = Overlay::sidebar;
+        }
+        else if (pressed & pad::up)
+            g_browser_choice = std::max(0, g_browser_choice - 1);
+        else if (pressed & pad::down)
+            g_browser_choice = std::min(last, g_browser_choice + 1);
+        return true;
+    }
+    if (g_overlay == Overlay::sidebar)
+    {
+        const auto &entry = g_sidebar_visible[g_sidebar_row];
+        if (pressed & (pad::circle | pad::options) ||
+            ((pressed & pad::left) && entry.id != MenuAction::volume))
+            g_overlay = Overlay::none;
+        else if (pressed & pad::up) g_sidebar_row = std::max(0, g_sidebar_row - 1);
+        else if (pressed & pad::down)
+            g_sidebar_row = std::min(g_sidebar_row + 1, g_sidebar_count - 1);
+        else if (pressed & pad::cross)
+            run_sidebar_action(entry);
+        else if (entry.id == MenuAction::volume && (pressed & (pad::left | pad::right)))
+        {
+            auto &volume = settings::get().volume;
+            volume = std::clamp(volume + (pressed & pad::left ? -5 : 5), 0, 100);
+            audio::set_volume(volume);
+            settings::save();
+        }
+        return true;
+    }
+    if (g_overlay == Overlay::home_network)
+    {
+        if (pressed & (pad::cross | pad::circle | pad::options))
+            g_overlay = Overlay::none;
+        return true;
+    }
+    if (g_overlay == Overlay::torrent_settings)
+    {
+        if (pressed & pad::circle)
+            g_overlay = Overlay::settings;
+        else if (pressed & pad::options)
+            g_overlay = Overlay::none;
+        else if (pressed & pad::up)
+            g_torrent_settings_row = (g_torrent_settings_row + torrent_setting_count - 1) % torrent_setting_count;
+        else if (pressed & pad::down)
+            g_torrent_settings_row = (g_torrent_settings_row + 1) % torrent_setting_count;
+        else if (pressed & (pad::left | pad::right))
+            nudge_torrent_setting(g_torrent_settings_row, pressed & pad::left ? -1 : 1);
+        else if (pressed & pad::triangle)
+        {
+            auto &d = settings::get();
+            const settings::Data defaults;
+            d.torrent_cache_path = defaults.torrent_cache_path;
+            d.torrent_cache_mib = defaults.torrent_cache_mib;
+            d.torrent_read_ahead = defaults.torrent_read_ahead;
+            d.torrent_preload = defaults.torrent_preload;
+            d.torrent_connections = defaults.torrent_connections;
+            d.torrent_requests = defaults.torrent_requests;
+            d.torrent_block_timeout = defaults.torrent_block_timeout;
+            d.torrent_retrackers = defaults.torrent_retrackers;
+            settings::save();
+        }
+        return true;
+    }
+    if (g_overlay == Overlay::setting_detail)
+    {
+        const int action = selected_setting().action;
+        const int count = setting_choices(action);
+        if (pressed & pad::options)
+            g_overlay = Overlay::none;
+        else if (pressed & pad::circle)
+            g_overlay = Overlay::settings;
+        else if (pressed & pad::cross)
+        {
+            if (count) apply_setting_choice(action, g_setting_choice);
+            g_overlay = Overlay::settings;
+        }
+        else if (count && (pressed & (pad::up | pad::down)))
+            g_setting_choice = std::clamp(g_setting_choice + (pressed & pad::up ? -1 : 1), 0, count - 1);
         return true;
     }
     if (g_overlay == Overlay::settings)
     {
-        if (pressed & pad::up)
-            g_settings_row = (g_settings_row + setting_count - 1) % setting_count;
-        if (pressed & pad::down)
-            g_settings_row = (g_settings_row + 1) % setting_count;
-        if (pressed & pad::left)
-            setting_nudge(g_settings_row, -1);
-        if ((pressed & pad::right) || (pressed & pad::cross))
-            setting_nudge(g_settings_row, 1);
+        if (pressed & pad::options)
+            g_overlay = Overlay::none;
+        else if (pressed & pad::circle)
+        {
+            if (g_settings_in_category) g_settings_in_category = false;
+            else g_overlay = g_settings_from_sidebar ? Overlay::sidebar : Overlay::none;
+        }
+        else if (!g_settings_in_category)
+        {
+            if (pressed & (pad::up | pad::down))
+            {
+                const int last = static_cast<int>(settings_menu::categories.size()) - 1;
+                g_settings_category = std::clamp(g_settings_category + (pressed & pad::up ? -1 : 1), 0, last);
+                g_settings_row = 0;
+            }
+            if (pressed & (pad::cross | pad::right))
+                g_settings_in_category = true;
+        }
+        else if (pressed & (pad::up | pad::down))
+        {
+            const int last = static_cast<int>(settings_menu::categories[g_settings_category].rows.size()) - 1;
+            g_settings_row = std::clamp(g_settings_row + (pressed & pad::up ? -1 : 1), 0, last);
+        }
+        else if (pressed & pad::cross)
+        {
+            const int action = selected_setting().action;
+            const int count = setting_choices(action);
+            if (count || action < 0)
+            {
+                g_setting_choice = count ? std::clamp(current_choice(action), 0, count - 1) : 0;
+                g_overlay = Overlay::setting_detail;
+            }
+            else
+                setting_nudge(action, 1);
+        }
+        else if (pressed & (pad::left | pad::right))
+        {
+            const int action = selected_setting().action;
+            if (setting_choices(action) || (action >= 0 && action <= 10) ||
+                action == 13 || action == 14 || action == 16)
+                setting_nudge(action, pressed & pad::left ? -1 : 1);
+        }
         return true;
     }
+    if (pressed & (pad::circle | pad::options | pad::left))
+    {
+        g_overlay = Overlay::none;
+        return true;
+    }
+    const auto entries = context_entries();
     if (pressed & pad::up)
-        g_item_row = (g_item_row + item_action_count - 1) % item_action_count;
-    if (pressed & pad::down)
-        g_item_row = (g_item_row + 1) % item_action_count;
-    if (pressed & pad::cross)
-        run_item_action(g_item_row);
+        g_item_row = std::max(0, g_item_row - 1);
+    else if (pressed & pad::down)
+        g_item_row = std::min(g_item_row + 1, static_cast<int>(entries.size()) - 1);
+    else if (pressed & pad::cross)
+        run_item_action(entries[g_item_row]);
     return true;
 }
 
 bool update() noexcept
 {
+    const bool page_ready = finish_plugin_page();
+    const bool torrent_ready = finish_torrent_download();
+    if (g_home_keyboard)
+    {
+        const auto state = keyboard::poll();
+        if (state == keyboard::State::open)
+            return false;
+        g_home_keyboard = false;
+        if (state == keyboard::State::accepted)
+        {
+            const char *query = keyboard::text();
+            query += std::strspn(query, " \t\r\n");
+            if (*query)
+            {
+                copy_text(g_home_query, sizeof g_home_query, query);
+                std::size_t size = std::strlen(g_home_query);
+                while (size && std::strchr(" \t\r\n", g_home_query[size - 1])) --size;
+                g_home_query[size] = 0;
+                open_home_folder(kSearchUri, "Search");
+            }
+        }
+        keyboard::clear();
+        return true;
+    }
+
+    if (g_torrent_peer_input)
+    {
+        const auto state = keyboard::poll();
+        if (state == keyboard::State::open)
+            return true;
+        g_torrent_peer_input = false;
+        if (state == keyboard::State::accepted && keyboard::text()[0])
+            start_torrent_download(keyboard::text());
+        keyboard::clear();
+        return true;
+    }
+    if (g_login_input != LoginInput::none)
+    {
+        const auto state = keyboard::poll();
+        if (state == keyboard::State::open)
+            return true;
+        const auto field = g_login_input;
+        g_login_input = LoginInput::none;
+        auto &job = g_plugin_job;
+        if (state == keyboard::State::accepted && keyboard::text()[0])
+        {
+            if (field == LoginInput::username)
+            {
+                copy_text(job.username, sizeof job.username, keyboard::text());
+                keyboard::clear();
+                char title[288];
+                snprintf(title, sizeof title, "Password for %s", g_login_origin);
+                if (keyboard::open(title, "Password", "", 60, true))
+                {
+                    g_login_input = LoginInput::password;
+                    return true;
+                }
+                append_log("KinoZal.TV password keyboard did not open");
+                screen::notify("Password keyboard unavailable");
+            }
+            else
+            {
+                copy_text(job.password, sizeof job.password, keyboard::text());
+                keyboard::clear();
+                open_plugin_job(PluginJob::Action::login, g_login_origin, true);
+                if (job.busy)
+                {
+                    append_log("KinoZal.TV sign-in request queued");
+                    return true;
+                }
+                append_log("KinoZal.TV sign-in request could not start");
+            }
+        }
+        else if (state == keyboard::State::failed)
+            append_log("KinoZal.TV sign-in keyboard failed");
+        keyboard::clear();
+        clear_login(job);
+        return true;
+    }
+    if (g_plugin_text_key[0])
+    {
+        const auto state = keyboard::poll();
+        if (state == keyboard::State::accepted)
+        {
+            char assignment[320];
+            snprintf(assignment, sizeof assignment, "%s%s", g_plugin_text_key, keyboard::text());
+            if (plugins::set_option(g_installed_plugins[g_active_plugin], assignment))
+                open_plugin_page("#settings", true);
+            else
+                screen::notify("Could not save plugin setting");
+        }
+        if (state != keyboard::State::open)
+            g_plugin_text_key[0] = 0;
+        return true;
+    }
     const unsigned pressed = pad::poll();
-    bool dirty = pressed != 0;
+    bool dirty = update_plugin_artwork(pressed) || page_ready || torrent_ready || pressed != 0;
+    if (g_place == Place::bittorrent && g_torrent_job.busy)
+    {
+        static unsigned shown_progress = 0;
+        const unsigned progress = g_torrent_job.progress.load(std::memory_order_relaxed);
+        dirty |= progress != shown_progress;
+        shown_progress = progress;
+    }
+
+    if (g_overlay != Overlay::none)
+    {
+        if (pressed) handle_overlay(pressed);
+        return (player::active() && player::tick()) || dirty;
+    }
+
+    if (pressed & pad::options)
+    {
+        open_sidebar();
+        return true;
+    }
 
     if (player::active())
     {
@@ -1304,15 +3526,12 @@ bool update() noexcept
             return true;
         if ((pressed & pad::r1) && play_delta(1, true))
             return true;
-        dirty = player::handle(pressed) || dirty;
+        dirty = player::handle(pressed, play_delta) || dirty;
         dirty = player::tick() || dirty;
         return dirty;
     }
 
-    if (handle_overlay(pressed))
-        return true;
-
-    if (g_place == Place::home && (pressed & pad::cross))
+    if (g_place == Place::home && (pressed & pad::triangle))
     {
         append_log("HEVC test requested after startup");
         constexpr const char *fixture = MOVIAN_APP0 "/assets/hevc-test.mp4";
@@ -1321,66 +3540,35 @@ bool update() noexcept
         return true;
     }
 
-    if (pressed & pad::options)
-    {
-        g_overlay = Overlay::settings;
-        return true;
-    }
-
+    if (g_place == Place::plugins && g_plugin_job.busy && (pressed & (pad::l1 | pad::r1)))
+        g_plugin_job.dismissed = true;
     if (pressed & pad::l1)
         g_place = static_cast<Place>((static_cast<int>(g_place) + place_count - 1) % place_count);
     if (pressed & pad::r1)
         g_place = static_cast<Place>((static_cast<int>(g_place) + 1) % place_count);
 
     if (g_place == Place::home)
-    {
-        if (pressed & pad::right)
-            g_home_row = (g_home_row + 1) % 4;
-        if (pressed & pad::left)
-            g_home_row = (g_home_row + 3) % 4;
-        if (pressed & pad::down)
-            g_home_row = (g_home_row + 2) % 4;
-        if (pressed & pad::up)
-            g_home_row = (g_home_row + 2) % 4;
-        if (pressed & pad::cross)
-        {
-            if (g_home_row == 0)
-            {
-                const settings::Resume r = settings::last_resume();
-                if (r.valid)
-                    play_path(r.path, r.title, false);
-                else
-                    screen::notify("Nothing to continue");
-            }
-            else if (g_home_row == 1)
-            {
-                g_place = Place::videos;
-                enter_videos();
-            }
-            else if (g_home_row == 2)
-            {
-                g_place = Place::videos;
-                enter_videos();
-                push_folder(kBookmarksUri, "Bookmarks");
-            }
-            else
-            {
-                g_overlay = Overlay::settings;
-            }
-        }
-    }
+        update_home(pressed);
     else if (g_place == Place::videos)
     {
         if (g_videos_dirty)
             reload_videos();
-        if (pressed & pad::up)
+        const bool grid = browser_grid();
+        const int stride = grid ? library_columns : 1;
+        const int page = grid ? library_grid_page : rows_in_view;
+        const int selected = g_stack[g_depth].selected;
+        if ((pressed & pad::up) && (!grid || selected >= library_columns))
+            move_selection(-stride);
+        if ((pressed & pad::down) && (!grid || selected / library_columns < (g_row_count - 1) / library_columns))
+            move_selection(stride);
+        if (grid && (pressed & pad::left) && selected % library_columns != 0)
             move_selection(-1);
-        if (pressed & pad::down)
+        if (grid && (pressed & pad::right) && selected % library_columns != library_columns - 1)
             move_selection(1);
         if (pressed & pad::l2)
-            move_selection(-rows_in_view);
+            move_selection(-page);
         if (pressed & pad::r2)
-            move_selection(rows_in_view);
+            move_selection(page);
         if (pressed & pad::cross)
             select_row();
         if ((pressed & pad::square) && g_row_count > 0)
@@ -1396,6 +3584,12 @@ bool update() noexcept
             screen::notify("Reloaded folder");
         }
     }
+    else if (g_place == Place::plugins)
+    {
+        update_plugins(pressed);
+    }
+    else if (g_place == Place::bittorrent)
+        update_torrents(pressed);
     else if (pressed & pad::circle)
     {
         g_place = Place::home;
@@ -1424,31 +3618,56 @@ bool update() noexcept
 
 void draw(screen::Canvas &canvas) noexcept
 {
-    if (player::active())
+    const bool playing = player::active();
+    if (playing)
     {
         player::draw(canvas);
-        return;
+        if (g_overlay == Overlay::none) return;
     }
-    canvas.clear(Color::bg);
-    draw_tab_bar(canvas);
-    switch (g_place)
+    else
     {
-    case Place::home:
-        draw_home(canvas);
-        break;
-    case Place::videos:
-        draw_videos(canvas);
-        break;
-    default:
-        draw_placeholder(canvas, g_place);
-        break;
+        canvas.clear(Color::bg);
+        draw_tab_bar(canvas);
+        switch (g_place)
+        {
+        case Place::home:
+            draw_home(canvas);
+            break;
+        case Place::videos:
+            draw_videos(canvas);
+            break;
+        case Place::plugins:
+            draw_plugins(canvas);
+            break;
+        case Place::bittorrent:
+            draw_torrents(canvas);
+            break;
+        default:
+            draw_placeholder(canvas, g_place);
+            break;
+        }
+        if (g_place != Place::videos)
+            draw_status_strip(canvas);
     }
-    if (g_place != Place::videos)
-        draw_status_strip(canvas);
-    if (g_overlay == Overlay::settings)
+    if (g_overlay == Overlay::sidebar)
+        draw_action_menu(canvas, "Page settings", playing ? player::title() : place_name[static_cast<int>(g_place)],
+                         {g_sidebar_visible, static_cast<std::size_t>(g_sidebar_count)}, g_sidebar_row);
+    else if (g_overlay == Overlay::plugin_details)
+        draw_plugin_details(canvas);
+    else if (g_overlay == Overlay::browser_choice)
+        draw_browser_choices(canvas);
+    else if (g_overlay == Overlay::menu_info)
+        draw_menu_info(canvas);
+    else if (g_overlay == Overlay::settings)
         draw_settings_overlay(canvas);
+    else if (g_overlay == Overlay::setting_detail)
+        draw_setting_detail(canvas);
+    else if (g_overlay == Overlay::home_network)
+        draw_home_network(canvas);
+    else if (g_overlay == Overlay::torrent_settings)
+        draw_torrent_settings_overlay(canvas);
     else if (g_overlay == Overlay::item)
-        draw_item_overlay(canvas);
+        draw_action_menu(canvas, "Item actions", g_item_title, context_entries(), g_item_row);
     draw_footer(canvas);
 }
 } // namespace movian::ui

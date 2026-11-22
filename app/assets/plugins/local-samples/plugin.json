@@ -1,0 +1,9 @@
+{
+  "id": "movian-ps5-samples",
+  "type": "javascript",
+  "apiversion": 2,
+  "file": "plugin.js",
+  "title": "Local samples",
+  "synopsis": "Open the video fixture included with Movian.",
+  "version": "1.0.0"
+}
