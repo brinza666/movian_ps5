@@ -386,4 +386,10 @@ that evidence folder precede the final socket/address dependency rebuild.
 - PS5 went offline before v60 upload: FTP2121 and ShadowMount10101 unavailable.
   v59 remains installed. Fresh-reset/access/listener/console remote tests are
   pending; no v60 PS5 playback or audibility claim. DNS/Avanpost stays deferred.
-- GitHub publication and Pages links are recorded after verification below.
+- Published source commit `44cdefb` / tag `playback-test-v60` and verified all
+  four GitHub release assets, including the server-side ZIP SHA-256 digest.
+  [Release](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60).
+  Updated repository description/homepage and main README/website. The first
+  Pages deploy hit artifact-metadata visibility timing; a bounded metadata wait
+  repaired it. Pages run `45241805249` completed successfully.
+  [Project page](https://brinza666.github.io/movian_ps5/).

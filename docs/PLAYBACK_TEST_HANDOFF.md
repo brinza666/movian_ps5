@@ -8,6 +8,13 @@ Read docs/STPP_V60.md, docs/STPP_V60_NATIVE.md and docs/STPP_TITLE_ACCESS.md fir
 Active branch test/native-playback in movian_ps5-playback-publish. Preserve media
 and production PPSA99455. No webcam/Chiaki. DNS/Avanpost remains deferred.
 
+Published source/tag:44cdefb / playback-test-v60. Release:
+https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60
+Main landing/docs commit95b21c5; Pages metadata-wait fix995307c;
+Pages run45241805249 successful. Repo description andhomepage updated.
+Release assets andGitHubdigestverified. The camera prototype files remain
+untracked/preserved andwereexcludedfromthispublication.
+
 Final v60 ZIP: build/PPSA99456-v60.zip, 7,706,570 bytes,
 SHA73b8b7a940703cf24abe6668ee53368ed74a451096b6c82c5e3b8421d419ef19.
 Eboot SHA7befb1d484baf4173beeda810d7950dc5807542802ecea0c255d450b40dab7e3.
