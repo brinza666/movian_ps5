@@ -1,6 +1,8 @@
 # Movian for PlayStation 5
 
-**Latest playback test — v53.** Movian HEVC Test (`PPSA99456`) adds an in-video control bar, a seek preview you can confirm or cancel, audio track selection, and a subtitle picker. Subtitle rendering and v53 console verification are pending. [Release notes and ZIP](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53) · [Project page](https://brinza666.github.io/movian_ps5/)
+**Latest preview — v60 STPP remote control.** The signed `PPSA99456` test build adds a property server and shared Home/Settings callbacks. Unmodified WSL M7 rendered the interface and changed/restored a persisted setting. **PS5 v60 startup, access and remote transport are pending: the console went offline before upload.** v59 is the last installed/startup-verified console build. [v60 release and ZIP](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60) · [Current build/how-to and changes](https://github.com/brinza666/movian_ps5/tree/test/native-playback) · [Project page](https://brinza666.github.io/movian_ps5/)
+
+The v60 development branch also includes v54–v59 settings, authenticated SMB2/FTP browsing/playback and network ZIP/torrent-metainfo imports. The release notes separate host verification, user-confirmed older builds and pending console tests. Optional one-shot access/fresh-profile support requires a separate request; public installation alone does not run the helper or clear plugins. The production source instructions below are separate from the isolated `PPSA99456` test branch.
 
 <p align="center">
   <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
