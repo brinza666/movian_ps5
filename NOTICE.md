@@ -85,3 +85,26 @@ Do not list a library here until `app/build.sh` compiles against it.
 - The [VLC Videodec2 import stub](https://github.com/ZiZc3/VLC/blob/7f104abb5a88dd675b60261769dc86d5dfb0a0d4/ps5/stubs/videodec2_link_stub.c)
   is used at link time. It is not packaged. Videodec2 is supplied by the console.
 - The included HEVC test fixture is a generated color pattern and sine tone.
+
+## v60 network and optional title-access test
+
+- The installed public SDK's static libc++, libc++abi and libunwind archives
+  supply the required C++ string/runtime symbols. Unused sections are discarded;
+  the server itself uses pthreads and bounded vector tables. The LLVM runtime
+  license is packaged as `assets/licenses/llvm-runtime.txt`. SDK input hashes
+  accompany the release verification; no exact upstream SDK rebuild is claimed.
+- libsmb2 commit `ef32cff6cdda24279eaac802f468d9290a2c8b5d` is statically
+  linked under LGPL-2.1. Its exact source archive is in the dependency-source
+  asset; `scripts/build-smb2-ps5.sh` and the tracked patches reproduce changes.
+- Optional test builds copy the GPL public starter elevation client from
+  starter commit `c3f939230aee18863da1f359e39eb43bf95a056d`. The exact starter
+  kit source is included in the dependency-source asset.
+- The optional one-shot Lapy helper is built from commit
+  `57fcc19b7f57e46c823d6f2a6c6233ebf3288079`, primary archive SHA-256
+  `c87cf02eceb1c004461f268de9657f7f17a367a4bbf3acfa2c6b7f86c90ae152`.
+  Its MIT license, manifest and exact source archive accompany the helper;
+  upstream component notices remain in that source and the starter notices.
+  The per-console authorization file is never included in public packages.
+- Current desktop feature reconstruction uses the installed WSL Movian build
+  and retained runtime/REA evidence. The historical andoma reference above is
+  not an implementation source for this work.

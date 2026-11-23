@@ -13,7 +13,9 @@
 #include "font.hpp"
 #include "pad.hpp"
 #include "paths.hpp"
+#include "profile_reset.hpp"
 #include "screen.hpp"
+#include "title_access.hpp"
 #include "ui.hpp"
 
 #include <cstdio>
@@ -33,13 +35,17 @@ void checkpoint(const char *message)
 
 int main()
 {
-    checkpoint("v52 entered main");
+    checkpoint("v60 entered main");
+    (void)movian::profile::reset_requested();
+    const auto access = movian::title_access::request_for_test();
+    movian::diagnostics::record("startup", "title access enabled=%d data_verified=%d status=%u path=%s root_restored=%d",
+        access.enabled, access.data_verified, access.status, access.path, access.root_restored);
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
         movian::screen::notify("Movian: fonts missing from title folder");
-    checkpoint("v52 fonts attempted");
+    checkpoint("v60 fonts attempted");
     (void)movian::pad::init();
-    checkpoint("v52 pad initialized");
+    checkpoint("v60 pad initialized");
     movian::ui::load();
-    checkpoint("v52 UI loaded; waiting for Cross");
+    checkpoint("v60 UI loaded; waiting for Cross");
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

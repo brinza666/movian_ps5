@@ -877,6 +877,15 @@ void draw(screen::Canvas &c) noexcept
         return;
     }
 
+    if (settings::get().playback_clock)
+    {
+        char clock[24];
+        settings::format_clock(clock, sizeof clock);
+        const float x = 1860.f - screen::Canvas::text_width(clock, font::mono_medium, 22);
+        c.round_rect(static_cast<int>(x) - 16, 40, 1900 - static_cast<int>(x), 42, 8, Color::surface, 225);
+        c.text(x, 69.f, clock, font::mono_medium, 22, Color::text);
+    }
+
     const bool transport = g_panel == Panel::transport;
     if (!transport && !g_paused && !g_ended && !g_torrent_error &&
         screen::now_ms() - g_opened_ms > 2600)

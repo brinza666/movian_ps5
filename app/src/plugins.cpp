@@ -5,6 +5,7 @@
 #include "fs.hpp"
 #include "plugin_http.hpp"
 #include "torrent.hpp"
+#include "input_file.hpp"
 #include "settings.hpp"
 #include "stb_image.h"
 #include <strings.h>
@@ -186,18 +187,8 @@ struct Archive
 
     bool load(const char *path)
     {
-        struct stat info{};
-        if (!path || stat(path, &info) != 0 || !S_ISREG(info.st_mode) ||
-            info.st_size <= 0 || info.st_size > max_archive)
-            return false;
-        size = static_cast<std::size_t>(info.st_size);
-        data = static_cast<unsigned char *>(std::malloc(size));
-        auto *file = data ? std::fopen(path, "rb") : nullptr;
-        if (!file)
-            return false;
-        const bool read_ok = std::fread(data, 1, size, file) == size;
-        std::fclose(file);
-        if (!read_ok)
+        data = reinterpret_cast<unsigned char *>(input::read_bounded(path, max_archive, size));
+        if (!data)
             return false;
         ready = mz_zip_reader_init_mem(&zip, data, size, 0) != 0;
         return ready && mz_zip_reader_get_num_files(&zip) <= 1024;
@@ -747,10 +738,11 @@ bool inspect_package(const char *path, Plugin &plugin) noexcept
 {
     plugin = {};
 #ifdef MOVIAN_HAVE_DUKTAPE
-    Engine engine;
     Archive archive;
+    if (!archive.load(path)) return false;
+    Engine engine;
     char entry[96];
-    if (!engine.ctx || !archive.load(path) || !read_manifest(engine.ctx, plugin, entry, &archive))
+    if (!engine.ctx || !read_manifest(engine.ctx, plugin, entry, &archive))
         return false;
     copy_text(plugin.archive, sizeof plugin.archive, path);
     return true;
@@ -763,11 +755,15 @@ bool inspect_package(const char *path, Plugin &plugin) noexcept
 bool install(const char *path, char *error, int capacity) noexcept
 {
 #ifdef MOVIAN_HAVE_DUKTAPE
-    Engine engine;
     Archive archive;
+    if (!archive.load(path)) {
+        copy_text(error, capacity, "Could not read plugin ZIP (8 MiB maximum)");
+        return false;
+    }
+    Engine engine;
     Plugin plugin{};
     char entry[96];
-    if (!engine.ctx || !archive.load(path) ||
+    if (!engine.ctx ||
         !read_manifest(engine.ctx, plugin, entry, &archive) || !std::strcmp(plugin.id, bundled_id))
     {
         copy_text(error, capacity, "Expected a Movian API v2 ZIP with plugin.json at the top level");

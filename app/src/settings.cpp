@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <sys/stat.h>
 
 namespace movian::settings
@@ -158,6 +159,25 @@ void parse_bool(const char *v, bool *out) noexcept
     *out = !(v[0] == '0' && v[1] == 0);
 }
 
+bool valid_repo_url(const char *url) noexcept
+{
+    if (!url || std::strlen(url) >= sizeof g_data.custom_repo_url)
+        return false;
+    if (!url[0])
+        return true;
+    constexpr char prefix[] = "https://";
+    if (std::strncmp(url, prefix, sizeof prefix - 1) != 0)
+        return false;
+    const char *authority = url + sizeof prefix - 1;
+    const auto length = std::strcspn(authority, "/?#");
+    if (!length || std::memchr(authority, '@', length))
+        return false;
+    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(authority); *p; ++p)
+        if (*p <= 32 || *p >= 127 || *p == '\\')
+            return false;
+    return true;
+}
+
 void load_settings_file() noexcept
 {
     FILE *f = std::fopen(MOVIAN_SETTINGS_PATH, "r");
@@ -182,6 +202,14 @@ void load_settings_file() noexcept
         const char *v = eq + 1;
         if (std::strcmp(k, "resume") == 0)
             parse_bool(v, &g_data.resume);
+        else if (std::strcmp(k, "resume_ask") == 0)
+            parse_bool(v, &g_data.resume_ask);
+        else if (std::strcmp(k, "show_extensions") == 0)
+            parse_bool(v, &g_data.show_extensions);
+        else if (std::strcmp(k, "playback_clock") == 0)
+            parse_bool(v, &g_data.playback_clock);
+        else if (std::strcmp(k, "custom_repo_url") == 0 && valid_repo_url(v))
+            std::snprintf(g_data.custom_repo_url, sizeof g_data.custom_repo_url, "%s", v);
         else if (std::strcmp(k, "seek") == 0)
             g_data.seek_step = clamp_seek(std::atoi(v));
         else if (std::strcmp(k, "clock24") == 0)
@@ -215,6 +243,8 @@ void load_settings_file() noexcept
             parse_bool(v, &g_data.torrent_trackers);
         else if (std::strcmp(k, "torrent_progressive") == 0)
             parse_bool(v, &g_data.torrent_progressive);
+        else if (std::strcmp(k, "remote_control") == 0)
+            parse_bool(v, &g_data.remote_control);
         else if (std::strcmp(k, "remote_diagnostics") == 0)
             parse_bool(v, &g_data.remote_diagnostics);
         else if (std::strcmp(k, "torrent_cache_path") == 0)
@@ -256,6 +286,11 @@ void load_settings_file() noexcept
         {
             const int mode = std::atoi(v);
             if (mode >= 0 && mode <= 3) g_data.torrent_retrackers = static_cast<unsigned>(mode);
+        }
+        else if (std::strcmp(k, "torrent_tracker_protocols") == 0)
+        {
+            const int mode = std::atoi(v);
+            if (mode >= 0 && mode <= 2) g_data.torrent_tracker_protocols = static_cast<unsigned>(mode);
         }
     }
     std::fclose(f);
@@ -410,11 +445,12 @@ void save_browser_prefs(const char *path, BrowserPrefs prefs) noexcept
 
 void save() noexcept
 {
-    char body[512];
+    char body[2048];
     std::snprintf(body, sizeof body,
                   "resume=%d\nseek=%d\nclock24=%d\ndebug=%d\nhwdec=%d\nshowall=%d\nautonext=%d\nnewest=%d\nrepeat=%d\nshuffle=%d\nvolume=%d\nrepo=%d\ntorrent_trackers=%d\ntorrent_progressive=%d\n"
                   "torrent_cache_path=%d\nremote_diagnostics=%d\ntorrent_cache_mib=%u\ntorrent_read_ahead=%u\ntorrent_preload=%d\n"
-                  "torrent_connections=%u\ntorrent_requests=%u\ntorrent_block_timeout=%u\ntorrent_retrackers=%u\n",
+                  "torrent_connections=%u\ntorrent_requests=%u\ntorrent_block_timeout=%u\ntorrent_retrackers=%u\ntorrent_tracker_protocols=%u\n"
+                  "resume_ask=%d\nshow_extensions=%d\nplayback_clock=%d\nremote_control=%d\ncustom_repo_url=%s\n",
                   g_data.resume ? 1 : 0, clamp_seek(g_data.seek_step), g_data.clock_24h ? 1 : 0,
                   g_data.debug_log ? 1 : 0, g_data.hw_decode ? 1 : 0, g_data.show_all ? 1 : 0,
                   g_data.auto_next ? 1 : 0, g_data.newest_first ? 1 : 0, g_data.repeat,
@@ -422,7 +458,9 @@ void save() noexcept
                   g_data.torrent_trackers ? 1 : 0, g_data.torrent_progressive ? 1 : 0,
                   g_data.torrent_cache_path, g_data.remote_diagnostics ? 1 : 0, g_data.torrent_cache_mib,
                   g_data.torrent_read_ahead, g_data.torrent_preload, g_data.torrent_connections,
-                  g_data.torrent_requests, g_data.torrent_block_timeout, g_data.torrent_retrackers);
+                  g_data.torrent_requests, g_data.torrent_block_timeout, g_data.torrent_retrackers,
+                  g_data.torrent_tracker_protocols,
+                  g_data.resume_ask, g_data.show_extensions, g_data.playback_clock, g_data.remote_control, g_data.custom_repo_url);
     write_atomic(MOVIAN_SETTINGS_PATH, body);
 }
 
@@ -431,14 +469,54 @@ Data &get() noexcept
     return g_data;
 }
 
+void format_clock(char *dst, std::size_t capacity) noexcept
+{
+    if (!dst || !capacity) return;
+    // Keep the time API used by the earlier console build. The UI calls this
+    // on its render thread; consume the two fields before any other time call.
+    const time_t now = std::time(nullptr);
+    const auto *local = std::localtime(&now);
+    const int hour = local ? local->tm_hour : -1;
+    const int minute = local ? local->tm_min : -1;
+    char text[12] = "--:--";
+    if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60)
+    {
+        int used = 0;
+        const int h = g_data.clock_24h ? hour : (hour % 12 ? hour % 12 : 12);
+        if (g_data.clock_24h || h >= 10) text[used++] = '0' + h / 10;
+        text[used++] = '0' + h % 10;
+        text[used++] = ':';
+        text[used++] = '0' + minute / 10;
+        text[used++] = '0' + minute % 10;
+        if (!g_data.clock_24h) {
+            text[used++] = ' ';
+            text[used++] = hour < 12 ? 'A' : 'P';
+            text[used++] = 'M';
+        }
+        text[used] = 0;
+    }
+    std::size_t i = 0;
+    while (i + 1 < capacity && text[i]) { dst[i] = text[i]; ++i; }
+    dst[i] = 0;
+}
+
+bool set_custom_repo_url(const char *url) noexcept
+{
+    if (!valid_repo_url(url))
+        return false;
+    std::snprintf(g_data.custom_repo_url, sizeof g_data.custom_repo_url, "%s", url);
+    save();
+    return true;
+}
+
 const char *repo_url() noexcept
 {
-    return kRepoPreset[clamp_repo(g_data.repo_preset)];
+    return g_data.custom_repo_url[0] ? g_data.custom_repo_url : kRepoPreset[clamp_repo(g_data.repo_preset)];
 }
 
 const char *repo_label() noexcept
 {
-    return repo_label(g_data.repo_preset);
+    return g_data.custom_repo_url[0] ? "Custom HTTPS repository" : repo_label(g_data.repo_preset);
 }
 
 const char *repo_label(int preset) noexcept
@@ -454,6 +532,7 @@ void cycle_repo(int delta) noexcept
     if (v >= repo_preset_count)
         v = 0;
     g_data.repo_preset = v;
+    g_data.custom_repo_url[0] = 0;
     save();
 }
 

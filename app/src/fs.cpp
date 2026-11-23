@@ -5,6 +5,7 @@
  */
 
 #include "fs.hpp"
+#include "network.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -312,6 +313,20 @@ int list_directory(const char *path, Entry *out, int cap, int *count, int *err,
                    bool include_other, SortOrder order, bool folders_first,
                    const char *file_extension) noexcept
 {
+    if(network::is_path(path)) {
+        int n=0, error=0;
+        const int rc=network::list(path,out,cap,&n,&error,include_other,order,folders_first);
+        if (rc==0 && file_extension) {
+            int kept=0;
+            for (int i=0;i<n;++i)
+                if (out[i].kind==Kind::directory || ends_with_ci(out[i].name,file_extension))
+                    out[kept++]=out[i];
+            n=kept;
+        }
+        if(count) *count=n;
+        if(err) *err=error;
+        return rc;
+    }
     return list_directory_impl(path, out, cap, count, err, include_other, order, folders_first, false, file_extension);
 }
 

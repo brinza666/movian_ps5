@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Small static FFmpeg for the Movian PS5 playback test (no network).
+# Small static FFmpeg for the Movian PS5 playback test with passive FTP.
 # Includes H.264, AAC and E-AC-3. HEVC uses the platform hardware decoder.
 set -euo pipefail
 SDK=${PS5_PAYLOAD_SDK:-$HOME/.ps5-starter/ps5-payload-sdk}
@@ -61,11 +61,12 @@ if [[ ! -d $SRC ]]; then
     tar -C "$WORK" -xf "$TARBALL"
 fi
 
+python3 "$ROOT/scripts/patch-ffmpeg-network.py" "$SRC"
 cd "$SRC"
 # Reconfigure when the parser/bsf set changes. HEVC parser only (no software
 # HEVC decoder: that crashed this title). VLC packetizes from extra data;
 # FFmpeg still needs the parser to name hev1/hvc1 streams.
-if [[ ! -f ffbuild/config.mak ]] || ! grep -q '#define CONFIG_LIBDAV1D_DECODER 1' config_components.h 2>/dev/null; then
+if [[ ! -f ffbuild/config.mak ]] || ! grep -q '#define CONFIG_FTP_PROTOCOL 1' config_components.h 2>/dev/null || ! grep -q '#define CONFIG_LIBDAV1D_DECODER 1' config_components.h || ! grep -q -- '-D__PROSPERO__' ffbuild/config.mak; then
     make distclean >/dev/null 2>&1 || true
     PKG_CONFIG_LIBDIR="$DAV1D_PREFIX/lib/pkgconfig" ./configure \
         --prefix="$PREFIX" \
@@ -80,7 +81,7 @@ if [[ ! -f ffbuild/config.mak ]] || ! grep -q '#define CONFIG_LIBDAV1D_DECODER 1
         --sysroot="$SDK/target" \
         --enable-static --disable-shared \
         --disable-programs --disable-doc --disable-avdevice --disable-avfilter \
-        --disable-network --disable-protocols --enable-protocol=file \
+        --enable-network --disable-protocols \
         --disable-muxers --disable-encoders --disable-hwaccels \
         --disable-x86asm --disable-inline-asm --disable-autodetect \
         --disable-everything \
@@ -89,8 +90,8 @@ if [[ ! -f ffbuild/config.mak ]] || ! grep -q '#define CONFIG_LIBDAV1D_DECODER 1
         --enable-decoder=mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9,libdav1d,rawvideo,aac,ac3,eac3,mp2,mp3,opus,vorbis,pcm_s16le \
         --enable-parser=mpegvideo,mpeg4video,h264,hevc,vp8,vp9,av1,aac,ac3,mpegaudio,opus,vorbis \
         --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb \
-        --enable-protocol=file \
-        --extra-cflags="-O2 -fPIC" \
+        --enable-protocol=file,ftp,tcp \
+        --extra-cflags="-O2 -fPIC -D__PROSPERO__" \
         --extra-ldflags="-fPIC"
 fi
 make -j"$JOBS"

@@ -10,6 +10,7 @@ namespace movian::torrent
 constexpr int max_files = 64;
 enum class CacheStorage { ram, internal, usb };
 enum class RetrackersMode { original, add, replace, remove };
+enum class TrackerProtocols { tcp_udp, tcp, udp }; // Observed WSL chooser order.
 constexpr unsigned max_cache_connections = 8;
 struct CacheOptions
 {
@@ -25,6 +26,7 @@ struct TransferOptions
     unsigned requests = 16;
     unsigned block_timeout_seconds = 6;
     RetrackersMode retrackers = RetrackersMode::add;
+    TrackerProtocols tracker_protocols = TrackerProtocols::tcp_udp;
 };
 
 constexpr unsigned cache_limit_mib(CacheStorage storage) noexcept
@@ -78,6 +80,7 @@ bool cached_path(const char *descriptor, char (&result)[384]) noexcept;
 bool magnet_hash(const char *uri, char (&hash)[41]) noexcept;
 bool peer_info(const char *data, std::size_t size, PeerInfo &result) noexcept;
 void configure_trackers(PeerInfo &info, const char *path, RetrackersMode mode) noexcept;
+void filter_trackers(PeerInfo &info, TrackerProtocols protocols) noexcept;
 bool tracker_peers(const char *data, std::size_t size, Endpoints &result) noexcept;
 bool compact_tracker_peers(const unsigned char *data, std::size_t size, Endpoints &result) noexcept;
 #if defined(MOVIAN_TORRENT_DHT)

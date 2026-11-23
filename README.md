@@ -1,130 +1,98 @@
 # Movian for PlayStation 5
 
-> **Native playback test branch.** The [v53 prerelease](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53) builds the isolated PS5 title PPSA99456 and adds the playback control bar, seek preview, audio track selection and subtitle picker. See the [UI work list](docs/UI_WORK_LIST.md) for verification and pending features.
+Native C++20 media-center homebrew, packaged as a signed ShadowMountPlus folder title using the public PS5 payload SDK and the VLC for PS5 build approach.
 
-<p align="center">
-  <img src="app/sce_sys/icon0.png" alt="Movian" width="96">
-</p>
+**Playback test branch: `test/native-playback`, title `PPSA99456`.** The separate production title is `PPSA99455`. Keep their application folders and persistent profiles separate.
 
-<p align="center">
-  <b>A native PS5 port of the Movian media center.</b><br>
-  Built as a ShadowMountPlus home-screen title, the same way
-  <a href="https://github.com/ZiZc3/VLC">VLC for PS5</a> ships.
-</p>
+As of 23 November 2026, [v60 is the latest STPP preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60). The signed package passed host and unmodified WSL Movian control tests. **PS5 v60 startup/access/transport are pending because the console went offline before upload.** v59 remains the last installed and startup-verified console build. See the [release notes](docs/release-notes/playback-test-v60.md), [v60 scope](docs/STPP_V60.md) and [port log](docs/PORT_LOG.md).
 
-<p align="center">
-  <img alt="status" src="https://img.shields.io/badge/status-hardware%20playback%20test-yellow">
-  <img alt="title" src="https://img.shields.io/badge/title-PPSA99456-1f1f1f">
-  <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
-</p>
+## Capabilities and evidence
 
-Movian (formerly Showtime) is Andreas Öman’s media center, continued as
-Dean Kasabow’s **M7** on PS3 and as [czz/movian-go](https://github.com/czz/movian-go)
-on desktop. This repository ports that product to a jailbroken PS5 as a
-**native C++20 application**, not as a Go binary and not as a one-shot ELF
-sent to port 9021.
-
-> **Honesty.** Earlier trees in this repository claimed FFmpeg, BitTorrent,
-> Duktape plugins, and SMB2 were already working. Those sources were stubs,
-> a Go overlay that dies before `main` on this userland, or a separate
-> loader experiment. They are kept under [`archive/`](archive/README.md) as
-> reference only. The live application is [`app/`](app/).
-
-## Native playback test
-
-| Capability | Status |
+| Area | Evidence and limits |
 | --- | --- |
-| ShadowMountPlus title `PPSA99456` (Media category) | In tree. Build with `app/build.sh`. |
-| DualSense navigation, 1080p CPU UI | Implemented |
-| Videos file browser (`/download0`, `/data/movian`, USB) | Implemented |
-| MPEG Program Stream (`.mpg`) | FFmpeg software decode. v15 console retest pending. |
-| Settings / bookmarks / continue watching | Implemented (`/download0/*.txt`) |
-| H.264 / HEVC hardware video | Videodec2 output on PS5 in MKV and MP4 test runs. |
-| E-AC-3 audio | 5.1 decoded to 48 kHz stereo PCM on PS5. Audible playback through the MKV's EOF is pending. |
-| Home, Videos, BitTorrent, Plugins and playback controls | v53 builds the updated screens. Console verification pending. |
-| BitTorrent client | Peer discovery and verified piece caching are in the test build. Sustained Avanpost playback is pending. |
-| Plugin host (Movian API v2) | Catalog, installed plugins, local ZIPs, settings and artwork. Compatibility varies by plugin. |
-| Go `movian-go` ELF | Abandoned for PS5 (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |
+| Local playback | PS5 H.264/HEVC hardware frames, software decoding and 48 kHz stereo PCM recorded on controlled fixtures. Format, track and EOF coverage varies by fixture. |
+| UI and controls | Home, files, list/grid views, sidebar, categorized settings, resume/bookmarks, playback bar, seek preview and audio/subtitle pickers. Subtitle rendering and complete desktop parity remain open. |
+| SMB2 and FTP | Saved authenticated servers, background browsing and seekable input. The user separately confirmed playback, sound and seeks over both protocols in v57. Automatic server/share discovery is pending. |
+| Network imports | v58 supports bounded ZIP plugin installation and torrent-metainfo reads from shares; SMB/FTP ZIP installation and FTP torrent file lists were user-confirmed. |
+| Native BitTorrent | Verified pieces, bounded RAM/internal/USB cache choices, HTTP/UDP trackers and IPv4 DHT. v59 completed a small numeric-IP tracker transfer in RAM and decoded 180 HEVC 1080p hardware frames through EOF. Feature-length sustained playback and rolling-cache seeks remain open. |
+| Plugin API v2 | Duktape host, catalog, ZIP installation, routes, settings, stores and artwork. Compatibility and live account login depend on each plugin. |
+| STPP remote control | v60 server and shared Home/Settings callbacks passed against unmodified WSL M7, including a persisted native toggle and return Home. PS5 listener/startup remain pending; complete resources/settings/player coverage is separate. |
 
-Product behaviour we are aiming at is documented from a **live** M7 7.0.273
-WSL install in [docs/M7_CAPABILITIES.md](docs/M7_CAPABILITIES.md) and
-[docs/PRODUCT.md](docs/PRODUCT.md). The engineering plan is
-[docs/PORTING_PLAN.md](docs/PORTING_PLAN.md). Run the reference with
-`wsl -d Ubuntu-24.04 -- showtime`.
+The v59 hostname-based HTTP/UDP/DHT failure remains unresolved; the numeric-IP control succeeded. DNS work is deferred. The v59 diagnostics listener was denied by the title sandbox (bind error 13). The v60 ZIP includes optional one-shot title-access support but no authorization request; there is no verified v60 console result yet. The published v53 package excludes sandbox lift.
 
-## Why we copy VLC, not Go
+## Build in WSL2 Ubuntu 24.04
 
-[VLC for PS5](https://github.com/ZiZc3/VLC) is a working native title:
-
-1. Cross-compile C/C++ with [ps5-payload-dev/sdk](https://github.com/ps5-payload-dev/sdk).
-2. Link a PIE ELF, convert + sign to `eboot.bin` with the
-   [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate)
-   toolchain (VLC uses the same converter via [PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan)).
-3. Ship `dist/PPSA…/eboot.bin` + `sce_sys/` + `sce_module/libc.prx`.
-4. Copy the folder to `/data/homebrew/<TITLE_ID>/` and launch from the home screen.
-
-A stock Go `freebsd/amd64` binary issues FreeBSD syscalls (`SYSCALL` with
-FreeBSD numbers). The PS5 title userland does not service that table, so
-the process dies before `main`. That is why
-[`archive/go-overlay/`](archive/go-overlay) is not the shipping path.
-
-Movian-go remains the **behaviour and plugin-API reference**. We reimplement
-its features in native code, the same way VLC reimplemented libvlc on this
-platform instead of running the desktop binary.
-
-## Build
-
-On **WSL2 Ubuntu 24.04** (this workstation is already provisioned):
+Install the public [ps5-payload SDK](https://github.com/ps5-payload-dev/sdk) and provision the [ps5-homebrew-starter](https://github.com/MiladRTX/ps5-homebrew-starter) kit first. Host tools include Clang/LLD 18, a C++20 compiler, Make, Python 3, Git, curl, unzip, Meson/Ninja, pkg-config and Node.js. Console builds run in WSL with no proprietary SDK.
 
 ```bash
-cd /mnt/c/Users/brinza/Documents/deep/movian_ps5
+git clone --branch test/native-playback https://github.com/brinza666/movian_ps5.git
+cd movian_ps5
+export PS5_PAYLOAD_SDK="$HOME/.ps5-starter/ps5-payload-sdk"
+export PS5_STARTER="/path/to/ps5-homebrew-starter"
+export PS5_HOST="PS5_IP"
 bash scripts/doctor.sh
-bash app/build.sh                          # -> build/app/PPSA99455/
-bash app/build.sh deploy 192.168.10.238    # FTP to /data/homebrew
+bash scripts/build-ffmpeg-ps5.sh
+bash scripts/self-check.sh
+bash app/build.sh
+# build/app/PPSA99456/ and build/app/PPSA99456.zip
 ```
 
-Details: [docs/BUILDING.md](docs/BUILDING.md) · [docs/DEPLOY.md](docs/DEPLOY.md).
+`app/build.sh` fetches pinned Duktape/miniz/Gumbo sources, builds libsmb2 as needed, links existing static FFmpeg libraries and signs/packages `eboot.bin` through the kit. Run the FFmpeg step first for a fresh checkout. Generated dependencies and artifacts stay under ignored `.deps/` and `build/`. The title ID comes from `app/sce_sys/param.json`; older production documents use `PPSA99455`.
 
-New contributors and new AI sessions should start at
-[docs/NEW_SESSION.md](docs/NEW_SESSION.md).
+From PowerShell in this checkout, run the required check with `wsl -d Ubuntu-24.04 -- bash scripts/self-check.sh`. Optional plugin, Matroska and real SMB2/FTP fixtures require the `MOVIAN_HOST_*` paths in [the script](scripts/self-check.sh). A base check does not imply optional fixtures ran. Host results and console results are recorded separately.
 
-## Repository layout
+## Install and verify on PS5
 
-```text
-app/                  Live native title (sources, param.json, fonts, icon)
-scripts/              doctor, deploy, icon helper
-docs/                 Architecture, plan, manuals, new-session handoff
-website/              Project page (GitHub Pages)
-plugins/repo.json     Alternative Movian plugin feed (https://bit.ly/mprepo)
-archive/              Frozen experiments — do not build these for shipping
-.agents/skills/       Agent skill for this port
+Use a supported homebrew runtime with ShadowMountPlus and an FTP server. Close the test title, extract the complete `PPSA99456` folder and upload it to `/data/homebrew/PPSA99456/` using your actual FTP port (2121 on the tested setup). Retain executable permissions and verify uploaded bytes before activation. Include `eboot.bin`, `sce_sys`, `sce_module` and assets. Do not send `eboot.bin` to the payload loader on port 9021.
+
+The build tool also provides `bash app/build.sh deploy "$PS5_HOST"` when the kit FTP configuration matches the console. Manual staging supports other FTP ports. Preserve the previous folder until the replacement starts successfully.
+
+```bash
+curl -sS -X POST "http://$PS5_HOST:10101/api/v1/scan"
+curl -sS -X POST "http://$PS5_HOST:10101/api/v1/games/mount" \
+  -H 'Content-Type: application/json' -d '{"title_id":"PPSA99456"}'
 ```
 
-## Credits
+Launch the mounted icon. A mount alone does not prove startup. Check the version, Home, controller input and startup log; then test picture, audible sound, seeks and EOF on a known local fixture before repeating over SMB/FTP or torrent. klog uses TCP 3232 on the tested setup; diagnostics persist under `/download0`. A remote property update is independent of decoded picture and audible output.
 
-This port stands on public homebrew work. Full attributions:
-[docs/CREDITS.md](docs/CREDITS.md).
+Settings and installed plugins persist in the title's `/download0` profile across app-folder replacements. The requested fresh-profile v60 test has a scoped one-time reset, gated by a separately uploaded request after a verified backup; its console execution is pending. Installing an archive alone does not clear the profile. Keep personal configurations, credentials, device identities and private tracker data out of release assets.
 
-| Project | Authors | Role here |
-| --- | --- | --- |
-| [Movian / Showtime](https://github.com/andoma/movian) | Andreas Öman | Original media center |
-| M7 | Dean Kasabow / [apps.movian.eu](https://apps.movian.eu/) | PS3 reference |
-| [movian-go](https://github.com/czz/movian-go) | czz | Behaviour, plugin API v2, architecture reference |
-| [VLC for PS5](https://github.com/ZiZc3/VLC) | ZiZc3 | Native title recipe we follow |
-| [ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | BlackBearReloaded | FSELF, `libc.prx`, folder packaging |
-| [ps5-homebrew-starter](https://github.com/MiladRTX/ps5-homebrew-starter) | MiladRTX | Verified VideoOut renderer, DualSense, fonts |
-| [ps5-payload-dev/sdk](https://github.com/ps5-payload-dev/sdk) | John Törnblom | Public headers, Clang target, libc++ |
-| [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) | drakmor | Home-screen titles from `/data/homebrew` |
-| [etaHEN](https://github.com/LightningMods/etaHEN) | LightningMods | Jailbreak runtime |
-| [kstuff](https://github.com/EchoStretch/kstuff) | EchoStretch | Kernel patches titles need |
-| [Breeze](https://github.com/MiladRTX/Breeze) | MiladRTX | Renderer lineage used by the starter |
-| stb | Sean Barrett | `stb_truetype`, `stb_image` |
-| Inter / JetBrains Mono | rsms / JetBrains | UI fonts |
+## Remote control and diagnostics
 
-PlayStation and PS5 are trademarks of Sony Interactive Entertainment.
-This project is independent and is not affiliated with Sony.
+[STPP findings and implementation plan](docs/REMOTE_CONTROL_STPP.md) describes the observed Movian-to-Movian property protocol. Discovery uses UDP 42000; connect to the advertised HTTP port. STPP upgrades at `/api/stpp` and carries navigation, settings and live properties. Pixel/audio inspection requires separate verification.
 
-## License
+This controller has been verified against an existing Movian peer. The PS5 title attempts STPP TCP 42000 when Network → Allow remote control is enabled. Diagnostics now use TCP 42001. Console binding is pending verification; use the actual reachable endpoint, not a claimed test pass.
 
-Repository-authored code is **GPL-3.0-or-later**. Upstream components keep
-their own licenses (see [NOTICE.md](NOTICE.md) and `app/fonts/`).
+```bash
+python3 -m venv build/stpp-client-venv
+build/stpp-client-venv/bin/pip install websocket-client==1.8.0
+build/stpp-client-venv/bin/python scripts/movian_stpp.py \
+  --url ws://PEER_IP:HTTP_PORT/api/stpp \
+  --path '["clock","unixtime"]' --seconds 5
+```
+
+The CLI defaults to observation and emits JSON events. Explicit `--open-url settings:` and `--action back` request navigation. Integer writes need the correct live property path/reference; exported references expire on reconnect. Protocol-only tests need no WebSocket dependency: `python3 tests/stpp_protocol.py`. An STPP server belongs to a running app and cannot launch a closed/crashed title.
+
+## Changes since published v53
+
+- **v54:** desktop-observed settings structure, filename extensions, clock, alternate HTTPS repository, resume policy and shared torrent limits.
+- **v55:** SMB2/FTP browsing and seekable playback, saved authentication, network settings and authenticated FTP server.
+- **v56–v57:** startup clock correction and SMB random-source compatibility; subsequent console network playback/sound/seek confirmations.
+- **v58:** asynchronous SMB2/FTP plugin ZIP and torrent-metainfo imports, bounded reads and saved servers in the ZIP picker.
+- **v59:** native network initialization, precise HTTP-stage diagnostics and persisted TCP & UDP / TCP / UDP tracker selection. Small numeric-IP RAM torrent playback passed through hardware EOF; hostname discovery remains blocked.
+- **v60:** STPP server/shared property adapter, native WSL control acceptance and default-off one-shot access/fresh-profile requests. Signed package and hashes are published; PS5 upload/runtime and fresh-profile execution remain pending.
+
+See [Network v55](docs/NETWORK_V55.md), [v58](docs/NETWORK_V58.md), [v59](docs/NETWORK_V59.md) and the [UI work list](docs/UI_WORK_LIST.md) for test details.
+
+## Source and credits
+
+`app/` is the live native application; `scripts/` holds build/test tools; `tests/` holds host fixtures; `website/` is the GitHub Pages source. `archive/` contains superseded experiments. Current desktop behavior comes from the inspected M7 7.0.273 WSL build and retained evidence; TorrServer and its pinned engine inform the torrent implementation. See [SPEC.md](SPEC.md), [desktop inventory](docs/M7_CAPABILITIES.md), [credits](docs/CREDITS.md), [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE).
+
+Repository-authored code is GPL-3.0-or-later; dependencies retain their licenses. This independent project is unaffiliated with Sony. PlayStation and PS5 are Sony Interactive Entertainment trademarks.
+
+
+The v60 access experiment requires `MOVIAN_TITLE_ACCESS_TEST=1` at build time
+and a separate one-shot console request. Standard `bash app/build.sh` omits
+helper support. See [the exact opt-in/reset procedure](docs/STPP_V60.md). Public
+ZIPs contain no request markers. Host UI acceptance can be rerun with
+`bash scripts/test-ui-stpp.sh` after provisioning its documented host dependencies.

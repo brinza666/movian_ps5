@@ -1,5 +1,47 @@
 # Status
 
+2026-11-23, v60: STPP server and shared UI callbacks are implemented. Actual WSL
+M7 rendered Home/Settings and changed/restored the real extension setting.
+Full host/native WSL checks and signed packaging passed. v60 console upload
+and access/reset execution are pending because FTP2121/ShadowMount are offline. Latest user request authorizes a one-shot access experiment
+and a backed-up fresh plugin/config profile. [v60 scope/results](STPP_V60.md).
+Earlier no-lift/preserve-plugin entries below describe historical builds.
+
+
+2026-11-23, remote-control priority: DNS investigation is deferred by the user.
+Verified actual WSL → matv STPP v3 control, restored a boolean preference,
+opened KinoZal.TV and observed pushed clock/log updates. A reusable host client
+and six wire tests are added; the PS5 server/property adapter is not implemented.
+The installed console remains v59. See [STPP findings and three-part build plan](REMOTE_CONTROL_STPP.md).
+
+
+2026-11-23, v59: user reports confirm v58 SMB and FTP ZIP installs and FTP
+metainfo file-list opening. The failing torrent allocated RAM but all HTTP
+requests failed with 0x8041013d before verified pieces. v59 adds native network
+initialization, precise HTTP-stage logs and the observed WSL TCP & UDP / TCP /
+UDP tracker chooser with a working backend. Full host self-check/UI tests and
+signed build passed; v59 is uploaded, readback-verified, mounted and startup
+is captured. The Avanpost retest still fails at hostname HTTP/UDP/DHT discovery. A numeric
+tracker control completed verified RAM transfer, 180 hardware HEVC 1080p frames
+through EOF and PCM drain without dropped samples; audibility and large-file
+seek/rolling-cache playback remain open. DNS configuration/cause is being checked. Preserve plugins;
+no sandbox-lift. See [v59 evidence and limitations](NETWORK_V59.md).
+
+
+2026-11-23: v57 SMB and FTP browsing/playback, audible sound and seeking were
+confirmed separately by the user. FTP diagnostics corroborate authenticated
+SMB reads, HEVC hardware frames and PCM, and later FTP listings/H.264 seeks;
+the exact FTP 1080p HEVC clip is not independently identified in the trace.
+v58 (`01.000.058`) adds bounded SMB2/FTP ZIP installs and torrent metainfo,
+background previews with cancellation, and saved servers in the ZIP picker.
+Full self-check, shared-source UI checks and signed build passed. All 23 files
+were staged and readback-verified via FTP **2121**. After the user closed v57,
+v58 was activated and mounted successfully. Its startup and console imports
+are pending the user opening the title and confirming RAM.
+Sandbox-lift remains excluded; installed plugins are preserved. See
+[Network v58](NETWORK_V58.md). Discovery was observed in WSL and scheduled for
+later implementation, as requested. Webcam capture remains disabled.
+
 The isolated `PPSA99456` playback title has a published v15 prerelease
 and a mounted v23 test build. v22 console logs show finished catalog loads,
 repository ZIP installs, artwork decodes, and playback from local torrent
@@ -60,11 +102,26 @@ Zero pieces were verified and Avanpost did not start playback.
 v47 is mounted with an IPv4 DHT lookup adapted from TorrServer's pinned
 engine. Host discovery, private-torrent exclusion, RAM seek and Matroska
 checks passed. The Avanpost console retest is pending.
-v53 is the latest signed `PPSA99456` test build. It adds the in-video transport bar,
+v53 is the latest published `PPSA99456` test build. It adds the in-video transport bar,
 a seek preview with confirm and cancel, local audio selection, and an embedded
 subtitle picker. Host tests passed, including playback continuity, track selection
 and seeks. Subtitle rendering and v53 console verification are pending. See the
 [UI work list](UI_WORK_LIST.md) for the v48–v53 changes.
+
+v55 added the initial signed network test package. It adds saved SMB2/FTP server
+connections, background network browsing, authentication and seekable playback
+input, plus an authenticated FTP server and the observed Network settings.
+Host service and UI checks passed. PS5 upload and runtime checks remain pending
+because FTP 2120 was unavailable. See [Network v55](NETWORK_V55.md) and the
+[UI work list](UI_WORK_LIST.md). Sandbox-lift is excluded.
+
+v57 is the currently uploaded and running console test build, using FTP 2121.
+It retains v56's startup-clock repair and fixes the SMB context crash caused by
+an unavailable `arc4random_buf` import. The verified archive, file readback and
+mount succeeded. Console logs show network file opens and hardware H.264 output;
+fresh 1080p HEVC, audible sound and seek evidence is being collected separately
+for SMB and FTP. Webcam-photo testing is paused at the user's request.
+See [the port log](PORT_LOG.md).
 
 Production status for `PPSA99455` is below.
 

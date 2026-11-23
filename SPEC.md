@@ -85,6 +85,9 @@ PS5 defaults to RAM for new torrent payloads. The “Torrent cache path” setti
 
 | Desktop feature or option | Acceptance test |
 | --- | --- |
+| Network-share plugin ZIP installation | Browse a controlled SMB2 or FTP folder, install its API v2 ZIP, restart, and verify that plugin and the pre-existing installed plugins remain available. Repeat separately for each protocol. |
+| Network-share torrent metainfo | Open a controlled SMB2 or FTP `.torrent`, compare its file list and info hash to the local fixture, then start the existing peer transfer with RAM selected. Repeat separately for each protocol. |
+| Discovered network server selection and prefill | Select a controlled discovered server without typing its host; verify protocol/host/share fields against the WSL observation, authenticate and browse. Discovery and prefill remain a later unfinished slice. |
 | API v2 Duktape, ZIP install, ZIP-relative modules | Install a signed-off fixture ZIP and execute a nested import. |
 | Plugin catalog, uninstall, autostart, search registration | Exercise each action independently on a disposable plugin. |
 | Official and alternate repos, automatic install, version gating | Switch feeds and verify the displayed catalog and compatibility rule. |
@@ -105,10 +108,29 @@ PS5 defaults to RAM for new torrent payloads. The “Torrent cache path” setti
 | HTTP/SOCKS proxy, IPv6, SMB buffer and xattr | Verify traffic or attribute behavior for each controlled option. |
 | TMDB, TVDB, IMDb, NFO, original titles and metadata languages | Compare one deterministic metadata result for each source or setting. |
 | Last.fm scrobble | Verify a mock account receives one test event. |
-| HTTP control, state properties, remote control | Query a read-only property and send a permitted playback command. |
+| Movian STPP discovery | Decode a controlled peer's 88-byte advertisement and select its advertised endpoint from Local network. |
+| Native and modern WebSocket STPP v3 handshake | Connect the unmodified WSL client and a modern client to the same server and verify version and instance identity. |
+| Remote live properties and exported references | Subscribe to a page, resolve its child models and verify a pushed change without polling. |
+| Remote plugin/page navigation | Open a known plugin through STPP OpenURL and return with Back, comparing the local and remote current page. |
+| Remote boolean settings | Change and restore one disposable option; verify the actual saved value and pushed notification through an independent client. |
+| Remote numeric settings | Change and restore one bounded number and verify the shared backend accepts its bounds. |
+| Remote text settings | Edit and restore a non-sensitive text field and verify UTF-8 text and persistence. |
+| Remote dropdown settings | Select another option, cancel a second change, and verify both views agree on the committed selection. |
+| Remote playback and seek | Start known media, seek, select a track and stop through the remote model while verifying decoder output. |
+| Remote live log buffer | Subscribe before a controlled event and verify a new entry with severity/prefix/message and detectable sequence gaps after reconnect. |
+| PS5 outbound remote-control transport | Connect the restricted title through a paired bridge and control its real settings with sandbox-lift excluded. |
+| Remote artwork/resources | Fetch a fixture icon through the required resource messages and verify dimensions and cancellation. |
+| Remote lifecycle and stale references | Disconnect/reconnect, reject stale exported references, and restore subscriptions without interrupting playback. |
+| Remote pixel inspection | Fetch a controlled framebuffer image and compare it to the known rendered fixture. |
 | Remote diagnostics | Enable the LAN listener, read `/api/logfile/0` during a torrent run, confirm cache, peer, and seek events, then disable the listener and confirm it closes. |
 | System name, upgrade channel, auto-upgrade, general cache and logs | Use test profiles and check the selected identity, update offer, cleared cache or log output separately. |
 | TV controls, device-specific capabilities, developer views | Verify each feature only on the platform and hardware that exposes it. |
+
+The 2026-11-23 [STPP investigation and three-part PS5 build plan](docs/REMOTE_CONTROL_STPP.md)
+records actual WSL/Android discovery, property subscriptions, plugin navigation,
+one restored setting mutation and live clock/log updates. A host controller and
+wire self-check exist. These observations do not mark the PS5 server or all
+remote setting/playback/resource tests complete.
 
 ## Build plan
 
@@ -121,3 +143,17 @@ Run `wsl -d Ubuntu-24.04 -- bash scripts/self-check.sh` from the worktree. The s
 For the FFmpeg packet and seek comparison, set `MOVIAN_HOST_FFMPEG_DIR` to a native FFmpeg 6.1.2 build with the Matroska demuxer, and `MOVIAN_MATROSKA_FIXTURE` to the generated test MKV. The self-check then compares the growing cache to the same completed file.
 
 Repository workflow, context handoff and terminal verification are described in [AGENTS.md](AGENTS.md). Chat commands, MCP connectors, and assistant lifecycle hooks belong to their chat host.
+
+
+## v60 first STPP step acceptance (2026-11-23)
+
+Native WSL Home/Settings/shared boolean callbacks passed against the actual UI
+adapter, including persisted restoration and pushed local changes. Core and UI
+socket tests are in the self-check; full UI checks require the optional host
+network/plugin dependencies. See docs/STPP_V60.md for the console boundary.
+
+| Authorized test-only behavior | One acceptance test |
+| --- | --- |
+| One-shot per-title access | Launch with the separate exact request, capture helper/root/path proof and independently verify bind; relaunch without consuming a second request must not run it again. |
+| Fresh plugin/config profile | Back up the closed image, apply the one-time request and verify old installed plugins/settings are absent while media/resume/bookmarks remain. |
+| Console backup cleanup | Verify every copied backup file against an independent read before deleting only its scoped inactive console folder. |

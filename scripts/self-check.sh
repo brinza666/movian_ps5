@@ -5,9 +5,33 @@ cd "$root"
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 
+python3 tests/stpp_protocol.py
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
+    app/src/profile_reset.cpp tests/profile_reset.cpp -o "$scratch/profile-reset"
+(mkdir -p "$scratch/profile-work" && cd "$scratch/profile-work" && ../profile-reset)
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -pthread -DMOVIAN_STPP_TEST -Iapp/src \
+    tests/stpp_server.cpp app/src/stpp.cpp -l:libcrypto.so.3 -o "$scratch/stpp-server"
+"$scratch/stpp-server"
+
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HAVE_SMB2 -Iapp/src \
+    tests/input_file.cpp -o "$scratch/input-file"
+"$scratch/input-file"
+
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -pthread -Iapp/src \
+    app/src/plugin_http.cpp tests/plugin_http_native.cpp -o "$scratch/plugin-http-native"
+"$scratch/plugin-http-native"
+
+"${CC:-cc}" -std=c11 -D_POSIX_C_SOURCE=200112L -Wall -Wextra -Werror -DMOVIAN_NETWORK_POSIX_TEST \
+    app/src/network_posix.c tests/network_posix.c -o "$scratch/network-posix"
+"$scratch/network-posix"
+
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -pthread -DMOVIAN_HOST_PREVIEW -Iapp/src \
     app/src/diagnostics.cpp tests/diagnostics.cpp -o "$scratch/diagnostics"
 (mkdir -p "$scratch/diagnostics-work/download0" && cd "$scratch/diagnostics-work" && ../diagnostics)
+
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
+    app/src/settings.cpp tests/settings_clock.cpp -o "$scratch/settings-clock"
+"$scratch/settings-clock"
 
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
     app/src/settings.cpp tests/torrent_settings.cpp -o "$scratch/torrent-settings"
@@ -41,3 +65,29 @@ else
     node.exe --check app/assets/plugins/host.js
 fi
 bash -n app/build.sh
+
+# Optional real SMB2/FTP service fixtures, with disposable accounts and data.
+if [[ -n ${MOVIAN_HOST_NETWORK_FFMPEG_DIR:-} && -n ${MOVIAN_HOST_SMB2_DIR:-} ]]; then
+    package_flags=() package_objects=()
+    if [[ -n ${MOVIAN_HOST_PLUGIN_HEADERS:-} ]]; then
+        package_flags=(-DMOVIAN_HAVE_DUKTAPE -I"$MOVIAN_HOST_PLUGIN_HEADERS")
+        for source in duktape miniz miniz_zip miniz_tinfl miniz_tdef; do
+            "${CC:-cc}" -ffunction-sections -fdata-sections -I"$MOVIAN_HOST_PLUGIN_HEADERS" \
+                -c "$MOVIAN_HOST_PLUGIN_HEADERS/$source.c" -o "$scratch/$source.o"
+            package_objects+=("$scratch/$source.o")
+        done
+    fi
+    "${CXX:-c++}" -std=c++20 -pthread -ffunction-sections -fdata-sections -Wl,--gc-sections \
+        -DMOVIAN_HOST_PREVIEW -DMOVIAN_HAVE_FFMPEG -DMOVIAN_HAVE_SMB2 "${package_flags[@]}" \
+        -Iapp/src -I.deps/ffmpeg-ps5/include -I.deps/smb2-ps5/include tests/network.cpp \
+        app/src/network.cpp app/src/network_ftp_server.cpp app/src/fs.cpp app/src/diagnostics.cpp \
+        app/src/torrent.cpp app/src/plugins.cpp "${package_objects[@]}" \
+        "$MOVIAN_HOST_NETWORK_FFMPEG_DIR/libavformat/libavformat.a" \
+        "$MOVIAN_HOST_NETWORK_FFMPEG_DIR/libavcodec/libavcodec.a" \
+        "$MOVIAN_HOST_NETWORK_FFMPEG_DIR/libavutil/libavutil.a" \
+        "$MOVIAN_HOST_SMB2_DIR/lib/libsmb2.a" -lm -o "$scratch/network"
+    "${MOVIAN_NETWORK_TEST_PYTHON:-python3}" tests/network_services.py "$scratch/network"
+    if [[ -n ${MOVIAN_HOST_PLUGIN_HEADERS:-} ]]; then
+        bash scripts/test-ui-stpp.sh
+    fi
+fi

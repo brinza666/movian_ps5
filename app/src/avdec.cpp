@@ -11,6 +11,7 @@
 #include "diagnostics.hpp"
 #include "audio.hpp"
 #include "torrent.hpp"
+#include "network.hpp"
 
 #include "hwdec.h"
 
@@ -55,6 +56,8 @@ namespace
 #ifdef MOVIAN_HAVE_FFMPEG
 AVFormatContext *g_fmt = nullptr;
 AVIOContext *g_torrent_io = nullptr;
+AVIOContext *g_network_io = nullptr;
+network::File *g_network_input = nullptr;
 const torrent::VerifiedFile *g_torrent_input = nullptr;
 std::uint64_t g_torrent_offset = 0;
 bool g_reading_packet = false;
@@ -287,9 +290,17 @@ std::int64_t torrent_seek(void *, std::int64_t offset, int how)
     return static_cast<std::int64_t>(g_torrent_offset);
 }
 
+int network_read(void *, std::uint8_t *buffer, int size) {
+    const int n=network::read(g_network_input,buffer,size);
+    return n==0?AVERROR_EOF:n;
+}
+std::int64_t network_seek(void *, std::int64_t offset, int how) {
+    return network::seek(g_network_input,offset,how);
+}
+
 int read_packet()
 {
-    if (!g_torrent_input)
+    if (!g_torrent_input && !g_network_input)
         return av_read_frame(g_fmt, g_pkt);
     g_reading_packet = true;
     // Only the decode worker enters libavformat on a progressive input
@@ -298,7 +309,7 @@ int read_packet()
     const int result = av_read_frame(g_fmt, g_pkt);
     pthread_mutex_lock(&g_lock);
     g_reading_packet = false;
-    if (g_pending_seek.load(std::memory_order_relaxed) >= 0 && result < 0)
+    if (g_torrent_io && g_pending_seek.load(std::memory_order_relaxed) >= 0 && result < 0)
     {
         g_torrent_io->error = 0;
         g_torrent_io->eof_reached = 0;
@@ -795,6 +806,22 @@ bool open(const char *path, char *why, int why_cap, PcmFn pcm,
         g_fmt->pb = g_torrent_io;
         g_fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
     }
+    if (network::is_path(path))
+    {
+        g_network_input=network::open(path);
+        const int bytes=network::config().smb_large_buffer?256*1024:32*1024;
+        auto *buffer=static_cast<std::uint8_t *>(av_malloc(bytes));
+        g_fmt=avformat_alloc_context();
+        if(g_network_input && buffer && g_fmt)
+            g_network_io=avio_alloc_context(buffer,bytes,0,nullptr,network_read,nullptr,network_seek);
+        if(!g_network_io) {
+            av_free(buffer); close();
+            copy_text(why,why_cap,"Network open failed. Check address and login in Local network.");
+            return false;
+        }
+        g_fmt->pb=g_network_io;
+        g_fmt->flags|=AVFMT_FLAG_CUSTOM_IO;
+    }
     const int opened = avformat_open_input(&g_fmt, path, input_hint, nullptr);
     if (opened < 0)
     {
@@ -973,6 +1000,12 @@ void close() noexcept
         av_freep(&g_torrent_io->buffer);
         avio_context_free(&g_torrent_io);
     }
+    if(g_network_io) {
+        av_freep(&g_network_io->buffer);
+        avio_context_free(&g_network_io);
+    }
+    network::close(g_network_input);
+    g_network_input=nullptr;
     g_torrent_input = nullptr;
     g_torrent_offset = 0;
     g_peer_buffering = false;
@@ -1130,19 +1163,20 @@ bool seek_locked(double seconds) noexcept
 {
     g_seek_picture = -1;
     const int64_t ts = static_cast<int64_t>(seconds * static_cast<double>(AV_TIME_BASE));
-    if (g_torrent_input)
+    if (g_torrent_input || g_network_input)
     {
-        g_torrent_io->error = 0;
-        g_torrent_io->eof_reached = 0;
+        auto *io=g_torrent_io?g_torrent_io:g_network_io;
+        io->error = 0;
+        io->eof_reached = 0;
         g_reading_packet = true;
         pthread_mutex_unlock(&g_lock);
     }
     const int result = av_seek_frame(g_fmt, -1, ts, AVSEEK_FLAG_BACKWARD);
-    if (g_torrent_input)
+    if (g_torrent_input || g_network_input)
     {
         pthread_mutex_lock(&g_lock);
         g_reading_packet = false;
-        record_decode(result >= 0 ? "torrent seek complete" : "torrent seek failed",
+        record_decode(result >= 0 ? "input seek complete" : "input seek failed",
                       static_cast<int>(seconds), result, 0);
     }
     if (result >= 0)
@@ -1180,7 +1214,7 @@ void seek(double seconds) noexcept
         return;
     if (seconds < 0)
         seconds = 0;
-    if (g_torrent_input)
+    if (g_torrent_input || g_network_input)
     {
         g_pending_seek.store(seconds, std::memory_order_relaxed);
         return;
@@ -1234,7 +1268,7 @@ bool select_audio_track(int stream) noexcept
 #ifdef MOVIAN_HAVE_FFMPEG
     pthread_mutex_lock(&g_lock);
     bool selected = false;
-    if (g_fmt && !g_torrent_input && !g_ended && stream >= 0 &&
+    if (g_fmt && !g_torrent_input && !g_reading_packet && !g_ended && stream >= 0 &&
         static_cast<unsigned>(stream) < g_fmt->nb_streams &&
         g_fmt->streams[stream]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
     {

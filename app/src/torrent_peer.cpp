@@ -3,6 +3,7 @@
 #include "diagnostics.hpp"
 #include "paths.hpp"
 #include "plugin_http.hpp"
+#include "input_file.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -92,15 +93,10 @@ bool sha1(const void *data, std::size_t size, unsigned char (&hash)[20])
 
 char *read_peer_info(const char *descriptor, PeerInfo &info, unsigned char (&hash)[20])
 {
-    struct stat st{};
-    if (stat(descriptor, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > 1024 * 1024)
-        return nullptr;
-    const auto size = static_cast<std::size_t>(st.st_size);
-    auto *data = static_cast<char *>(std::malloc(size));
-    auto *file = data ? std::fopen(descriptor, "rb") : nullptr;
-    const bool ok = file && std::fread(data, 1, size, file) == size &&
+    std::size_t size = 0;
+    auto *data = input::read_bounded(descriptor, 1024 * 1024, size);
+    const bool ok = data &&
                     peer_info(data, size, info) && sha1(info.info, info.info_size, hash);
-    if (file) std::fclose(file);
     if (!ok)
     {
         std::free(data);
@@ -1117,6 +1113,9 @@ bool download(const char *descriptor, const char *address, char (&path)[384],
         return fail(error, error_size, "Unsupported single-file v1 torrent");
     if (!address[0])
         configure_trackers(info, MOVIAN_DATA_DIR "/trackers.txt", options.retrackers);
+    filter_trackers(info, options.tracker_protocols);
+    diagnostics::record("torrent", "effective trackers=%d protocols=%u private=%d",
+                        info.tracker_count, static_cast<unsigned>(options.tracker_protocols), info.private_torrent);
     std::memcpy(path, info.file.path, sizeof path);
     if (info.stream_only)
     {

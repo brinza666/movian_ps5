@@ -1,3 +1,340 @@
+# Active v60 implementation — 2026-11-23
+
+Current request authorizes the STPP property server, shared callbacks, native
+WSL acceptance, PS5 integration, one-shot title-access experiment, fresh test
+plugins/config after verified backup, console backup cleanup and GitHub release.
+This supersedes older no-lift/preserve-plugin instructions below for this test.
+Read docs/STPP_V60.md, docs/STPP_V60_NATIVE.md and docs/STPP_TITLE_ACCESS.md first.
+Active branch test/native-playback in movian_ps5-playback-publish. Preserve media
+and production PPSA99455. No webcam/Chiaki. DNS/Avanpost remains deferred.
+
+Final v60 ZIP: build/PPSA99456-v60.zip, 7,706,570 bytes,
+SHA73b8b7a940703cf24abe6668ee53368ed74a451096b6c82c5e3b8421d419ef19.
+Eboot SHA7befb1d484baf4173beeda810d7950dc5807542802ecea0c255d450b40dab7e3.
+Final core sanitizer/socket and shared-UI/native WSL tests passed; signed package
+integrity passed. Next unfinished test is PS5 upload/mount/startup/access.
+Console went offline before staging; v59 still installed. PC backups are in
+D:/GPTDEEP/PS5-Movian-Backups/2026-11-23 (28 removed console folders,44 packages,
+closed verified profile). Fresh reset is prepared, not executed on PS5.
+
+The host actualUI server (finalcore) listens loopback42011 with disposable profile
+build/ui-stpp-final/native-serve. WSL viewer HTTP42000, native connection via
+recording proxy42010. Rediscover ports/processes rather than assume PIDs survive.
+Raw evidence/backup manifests are private/ignored. No per-console request file
+is packaged; provision only after the saved closed-profile backup is verified.
+
+# Current priority: native Movian remote control — 2026-11-23
+
+User explicitly deferred DNS/Avanpost work. Do not continue it or repeat the DNS
+question until asked. New priority is WSL Movian controlling another Movian,
+then implementing the same mechanism on PS5 so tests can run without controller
+hand-offs. Read docs/REMOTE_CONTROL_STPP.md, docs/STPP_ARTIFACT_FINDINGS.md and
+latest PORT_LOG.md first. Keep sandbox-lift out; preserve plugins, private
+settings and all uncommitted work. No webcam or Chiaki control.
+
+Actual research DONE: WSL M7 7.0.273 Local network discovered matv (live Android
+7.0.289); type movian, stpp:id:<id>, direct stpp://<peer>:<port>. WSL HTTP port
+is currently 44456, not 42000. Peer/ID details stay in ignored captures. Real
+STPP controls opened Settings and KinoZal.TV; changed Show filename extensions
+1→0→1 with independent HTTP verification; Back restored navigation. Live clock
+and log additions were pushed, and unsubscribe stopped updates. Final state
+is WSL directly connected to matv and Android showing KinoZal.TV.
+
+New tracked files: scripts/movian_stpp.py (host client/codec),
+tests/stpp_protocol.py (six passing wire tests), docs/REMOTE_CONTROL_STPP.md,
+docs/STPP_ARTIFACT_FINDINGS.md. Added wire test to scripts/self-check.sh and
+acceptance rows in SPEC.md. The reusable Client was verified against the actual
+TV for subscription/unsubscription and navigation/Back. Optional network package
+websocket-client==1.8.0 is installed under ignored build/remote-control-rea/vendor;
+codec tests need no dependency. No native PS5 source change/package was made in
+this remote-control investigation. Current PS5 remains v59/hash recorded below.
+
+Raw evidence: build/remote-control-rea. Native WebSocket handshake is legacy:
+GET /api/stpp; Connection Upgrade; Upgrade websocket; Sec-WebSocket-Key: 1;
+no Host or WS version. Binary STPP hello 00 03 00; server 00 03 +16-byte ID+00.
+Root ref0 is exposed global tree. Subscribe opcode1: LE32 sub ID, LE32 base,
+LE16 flags, byte-length-prefixed path (native sender omits terminator). Embedded
+addresses terminate path with00. Notify opcode4 includes subtype+sub ID. Int
+write opcode3 address+01+LE32 signed value. Event5 OpenURL type14/mask1/string
+to navigators/current/eventSink; Back type1/action name worked. Exported child
+references are per-connection; do not reuse after reconnect. See full layouts,
+remaining unknown subtypes/flags and artifact limitations in reports.
+
+Live discovery: 88-byte STPP UDP to 239.255.255.250:42000; opaque ID @4,
+version3 @20, flags3 @21, big-endian HTTP port @22, name @24 and text @56.
+Unicast replies use server source port42000 and peer ephemeral destination.
+The 44456 WSL HTTP port was correctly advertised. Static bit meanings are not
+fully live-tested. All PCAPs/IDs and app raw data stay ignored/private.
+
+REA packet work runs inside WSL with Node24.11.1 locally extracted under
+build/remote-control-rea/tools/node, checksum verified from official Node
+SHASUMS, and Windows-installed REA scripts at
+/mnt/c/Users/brinza/AppData/Roaming/npm/node_modules/rea-agents/scripts/rea.mjs.
+WSL tcpdump/tshark installed. Root is available via wsl -u root; no sudo password
+or MCP registration was changed. REA evidence IDs and exact limitations are in
+REMOTE_CONTROL_STPP.md. Native action/discovery coverage complete; initial
+connection capture partial. Windows Ghidra rejects ELF, so artifact protocol
+semantics were supplemental GNU disassembly, not REA decompilation. Helper
+agent stpp_artifact completed its static report without runtime/source edits.
+
+NEXT unfinished acceptance (part1 of documented three-part plan): implement
+compatible STPP server/property graph in HOST PREVIEW; connect the unmodified
+WSL client and render a Home/Settings page, change/restore one disposable option,
+and confirm pushed state with the independent Python client. Then part2 maps
+shared UI callbacks and safe PS5 transport. Inbound PS5 listener bind currently
+fails error13; use public SDK tests, then an opt-in outbound paired bridge if
+needed, preserving the STPP wire protocol and no sandbox-lift. Part3 covers
+playback/torrents/logs/resources, bounded queues/reconnect/gap recovery and agent
+tool integration. STPP only controls a running app; relaunch needs a separate
+supported path. Android screenshot endpoint404 and pixel/audio mirroring not
+validated, so do not promise STPP alone sees the hardware video pixels.
+
+No CUA app input was sent: Movian window was minimized and binding failed;
+protocol/API work achieved the observations. Do not resume Chiaki. Scoped
+packet captures are complete; transparent proxy was temporary and WSL was
+restored to the direct matv endpoint. Do not reuse an expired recording proxy
+as the target. Current connection and exact private endpoint are recorded in
+build/remote-control-rea/final-state-private.json.
+
+---
+
+# Historical v59 playback continuation
+
+# Current v59 continuation — 2026-11-23
+
+Active checkout C:/Users/brinza/Documents/deep/movian_ps5-playback-publish,
+branch test/native-playback, base b2265f5. Preserve all uncommitted v54–v59
+work, installed plugins and private settings. No sandbox-lift. No webcam or
+Chiaki control. Latest published release remains v53; no new release was asked
+for during this continuation.
+
+v59 is activated and mounted at /data/homebrew/PPSA99456. User confirmed Close
+Game before replacing v58. Activation.json and mount-result.json are under
+build/v59-console; mount returned HTTP 200/status 0. Old v58 rollback is outside
+homebrew. Signed archive build/PPSA99456-v59.zip SHA-256:
+b54442548d0689e75e99c53ff52fa4564c43a21bb40eacb3c2ca7f4743b4b5bf.
+All 23 files were readback-verified byte for byte via FTP 2121 and chmod 777.
+Startup main/fonts/pad/UI is confirmed in live logs.
+
+Read docs/NETWORK_V59.md and the latest PORT_LOG.md section. v58 SMB ZIP install
+and FTP ZIP install/torrent file-list opening are user-confirmed. Existing logs
+support imports, but the most recent confirmations do not have separate freshly
+timestamped protocol traces. Plugin directory entries remained 14 before/after;
+no installed plugin removal or private config overwrite occurred.
+
+v59 changes native HTTP/DNS pool startup to call process-wide mutex-protected
+sceNetInit, adds exact native HTTP failure stages, and implements the observed
+WSL Tracker protocols chooser: TCP & UDP / TCP / UDP, persisted and passed into
+the effective tracker filter. Source additions include network_runtime.hpp and
+tests/plugin_http_native.cpp. Full self-check and shared-source UI harness passed.
+No cache/peer-engine rewrite or memory increase was made. See NETWORK_V59.md
+for the exact desktop ranges and still-unimplemented differences.
+
+The Avanpost/public-hostname problem remains. Native init returns 0/ready, but
+HTTP fails specifically at send request with 0x8041013d; UDP tracker DNS fails;
+DHT bootstrap has zero nodes. No public-torrent peer/verified piece was supplied.
+The initial native-init fix did not resolve these hostname requests.
+
+A corrected numeric-IP control PASSED ON PS5: tracker status 200, one peer,
+RAM cache=0 and 2,654,208-byte allocation for 2,640,741-byte HEVC media. Hardware
+1920x1080 HEVC first frame and 48 kHz PCM began before transfer completion;
+all 162 blocks/2,640,741 bytes were served and verified. Decoder EOF reached
+180 hardware frames; audio drain submitted 288,768/nonzero 288,108/dropped 0/
+result 0. Audibility still requires user confirmation. This is the small-file
+contiguous RAM path, not a 19.1 GB rolling-cache/seek pass.
+
+The numeric descriptor is /data/movian/movian-v59-http-probe.torrent, file row
+HEVC-1080p-v59-probe.mp4. Only small metainfo was uploaded to storage; payload
+comes from the laptop. BitTorrent root needs Triangle refresh after uploading
+new descriptors. The old local movian-v22 fixture playing is not this probe.
+
+Important fixture correction: build/v58-console/serve-peer.py uses fixed ports
+which Windows now rejects (WinError 10013). Do not reuse that broken server.
+Use build/v59-console/probe-peer.py: it binds available ports dynamically,
+records probe-fixture.json and rewrites the descriptor. On restart, upload the
+new descriptor with FTP, readback-check it and refresh the UI. Current session
+5180 runs the controlled peer/tracker for up to 15 minutes (ports were 60884 HTTP
+and 60885 peer for this run). Restart if expired. Do not count local host probes
+as PS5 evidence.
+
+Console success evidence was frozen BEFORE the WSL probe in
+build/v59-console/probe-success. Live FTP capture session 42246 writes
+build/v59-console/capture (15-minute bound; restart if needed). Sandbox log path
+is /mnt/sandbox/download/PPSA99456, sometimes absent briefly around startup.
+Alternate /mnt/sandbox/PPSA99456_000/download0. TCP diagnostics bind is still
+rejected with error 13, so use FTP fallback; klog 3232 is reachable again.
+
+Reference comparison: installed WSL M7 hash still matches retained REA identity
+(see NETWORK_V59.md). Captured live BitTorrent settings/options under ignored
+build/v58-investigation/wsl-*. With the corrected numeric fixture, WSL opens a
+video file list using torrentfile://, then pauses for buffering and media time
+advances 0.833 to 3.367 seconds in play state. No independent reference visual,
+audible or seek pass was obtained. The first WSL attempt failed because the
+fixed-port seed never started. Three public bootstrap names resolve on WSL.
+
+NEXT unfinished acceptance: isolate/fix PS5 hostname resolution, then retest
+Avanpost in RAM without changing its cache/peer policy during the network test.
+A pending async question asks for the PS5 primary/secondary DNS and whether they
+form part of update blocking (Settings → Network → Connection Status → View
+Connection Status). No reply yet. No system DNS/registry/network settings were
+changed. The numeric control shows native HTTP and hardware work; it does not
+by itself distinguish bad console DNS from a native-resolver adapter defect.
+If DNS settings are sound, add native DNS stage/result diagnostics to distinguish
+pool/create/start failure, initialize the DHT/UDP resolver through the same helper
+(it currently has its own pool creation path), and use the public SDK/TorrServer
+references rather than inventing a new torrent stack. Respect any update-blocking
+setup. Keep all credentials, media paths and tracker URLs out of tracked evidence.
+
+---
+
+# Historical v58 continuation
+
+# Current v58 network-import continuation — 2026-11-23
+
+Active worktree `C:/Users/brinza/Documents/deep/movian_ps5-playback-publish`,
+branch `test/native-playback`, base `b2265f5`. Preserve all uncommitted v54–v58
+changes, installed plugins and private settings. No sandbox-lift. Do not use
+the webcam or resume Chiaki control. The latest published release remains v53.
+
+The user separately confirmed SMB and FTP browsing/playback, sound and seeks
+on v57. Read [Network v58](NETWORK_V58.md) for exact log coverage and limits;
+do not promote these reports to an independently measured FTP 1080p HEVC EOF
+pass or an Avanpost pass.
+
+v58 source is complete, full self-check and UI fixture tests passed, and the
+signed package is `build/PPSA99456-v58.zip`, SHA-256
+`ca72e93f24777fe93db15d6f4fa9fc0a75b5757e7473612af1d78df4078cda13`.
+It adds authenticated network ZIP/torrent reads (8 MiB/1 MiB caps), worker
+previews and dismissal, remote ZIP install, and saved server roots in the
+ZIP picker. Payload cache policy is unchanged. New imports are host-tested,
+not yet PS5-tested. New bounded input and service regressions are in `tests/`.
+The host UI harness additionally completed hash-verified RAM peer transfers
+from both remote descriptors. Its 100-byte fixture is an input/transfer test,
+not hardware playback. Runner: `build/v58-ui/peer-test.py` (seed service exited).
+
+All 23 files were uploaded to a staging folder **outside** homebrew with
+execute permissions and byte readback checks, through FTP **2121**. The exact
+folder is in ignored `build/v58-console/staging-path.txt`, verification in
+`staging-verification.json`, staging helper `stage.py`, matching `reference.elf`.
+The user confirmed Close Game. v58 is now active at
+`/data/homebrew/PPSA99456` and mounted (HTTP 200, status 0). The staging path
+was renamed into place and no longer exists. The prior v57 rollback location
+is recorded in `build/v58-console/activation.json`. Installed metadata is
+`01.000.058`; ShadowMount catalog version 47 is stale. Persistent plugins and
+download0 were untouched. A pending question asks the user to open v58,
+confirm the footer and RAM cache, and remain on Home. No v58 startup or
+console import test is verified yet. Live FTP capture is session 16700,
+`build/v58-console/capture.py`, output `capture/` (15-minute bounded run).
+
+Next unfinished acceptance: on v58, browse a configured SMB folder, inspect
+and install a known API v2 ZIP, then open its `.torrent` and start the existing
+peer path with RAM selected. Repeat over FTP as a separate check. Controlled
+host fixtures are under ignored `build/v55-console/media/Imports`; existing
+read-only fixture services still run on workstation SMB2 1445 and FTP 21219.
+Do not overwrite the user's saved network config.
+New controlled fixture files are `Imports/movian-network-v58.zip` (distinct
+API v2 plugin ID) and `Imports/movian-v58-ram-playback.torrent` (actual bundled
+1080p HEVC media). Seed/tracker helper `build/v58-console/serve-peer.py` is
+running in session 42144 for up to 15 minutes on ports 49168/49169; it accepts
+only this private fixture. Start it again if expired. This is prepared test
+infrastructure, not evidence of a PS5 transfer. First ask whether the user
+can reach the fixture share or will use known ZIP/torrent files on their own
+configured server; do not replace their saved connections. Raw v57 evidence is in
+`build/v57-live` and `build/v58-console/v57-*`. Remote diagnostics bind is
+denied on PS5; use FTP `/mnt/sandbox/download/PPSA99456` logs while running.
+
+Network discovery is deliberately later work. WSL M7's `discovered:` page
+showed five server rows with SMB2 URLs; one selection stayed loading. REA
+identity and private raw property captures are in `build/v58-wsl-network`.
+Do not use old andoma Git code. The follow-up plan and evidence limitations
+are in [Network v58](NETWORK_V58.md) and [UI work list](UI_WORK_LIST.md).
+
+---
+
+# Historical v57 continuation — 2026-11-23
+
+The installed and running test version is `01.000.057`, verified through FTP
+2121. v57 removes the null `arc4random_buf` import which crashed v56 while
+initializing SMB. Both SMB and FFmpeg now use the existing `kern.arandom`
+adapter. Self-check, signed build, 23-file readback and mount passed. Archive
+`build/PPSA99456-v57.zip` has SHA-256
+`d1f7315a300db9691a9b4d7430dd4ce1ea671b203b5f2fd99f781542ea1d3d94`.
+
+**The user has stopped webcam-photo testing. Do not capture more camera frames.**
+A different visual approach will be supplied later. Continue with FTP logs and
+controller observations. Do not resume Chiaki computer control either.
+
+Latest logs are under `build/v57-live`. They show v57 starts and opens network
+media, plus hardware H.264 decoding. A fresh, protocol-specific 1080p HEVC
+playback and seek run is pending. The user has been asked to run SMB first,
+with the clip name, server number, audible sound and any error reported.
+Read-only fixture services still answer at workstation `192.168.10.29`, SMB2
+1445 and FTP 21219; preserve the user's configured servers and plugins.
+
+---
+
+# Current console and camera state — 2026-11-22
+
+The active test title is now v56 (`01.000.056`), uploaded through FTP **2121**.
+v55 was uploaded and mounted but crashed during the initial clock render.
+v56 restores the earlier time conversion and uses bounded clock formatting;
+its full self-check passed, the upload was verified, and the user confirmed
+Home. The camera now also shows Movian Home on the physical TV.
+
+The v56 archive is `build/PPSA99456-v56.zip`, SHA-256
+`0c8c3f7e488d5e3d2b38a976b2987c7a52e7228c7ee7ada1c2a7d27edcc4bffb`.
+The user reported SMB and FTP picture, sound and seeking, but the collected
+hardware trace currently proves the bundled local clip only. Continue with
+network correlation before claiming an independently verified hardware pass.
+Decoder output is `/download0/hevc-test-decode.log`. While running, the title's
+FTP-accessible data path is `/mnt/sandbox/download/PPSA99456`. Diagnostics TCP
+bind is denied with error 13, so use the FTP fallback. Preserve installed plugins.
+
+For visual feedback use [the local camera helper](PS5_CAMERA.md). Windows
+Python `C:/Python314/python.exe scripts/ps5-camera.py` captures the RGB webcam
+with MJPG at 1280x720 to ignored `build/camera/latest.png`. Capture only during
+requested TV tests and stop while the user is positioning the laptop. Computer
+Use through Chiaki was stopped by the user; do not resume that route without
+a new request. Camera capture was separately authorized and is working.
+
+Read [the port log](PORT_LOG.md) for deployment, crash and camera evidence.
+The older v55 state below is historical. Preserve all uncommitted changes.
+
+---
+
+# Current UI and network handoff — 2026-11-22
+
+Active checkout `C:/Users/brinza/Documents/deep/movian_ps5-playback-publish`, branch
+`test/native-playback`, base commit `b2265f5`. Uncommitted v54 Settings and v55
+network changes are present and must be preserved. The local signed packages
+are `build/PPSA99456-v54.zip` and `build/PPSA99456-v55.zip`. The latest published
+release is v53. Read [STATUS](STATUS.md), [the port log](PORT_LOG.md),
+[Network v55](NETWORK_V55.md) and [the UI work list](UI_WORK_LIST.md) first.
+
+v55 implements saved SMB2/FTP connections, login, background directory listing,
+seekable player input and an authenticated FTP server. Host service, UI/player
+and full self-check results passed. Console FTP 2120 is unavailable while
+ShadowMount is reachable, so v55 remains unuploaded and console playback is
+unverified. Next is a real SMB2 and FTP hardware playback/seek run after upload.
+Keep sandbox-lift excluded and preserve installed plugins. Dependency scripts
+pin libsmb2 and FFmpeg and contain the PS5 socket/address adaptations.
+
+Local test evidence, commands, screenshots and REA bundles are under
+`build/v55-wsl-network`. WSL Movian is `/usr/bin/showtime` on Ubuntu-24.04;
+its diagnostics and the host diagnostics test both use TCP 42000. Stop the
+verified desktop executable before full self-check and restore it afterward.
+The desktop reference evidence covers Network settings and FTP authentication;
+controlled desktop fixture listing did not complete. Source paths and further
+limitations are recorded in Network v55. No old andoma Git source was used.
+
+Verified v55 archive SHA-256 is `2959ab59c5c6062bda94414783a2a97e6f5524ba6539dee533ba2e54e33390b5`. The final REA package bundle is
+`build/v55-wsl-network/package-verified-rea.json`. Earlier package bundles in
+that evidence folder precede the final socket/address dependency rebuild.
+
+---
+
+## Historical playback handoff
+
 # Movian PS5 playback test handoff
 
 Updated 2026-11-21. Release tag `playback-test-v15` and branch

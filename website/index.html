@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Movian for PlayStation 5</title>
-  <meta name="description" content="Native PS5 port of the Movian media center. ShadowMountPlus title PPSA99455, following VLC for PS5.">
+  <meta name="description" content="Native C++20 Movian for PS5. PPSA99456 playback tests, SMB2/FTP and STPP remote-control development.">
   <style>
     :root {
       --bg: #0b0d10;
@@ -71,55 +71,79 @@
   <header>
     <img src="icon0.png" alt="Movian icon">
     <p>
-      <span class="badge">Phase 2 MPEG-1</span>
-      <span class="badge">PPSA99455</span>
+      <span class="badge">Native playback tests</span>
+      <span class="badge">PPSA99456</span>
       <span class="badge">GPL-3.0-or-later</span>
     </p>
     <h1>Movian for PlayStation 5</h1>
     <p class="lead">
-      A native home-screen port of the Movian media center. Same product as
-      M7 on PS3 and <a href="https://github.com/czz/movian-go">movian-go</a>
-      on the desktop; same packaging as
+      A native C++20 home-screen port of the Movian media center, informed by
+      the installed WSL M7 build and captured runtime evidence, with folder-title packaging following
       <a href="https://github.com/ZiZc3/VLC">VLC for PS5</a>.
     </p>
   </header>
   <main>
     <section>
-      <h2>Status</h2>
-      <p>
-        The live tree is an honest DualSense shell, a Videos file browser
-        for <code>/download0</code>, <code>/data/movian</code>, and USB, and
-        software MPEG-1 playback. H.264/FFmpeg, torrents, and the plugin host
-        are the next phases — they are <strong>not</strong> in this binary.
-        Earlier GitHub trees over-claimed those features; that code is archived.
-      </p>
+      <h2>Latest preview: v60 — STPP remote control</h2>
+      <p>The signed <strong>v60</strong> package, title <code>PPSA99456</code>, adds
+        a compatible property server and shared Home/Settings callbacks. Unmodified WSL
+        Movian rendered the interface and changed/restored a persisted setting.</p>
+      <p><strong>PS5 v60 startup and transport are pending.</strong> The console went
+        offline before upload. This is a host-tested preview; v59 remains the last
+        installed and startup-verified console build.</p>
+      <p><a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60">v60 release notes and assets</a>
+        · <a href="https://github.com/brinza666/movian_ps5/releases/download/playback-test-v60/PPSA99456-v60.zip">Download v60 ZIP</a>
+        · <a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53">Previous v53 release</a></p>
+      <p class="subtle">ZIP: 7,706,570 bytes. SHA-256<br>
+        <code>73b8b7a940703cf24abe6668ee53368ed74a451096b6c82c5e3b8421d419ef19</code></p>
+      <h2>Development after v53</h2>
+      <p>v54–v59 add expanded settings, authenticated SMB2/FTP browsing and seekable playback,
+        plugin ZIP/torrent imports from shares and tracker protocol controls. The user confirmed
+        SMB and FTP playback, sound and seeks on v57, and network imports on v58.</p>
+      <p><strong>v59 is the last installed and startup-verified console build.</strong>
+        A small numeric-IP torrent completed a verified RAM transfer and 180 HEVC 1080p
+        hardware frames through EOF. Hostname-based tracker/DHT discovery remains unresolved;
+        sustained feature-length torrent playback and rolling-cache seeks remain open.</p>
+      <p>v60 includes optional one-shot title-access and fresh-profile reset support.
+        Public ZIPs contain no authorization requests and do not erase profiles on installation.
+        Discovery, complete settings/dialog controls, artwork, screenshots and autonomous relaunch
+        remain separate implementation steps.</p>
+      <p><a href="https://github.com/brinza666/movian_ps5/tree/test/native-playback">Development branch and current instructions</a>
+        · <a href="https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/REMOTE_CONTROL_STPP.md">STPP findings</a></p>
     </section>
     <section>
-      <h2>Get the source</h2>
-      <pre>git clone https://github.com/brinza666/movian_ps5.git
+      <h2>Build and install</h2>
+      <pre>git clone --branch test/native-playback https://github.com/brinza666/movian_ps5.git
 cd movian_ps5
-# WSL2 Ubuntu 24.04
+# WSL2 Ubuntu 24.04, public SDK and starter kit provisioned
+# Set PS5_PAYLOAD_SDK, PS5_STARTER and PS5_HOST for your setup
 bash scripts/doctor.sh
+bash scripts/build-ffmpeg-ps5.sh
+bash scripts/self-check.sh
 bash app/build.sh</pre>
-      <p>
-        New contributors and AI sessions: read
-        <a href="https://github.com/brinza666/movian_ps5/blob/main/docs/NEW_SESSION.md">docs/NEW_SESSION.md</a>.
-      </p>
+      <p>Close the test title, upload the complete <code>build/app/PPSA99456</code>
+        folder to <code>/data/homebrew/PPSA99456</code> through the console FTP server,
+        verify its files, then scan/mount through ShadowMountPlus and launch the icon.
+        Persistent settings/plugins survive an app-folder replacement.</p>
+      <p>The isolated test title <code>PPSA99456</code> and production title
+        <code>PPSA99455</code> have separate folders and profiles. Follow the
+        <a href="https://github.com/brinza666/movian_ps5/blob/test/native-playback/README.md">README</a>
+        for requirements, mounting, host/console checks and remote-controller usage.</p>
     </section>
     <section>
       <h2>How it ships</h2>
       <div class="grid">
         <div class="card">
           <h3>Native title</h3>
-          <p>Signed <code>eboot.bin</code> in <code>/data/homebrew/PPSA99455</code>, launched from the PS5 home screen via ShadowMountPlus.</p>
+          <p>Signed <code>eboot.bin</code> in <code>/data/homebrew/PPSA99456</code>, launched from the PS5 home screen via ShadowMountPlus.</p>
         </div>
         <div class="card">
-          <h3>Not a Go ELF</h3>
-          <p>Stock Go freebsd/amd64 dies before <code>main</code> on this userland. movian-go remains the behaviour reference.</p>
+          <h3>Native C++20</h3>
+          <p>FFmpeg and platform hardware decoding feed the native player. Desktop behavior is checked against the installed M7 build and retained evidence.</p>
         </div>
         <div class="card">
-          <h3>Not port 9021</h3>
-          <p>Payloads are a different file. Do not send <code>eboot.bin</code> to elfldr.</p>
+          <h3>Home-screen launch</h3>
+          <p>Use the complete signed title folder with ShadowMountPlus. Port 9021 is a separate payload-loader path; do not send <code>eboot.bin</code> there.</p>
         </div>
       </div>
     </section>

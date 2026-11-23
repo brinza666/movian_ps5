@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "plugin_http.hpp"
+#include "network_runtime.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -55,7 +56,7 @@ struct Request
 
 bool valid_header(const Header &header, bool tls)
 {
-    if (!header.name[0] || std::strpbrk(header.name, " :\t\r\n") ||
+    if (!header.name || !header.value || !header.name[0] || std::strpbrk(header.name, " :\t\r\n") ||
         std::strpbrk(header.value, "\r\n") ||
         !strcasecmp(header.name, "Host") || !strcasecmp(header.name, "Content-Length") ||
         !strcasecmp(header.name, "Transfer-Encoding"))
@@ -75,6 +76,9 @@ int http_request(const char *url, bool post, const Header *headers, int count,
                  const char *payload, std::size_t length, char *body,
                  std::size_t capacity, HttpResponse &response) noexcept
 {
+    response = {};
+    if (!url || !body || !capacity || count < 0 || count > 32 ||
+        (count && !headers) || (length && !payload)) return -1;
     const bool tls = std::strncmp(url, "https://", 8) == 0;
     if ((!tls && std::strncmp(url, "http://", 7)) || std::strpbrk(url, "\r\n\t ") ||
         (post && !tls))
@@ -85,27 +89,35 @@ int http_request(const char *url, bool post, const Header *headers, int count,
         return -1;
     const auto deadline = now_ms() + 8000;
     Request req;
-    int result = req.pool = sceNetPoolCreate("movian_plugin", 1024 * 1024, 0);
-    if (result >= 0) result = req.ssl = sceSslInit(304 * 1024);
-    if (result >= 0) result = req.http = sceHttpInit(req.pool, req.ssl, 4 * 1024 * 1024);
-    if (result >= 0) result = req.tmpl = sceHttpCreateTemplate(req.http, "Movian/PS5", 2, 0);
+    const char *stage = "net init";
+    auto step = [&](const char *name, int value) { stage = name; return value; };
+    auto failed = [&](int value) {
+        diagnostics::record("http", "stage=%s transport=sce-http tls=%d rc=0x%x status=%d bytes=%zu",
+                            stage, tls, static_cast<unsigned>(value), response.status, response.length);
+        return value;
+    };
+    int result = network::initialize_native();
+    if (result >= 0) result = req.pool = step("pool create", sceNetPoolCreate("movian_plugin", 1024 * 1024, 0));
+    if (result >= 0) result = req.ssl = step("ssl init", sceSslInit(304 * 1024));
+    if (result >= 0) result = req.http = step("http init", sceHttpInit(req.pool, req.ssl, 4 * 1024 * 1024));
+    if (result >= 0) result = req.tmpl = step("template create", sceHttpCreateTemplate(req.http, "Movian/PS5", 2, 0));
     constexpr unsigned timeout = 3000000;
-    if (result >= 0) result = sceHttpSetAutoRedirect(req.tmpl, 0);
-    if (result >= 0) result = sceHttpSetResolveTimeOut(req.tmpl, timeout);
-    if (result >= 0) result = sceHttpSetConnectTimeOut(req.tmpl, timeout);
-    if (result >= 0) result = sceHttpSetSendTimeOut(req.tmpl, timeout);
-    if (result >= 0) result = sceHttpSetRecvTimeOut(req.tmpl, timeout);
-    if (result >= 0 && tls) result = sceHttpsEnableOption(req.tmpl, 0xbd);
-    if (result >= 0) result = req.connection = sceHttpCreateConnectionWithURL(req.tmpl, url, 0);
+    if (result >= 0) result = step("redirect option", sceHttpSetAutoRedirect(req.tmpl, 0));
+    if (result >= 0) result = step("resolve timeout", sceHttpSetResolveTimeOut(req.tmpl, timeout));
+    if (result >= 0) result = step("connect timeout", sceHttpSetConnectTimeOut(req.tmpl, timeout));
+    if (result >= 0) result = step("send timeout", sceHttpSetSendTimeOut(req.tmpl, timeout));
+    if (result >= 0) result = step("receive timeout", sceHttpSetRecvTimeOut(req.tmpl, timeout));
+    if (result >= 0 && tls) result = step("tls options", sceHttpsEnableOption(req.tmpl, 0xbd));
+    if (result >= 0) result = req.connection = step("connection create", sceHttpCreateConnectionWithURL(req.tmpl, url, 0));
     if (result >= 0)
-        result = req.request = sceHttpCreateRequestWithURL(req.connection, post ? 1 : 0, url, length);
+        result = req.request = step("request create", sceHttpCreateRequestWithURL(req.connection, post ? 1 : 0, url, length));
     for (int i = 0; i < count && result >= 0; ++i)
         if (valid_header(headers[i], tls))
-            result = sceHttpAddRequestHeader(req.request, headers[i].name, headers[i].value, 0);
-    if (result >= 0) result = sceHttpSendRequest(req.request, payload, length);
-    if (result >= 0) result = sceHttpGetStatusCode(req.request, &response.status);
+            result = step("request header", sceHttpAddRequestHeader(req.request, headers[i].name, headers[i].value, 0));
+    if (result >= 0) result = step("send request", sceHttpSendRequest(req.request, payload, length));
+    if (result >= 0) result = step("status", sceHttpGetStatusCode(req.request, &response.status));
     if (result < 0)
-        return result;
+        return failed(result);
     char *raw = nullptr;
     std::size_t raw_length = 0;
     if (sceHttpGetAllResponseHeaders(req.request, &raw, &raw_length) >= 0 && raw &&
@@ -114,15 +126,16 @@ int http_request(const char *url, bool post, const Header *headers, int count,
     while (response.length < capacity)
     {
         if (now_ms() >= deadline)
-            return -3;
+            return failed(step("response deadline", -3));
         const int read = sceHttpReadData(req.request, body + response.length, capacity - response.length);
         if (read <= 0)
-            return read;
+            return read < 0 ? failed(step("response read", read)) : read;
         response.length += static_cast<std::size_t>(read);
     }
     char extra;
     const int read = sceHttpReadData(req.request, &extra, 1);
-    return read > 0 ? -2 : read;
+    return read > 0 ? failed(step("response size limit", -2)) :
+           read < 0 ? failed(step("response read", read)) : read;
 }
 #else
 int http_request(const char *, bool, const Header *, int, const char *, std::size_t,

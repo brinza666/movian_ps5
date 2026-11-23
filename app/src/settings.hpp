@@ -8,6 +8,8 @@
 #pragma once
 #include "fs.hpp"
 
+#include <cstddef>
+
 namespace movian::settings
 {
 constexpr int max_path = 383;
@@ -23,10 +25,15 @@ inline constexpr char mprepo_direct_url[] =
 struct Data
 {
     bool resume = true;
+    bool resume_ask = false;
+    bool show_extensions = true;
+    bool playback_clock = false;
+    char custom_repo_url[384]{};
     int seek_step = 10; // 5, 10, 30, or 60 seconds
     bool clock_24h = true;
     bool debug_log = true;
     bool remote_diagnostics = false;
+    bool remote_control = true; // Isolated test title; Network settings can disable it.
     bool hw_decode = true; // libSceVideodec2 when the module loads; else software H.264
     bool show_all = false;
     bool auto_next = true;
@@ -45,6 +52,7 @@ struct Data
     unsigned torrent_requests = 16;
     unsigned torrent_block_timeout = 6;
     unsigned torrent_retrackers = 1; // Add configured retrackers
+    unsigned torrent_tracker_protocols = 0; // TCP & UDP, TCP, UDP (WSL order).
 };
 
 struct BrowserPrefs
@@ -71,6 +79,8 @@ void load() noexcept;
 void save() noexcept;
 [[nodiscard]] Data &get() noexcept;
 
+void format_clock(char *dst, std::size_t capacity) noexcept;
+bool set_custom_repo_url(const char *url) noexcept;
 [[nodiscard]] const char *repo_url() noexcept;
 [[nodiscard]] const char *repo_label() noexcept;
 [[nodiscard]] const char *repo_label(int preset) noexcept;

@@ -24,6 +24,15 @@ starter=${PS5_STARTER:-/mnt/c/Users/brinza/Documents/deep/ps5-homebrew-starter}
 home=${PS5_STARTER_HOME:-$HOME/.ps5-starter}
 kit=$home/kit-work
 sdk=${PS5_PAYLOAD_SDK:-$home/ps5-payload-sdk}
+title_access_test=${MOVIAN_TITLE_ACCESS_TEST:-0}
+[[ $title_access_test == 0 || $title_access_test == 1 ]] || {
+    echo "MOVIAN_TITLE_ACCESS_TEST must be 0 or 1" >&2; exit 2;
+}
+title=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \
+    "$here/sce_sys/param.json")
+if [[ $title_access_test == 1 && $title != PPSA99456 ]]; then
+    echo "Title access support is restricted to test title PPSA99456" >&2; exit 2
+fi
 
 [[ -d $starter/kit ]] || {
     echo "starter kit not found: $starter/kit" >&2
@@ -55,8 +64,80 @@ fi
 rm -rf "$kit/movian"
 mkdir -p "$kit/movian/assets/fonts" "$kit/movian/stubs"
 cp -r "$here/src" "$here/sce_sys" "$kit/movian/"
+# STPP uses the public SDK's string implementation. Keep the kit allocation
+# runtime, use pthreads in the server, and discard unused SDK library sections.
+mkdir -p "$kit/movian-cxx"
+for library in libc++ libc++abi libunwind; do
+    cp "$sdk/target/lib/$library.a" "$kit/movian-cxx/${library//+/x}.a"
+done
+python3 - "$kit/tools/build.sh" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); text=p.read_text()
+text=text.replace('--eh-frame-hdr \\\n', '--eh-frame-hdr --gc-sections \\\n')
+if '--eh-frame-hdr --gc-sections -L' not in text:
+    text=text.replace('--eh-frame-hdr --gc-sections',
+                      '--eh-frame-hdr --gc-sections -L "$sdk_root/target/lib"')
+# Resolve existing platform C/ABI symbols before taking SDK archive members.
+# This matches the public SDK's application link order and avoids pulling a
+# separate unwinder into the kit's entry/runtime.
+tail='--as-needed "${stub_paths[@]}" "$sdk_root"/target/lib/*.so'
+if tail+' "$root"/movian-cxx' not in text:
+    text=text.replace(tail,tail+' "$root"/movian-cxx/libcxx.a "$root"/movian-cxx/libcxxabi.a "$root"/movian-cxx/libunwind.a')
+needle='ninja_edge LINK "$build/llvm-pie.elf"'
+if 'ninja_inputs+=("$root"/movian-cxx/libcxx.a' not in text:
+    text=text.replace(needle,'ninja_inputs+=("$root"/movian-cxx/libcxx.a "$root"/movian-cxx/libcxxabi.a "$root"/movian-cxx/libunwind.a)\n'+needle)
+p.write_text(text)
+PY
+# Console-only authorization files must never enter the public title or ZIP.
+if find "$here/sce_sys" "$here/assets" -type f \
+    \( -name 'stpp-title-access-test.request' -o -name 'stpp-fresh-profile.request' \) \
+    -print -quit 2>/dev/null | grep -q .; then
+    echo "Remove console-only STPP request files from packaged assets" >&2; exit 2
+fi
 cp "$here/fonts/"* "$kit/movian/assets/fonts/"
 [[ ! -d $here/assets ]] || cp -r "$here/assets/." "$kit/movian/assets/"
+
+if [[ $title_access_test == 1 ]]; then
+    client=$kit/movian/src/starter_elevation
+    mkdir -p "$client/src"
+    cp "$starter/kit/examples/sandbox-elevation/elevation.hpp" \
+       "$starter/kit/examples/sandbox-elevation/protocol.hpp" "$client/"
+    cp "$starter/kit/examples/sandbox-elevation/src/elevation.cpp" "$client/src/"
+    # The installed builder's fork URL is unavailable. Retain its pinned SDK,
+    # logging header, protocol and manifest checks; replace source acquisition
+    # with the reviewed exact-commit primary archive and its SHA-256.
+    python3 - "$starter/kit/tools/build-lapy-helper.py" "$kit/tools/build-lapy-helper.py" <<'PY'
+from pathlib import Path
+import sys
+text = Path(sys.argv[1]).read_text()
+start = text.index("def fetch_lapy():")
+end = text.index("\ndef fetch_sdk():", start)
+replacement = '''def fetch_lapy():
+    archive = CACHE / "lapy-57fcc19b7f57e46c823d6f2a6c6233ebf3288079.zip"
+    download("https://codeload.github.com/mpereiraesaa/PS5-Lapy-JB-Daemon/zip/" + LAPY_COMMIT,
+             archive, "c87cf02eceb1c004461f268de9657f7f17a367a4bbf3acfa2c6b7f86c90ae152")
+    prefix = "PS5-Lapy-JB-Daemon-" + LAPY_COMMIT
+    with zipfile.ZipFile(archive) as source:
+        for member in source.infolist():
+            parts = Path(member.filename).parts
+            if not parts or parts[0] != prefix or ".." in parts:
+                raise RuntimeError("unexpected pinned Lapy archive member")
+            if member.is_dir():
+                continue
+            target = LAPY.joinpath(*parts[1:])
+            expected = source.read(member)
+            if target.exists():
+                if not target.is_file() or target.read_bytes() != expected:
+                    raise RuntimeError("pinned Lapy source has local changes: " + str(target))
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(expected)
+
+'''
+Path(sys.argv[2]).write_text(text[:start] + replacement + text[end:])
+PY
+fi
 
 duk_archive=$repo/.deps/duktape-2.7.0.tar.xz
 duk_sha=90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890
@@ -129,8 +210,19 @@ PS5_PAYLOAD_SDK=$sdk sh "$kit/tooling/prospero-clang18" -O2 -Wall -Wextra -fPIC 
 ffmpeg_prefix=$repo/.deps/ffmpeg-ps5
 vars=(APP_SOURCE_DIR=movian/src APP_PARAM=movian/sce_sys/param.json
       APP_SCE_SYS=movian/sce_sys APP_ASSETS=movian/assets
+      APP_LAPY_HELPER="$title_access_test"
       APP_IMPORT_STUBS="movian/stubs/libSceCommonDialog.so movian/stubs/libSceSysmodule.so movian/stubs/libSceVideodec2.so movian/stubs/libSceSsl.so")
 definitions="MOVIAN_HAVE_DUKTAPE MOVIAN_HAVE_GUMBO"
+if [[ $title_access_test == 1 ]]; then
+    definitions+=" MOVIAN_TITLE_ACCESS_LAPY"
+    vars+=(APP_WRAP_SYMBOLS="sceSysmoduleLoadModule sceSysmoduleUnloadModule")
+    # Keep the exact reviewed source in the public artifact alongside existing
+    # helper MIT license/manifest and original GPL client headers.
+    python3 "$kit/tools/build-lapy-helper.py" "$title" "$kit/build/lapy-helper/$title"
+    cp "$kit/.deps/lapy/lapy-57fcc19b7f57e46c823d6f2a6c6233ebf3288079.zip" \
+        "$kit/movian/assets/licenses/lapy-source-57fcc19.zip"
+    cp "$starter/kit/THIRD_PARTY_NOTICES.md" "$kit/movian/assets/licenses/starter-notices.txt"
+fi
 if [[ -f $ffmpeg_prefix/lib/libavcodec.a && -f $ffmpeg_prefix/lib/libavformat.a && -f $ffmpeg_prefix/lib/libavutil.a ]]; then
     echo "Linking static FFmpeg from $ffmpeg_prefix"
     rm -rf "$kit/ffmpeg-ps5"
@@ -145,6 +237,16 @@ if [[ -f $ffmpeg_prefix/lib/libavcodec.a && -f $ffmpeg_prefix/lib/libavformat.a 
     vars+=(APP_INCLUDE_PATHS=ffmpeg-ps5/include
            APP_STATIC_ARCHIVES="$archives")
 fi
+smb_prefix=$repo/.deps/smb2-ps5
+if [[ ! -f $smb_prefix/lib/libsmb2.a ]]; then
+    PS5_PAYLOAD_SDK=$sdk bash "$repo/scripts/build-smb2-ps5.sh"
+fi
+mkdir -p "$kit/smb2-ps5"
+cp -a "$smb_prefix/include" "$smb_prefix/lib" "$kit/smb2-ps5/"
+cp "$smb_prefix/LICENSE.txt" "$kit/movian/assets/licenses/libsmb2.txt"
+definitions+=" MOVIAN_HAVE_SMB2"
+vars+=(APP_INCLUDE_PATHS="ffmpeg-ps5/include smb2-ps5/include"
+       APP_STATIC_ARCHIVES="$archives smb2-ps5/lib/libsmb2.a ")
 vars+=(APP_DEFINITIONS="$definitions")
 if [[ -n $deploy_host ]]; then
     make -C "$kit" "${vars[@]}" deploy PS5_HOST="$deploy_host"
@@ -152,8 +254,6 @@ else
     make -C "$kit" "${vars[@]}"
 fi
 
-title=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["titleId"])' \
-    "$here/sce_sys/param.json")
 rm -rf "$repo/build/app"
 mkdir -p "$repo/build/app"
 cp -r "$kit/dist/$title" "$kit/dist/$title.zip" "$repo/build/app/"

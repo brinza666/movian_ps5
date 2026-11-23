@@ -22,7 +22,8 @@ namespace
 {
 constexpr unsigned line_count = 192;
 constexpr unsigned line_size = 200;
-char lines[line_count][line_size]{};
+Entry lines[line_count]{};
+uint64_t last_sequence = 0;
 unsigned next_line = 0;
 unsigned used_lines = 0;
 pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -55,7 +56,7 @@ bool start_fallback() noexcept
         if (fallback)
         {
             for (unsigned i = 0; i < used_lines; ++i)
-                std::fprintf(fallback, "%s\n", lines[(next_line + line_count - used_lines + i) % line_count]);
+                std::fprintf(fallback, "%s\n", lines[(next_line + line_count - used_lines + i) % line_count].text);
             fallback_lines = used_lines;
             std::fflush(fallback);
         }
@@ -173,7 +174,7 @@ void handle(int fd) noexcept
     pthread_mutex_lock(&log_lock);
     for (unsigned i = 0; i < used_lines; ++i)
     {
-        const char *line = lines[(next_line + line_count - used_lines + i) % line_count];
+        const char *line = lines[(next_line + line_count - used_lines + i) % line_count].text;
         const auto bytes = std::strlen(line);
         std::memcpy(snapshot + length, line, bytes);
         length += bytes;
@@ -214,13 +215,16 @@ void record(const char *area, const char *format, ...) noexcept
         if (static_cast<unsigned char>(*c) < ' ') *c = ' ';
 
     pthread_mutex_lock(&log_lock);
-    auto *line = lines[next_line];
+    char line[line_size]{};
     const int prefix = std::snprintf(line, line_size, "%llu [%s] ", millis(), area);
     if (prefix >= 0 && static_cast<unsigned>(prefix) < line_size)
     {
         const auto size = std::min<std::size_t>(std::strlen(message), line_size - prefix - 1);
         std::memcpy(line + prefix, message, size);
         line[prefix + size] = 0;
+        auto &entry = lines[next_line];
+        entry.sequence = ++last_sequence;
+        std::memcpy(entry.text, line, line_size);
         if (fallback)
         {
             if (fallback_lines == line_count)
@@ -241,6 +245,18 @@ void record(const char *area, const char *format, ...) noexcept
         used_lines = std::min(used_lines + 1, line_count);
     }
     pthread_mutex_unlock(&log_lock);
+}
+
+std::size_t copy_entries(Entry *entries, std::size_t capacity) noexcept
+{
+    if (!entries || !capacity) return 0;
+    pthread_mutex_lock(&log_lock);
+    const auto count = std::min<std::size_t>(capacity, used_lines);
+    const auto first = (next_line + line_count - count) % line_count;
+    for (std::size_t i = 0; i < count; ++i)
+        entries[i] = lines[(first + i) % line_count];
+    pthread_mutex_unlock(&log_lock);
+    return count;
 }
 
 bool enable(bool enabled) noexcept

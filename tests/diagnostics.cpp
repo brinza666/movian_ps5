@@ -1,11 +1,13 @@
 #include "diagnostics.hpp"
 
 #include <cassert>
+#include <atomic>
 #include <cstring>
 #include <fstream>
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
 
 namespace
@@ -52,6 +54,19 @@ int main()
     record("decoder", "evicted marker");
     for (int i = 0; i < 220; ++i) record("peer", "piece %d", i);
     record("decoder", "line\nbreak");
+    Entry entries[192]{};
+    assert(copy_entries(nullptr, 192) == 0);
+    assert(copy_entries(entries, 0) == 0);
+    assert(copy_entries(entries, 192) == 192);
+    assert(entries[0].sequence == 31 && entries[191].sequence == 222);
+    assert(std::strstr(entries[191].text, "[decoder] line break"));
+    Entry latest[3]{};
+    assert(copy_entries(latest, 3) == 3);
+    assert(latest[0].sequence == 220 && latest[2].sequence == 222);
+    record("ring", "new record");
+    assert(copy_entries(entries, 192) == 192);
+    assert(entries[190].sequence == latest[2].sequence);
+    assert(std::strcmp(entries[190].text, latest[2].text) == 0);
     assert(enable(true));
     assert(request("GET /api/logfile HTTP/1.1").find("/api/logfile/0") != std::string::npos);
     const auto log = request("GET /api/logfile/0?mode=download HTTP/1.1");
@@ -84,4 +99,28 @@ int main()
     const std::string saved((std::istreambuf_iterator<char>(log_file)), {});
     assert(saved.find("[fallback] record written after TCP bind failed") != std::string::npos);
     close(occupied);
+
+    // A copied record's sequence and text must be one coherent publication even
+    // while the ring wraps repeatedly on another thread.
+    Entry before{};
+    assert(copy_entries(&before, 1) == 1);
+    std::atomic<bool> finished{false};
+    std::thread writer([&] {
+        for (int i = 1; i <= 3000; ++i) record("concurrent", "sequence-offset %d", i);
+        finished = true;
+    });
+    do {
+        const auto count = copy_entries(entries, 192);
+        for (std::size_t i = 0; i < count; ++i) {
+            assert(entries[i].text[199] == 0);
+            if (i) assert(entries[i].sequence == entries[i - 1].sequence + 1);
+            if (entries[i].sequence > before.sequence) {
+                const auto marker = std::string("[concurrent] sequence-offset ") + std::to_string(entries[i].sequence - before.sequence);
+                assert(std::strstr(entries[i].text, marker.c_str()));
+            }
+        }
+    } while (!finished);
+    writer.join();
+    assert(copy_entries(&before, 1) == 1);
+    assert(std::strstr(before.text, "[concurrent] sequence-offset 3000"));
 }

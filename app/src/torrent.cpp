@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "torrent.hpp"
 #include "paths.hpp"
+#include "input_file.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -318,6 +319,22 @@ void configure_trackers(PeerInfo &info, const char *path, RetrackersMode mode) n
     std::fclose(file);
 }
 
+void filter_trackers(PeerInfo &info, TrackerProtocols protocols) noexcept
+{
+    int kept = 0;
+    for (int i = 0; i < info.tracker_count; ++i) {
+        const bool udp = !std::strncmp(info.trackers[i], "udp://", 6);
+        const bool tcp = !std::strncmp(info.trackers[i], "http://", 7) ||
+                         !std::strncmp(info.trackers[i], "https://", 8);
+        if ((udp && protocols != TrackerProtocols::tcp) ||
+            (tcp && protocols != TrackerProtocols::udp)) {
+            if (kept != i) std::memcpy(info.trackers[kept], info.trackers[i], sizeof info.trackers[0]);
+            ++kept;
+        }
+    }
+    info.tracker_count = kept;
+}
+
 bool compact_tracker_peers(const unsigned char *data, std::size_t size, Endpoints &result) noexcept
 {
     result = {};
@@ -433,19 +450,9 @@ bool dht_reply(const char *data, std::size_t size, DhtReply &result) noexcept
 bool inspect(const char *path, Metadata &result) noexcept
 {
     result = {};
-    struct stat st{};
-    constexpr int limit = 1024 * 1024;
-    if (stat(path, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > limit)
-        return false;
-    const auto size = static_cast<std::size_t>(st.st_size);
-    auto *data = static_cast<char *>(std::malloc(size));
-    auto *file = data ? std::fopen(path, "rb") : nullptr;
-    bool valid = false;
-    if (file)
-    {
-        valid = std::fread(data, 1, size, file) == size && parse(data, size, result);
-        std::fclose(file);
-    }
+    std::size_t size = 0;
+    auto *data = input::read_bounded(path, 1024 * 1024, size);
+    const bool valid = data && parse(data, size, result);
     std::free(data);
     if (!valid) result = {};
     return valid;

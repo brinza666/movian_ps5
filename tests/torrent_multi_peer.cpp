@@ -155,6 +155,25 @@ int main(int argc, char **argv)
     assert(configured.tracker_count == 12);
     assert(!std::strcmp(configured.trackers[0], "http://retracker.local/announce"));
     assert(!std::strcmp(configured.trackers[11], "udp://explodie.org:6969/announce"));
+    {
+        movian::torrent::PeerInfo mixed{};
+        mixed.private_torrent=true;
+        mixed.tracker_count=3;
+        std::strcpy(mixed.trackers[0],"http://http.invalid/announce");
+        std::strcpy(mixed.trackers[1],"udp://udp.invalid:1337/announce");
+        std::strcpy(mixed.trackers[2],"https://https.invalid/announce");
+        auto tcp=mixed,udp=mixed,both=mixed;
+        using movian::torrent::TrackerProtocols;
+        movian::torrent::filter_trackers(tcp,TrackerProtocols::tcp);
+        movian::torrent::filter_trackers(udp,TrackerProtocols::udp);
+        movian::torrent::filter_trackers(both,TrackerProtocols::tcp_udp);
+        assert(tcp.tracker_count==2 && !std::strcmp(tcp.trackers[1],mixed.trackers[2]));
+        assert(udp.tracker_count==1 && !std::strcmp(udp.trackers[0],mixed.trackers[1]));
+        assert(both.tracker_count==3 && both.private_torrent && tcp.private_torrent && udp.private_torrent);
+        movian::torrent::filter_trackers(udp,TrackerProtocols::tcp);
+        assert(udp.tracker_count==0);
+        std::puts("Tracker TCP/UDP selection filters effective announces and preserves private status");
+    }
     movian::torrent::configure_trackers(configured, missing_file, RetrackersMode::add);
     assert(configured.tracker_count == 12);
 
