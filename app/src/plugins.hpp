@@ -16,6 +16,7 @@ struct Plugin
     char version[24];
     char archive[384];
     char icon[512];
+    char author[128];
 };
 
 struct Item
@@ -27,6 +28,7 @@ struct Item
     char icon[512];
     char id[64];
     char version[24];
+    char author[128];
 };
 
 struct Page
@@ -46,6 +48,7 @@ inline constexpr const char *category_names[] = {
 int catalog(Plugin (&entries)[max_installed]) noexcept;
 bool inspect_package(const char *path, Plugin &plugin) noexcept;
 bool install(const char *path, char *error, int capacity) noexcept;
+bool uninstall(const Plugin &plugin, char *error, int capacity) noexcept;
 bool open(const Plugin &plugin, const char *url, Page &page, char *error, int capacity) noexcept;
 bool torrent_path(const Plugin &plugin, char *path, std::size_t capacity) noexcept;
 bool set_option(const Plugin &plugin, const char *assignment) noexcept;

@@ -38,10 +38,11 @@ struct PropertyBuilder {
         const auto id = add(key, name, stpp::Type::Integer, parent); at(id).integer = value; return id;
     }
     uint32_t item(uint32_t parent, const std::string &key, const char *title,
-                  const char *type, const char *url) {
+                  const char *type, const char *url, uint32_t *metadata=nullptr) {
         auto id = dir(key, "", parent);
         str(id,key+"/type","type",type); str(id,key+"/url","url",url);
         auto md = dir(key+"/metadata","metadata",id);
+        if(metadata) *metadata=md;
         str(md,key+"/title","title",title);
         integer(id,key+"/enabled","enabled",1);
         return id;
@@ -102,6 +103,16 @@ void property_command(const stpp::Command &command) noexcept {
     }
     if(command.kind!=stpp::Command::Kind::Action && command.kind!=stpp::Command::Kind::Dynamic) return;
     const auto &action=command.text;
+    if(command.binding.starts_with("plugin:")) {
+        if(action=="uninstall") {
+            const auto *plugin=installed_by_id(command.binding.c_str()+7);
+            if(plugin && !g_plugin_job.busy) {
+                g_detail_plugin=*plugin;g_plugin_detail=PluginDetail::installed;
+                run_plugin_detail({MenuAction::plugin_remove,"Uninstall"});
+            }
+        } else screen::notify("This plugin action is not implemented yet");
+        return;
+    }
     if ((command.binding=="nav" && action=="Quit") ||
         (command.binding=="quit" && (action=="Activate" || action=="Enter" || action=="Quit"))) {
         request_quit(); return;
@@ -122,7 +133,7 @@ void property_command(const stpp::Command &command) noexcept {
     else screen::notify("This remote action is not implemented yet");
 }
 
-void publish_properties() {
+bool publish_properties() {
     static std::vector<std::pair<std::string,uint32_t>> ids{{"global",0}};
     static uint32_t next=1;
     PropertyBuilder b{{},ids,next};
@@ -130,6 +141,37 @@ void publish_properties() {
     auto app=b.dir("app","app",0);
     b.str(app,"app/name","systemname",network::config().system_name);
     b.str(app,"app/version","version",kVersion);
+    auto plugins_root=b.dir("plugins","plugins",0);
+    auto plugin_registry=b.dir("plugins/nodes","nodes",plugins_root);
+    uint32_t installed_refs[plugins::max_installed]{};
+    auto plugin_property=[&](const plugins::Plugin &plugin,bool installed) {
+        const auto key=std::string("plugin/state/")+plugin.id;
+        const auto uri=std::string("movian:plugin:")+plugin.id;
+        uint32_t metadata;
+        const auto item=b.item(plugin_registry,key,plugin.title,"plugin",uri.c_str(),&metadata);
+        b.at(item).name=plugin.id;
+        b.at(item).binding=std::string("plugin:")+plugin.id;
+        b.at(b.add(key+"/event","eventSink",stpp::Type::Void,item)).binding=std::string("plugin:")+plugin.id;
+        b.str(metadata,key+"/synopsis","synopsis",plugin.synopsis);
+        b.str(metadata,key+"/author","author",plugin.author);
+        b.str(metadata,key+"/version","version",plugin.version);
+        if(!std::strncmp(plugin.icon,"https://",8)) b.str(metadata,key+"/icon","icon",plugin.icon);
+        const auto status=b.dir(key+"/status","status",item);
+        b.str(status,key+"/statustxt","statustxt",installed ? "Installed" : "Not installed");
+        if(installed) b.str(status,key+"/installedVersion","installedVersion",plugin.version);
+        else b.add(key+"/installedVersion","installedVersion",stpp::Type::Void,status);
+        b.add(key+"/availableVersion","availableVersion",stpp::Type::Void,status);
+        b.integer(status,key+"/installed","installed",installed);
+        b.integer(status,key+"/loaded","loaded",0); // Engines are scoped to route invocation.
+        // Reinstall/upgrade need observed repository provenance, not a deleted ZIP.
+        b.integer(status,key+"/canInstall","canInstall",0);
+        b.integer(status,key+"/canUpgrade","canUpgrade",0);
+        b.integer(status,key+"/canUninstall","canUninstall",installed && plugin.archive[0]);
+        return item;
+    };
+    for(int i=0;i<g_installed_count;++i) installed_refs[i]=plugin_property(g_installed_plugins[i],true);
+    for(int i=0;i<g_removed_count;++i)
+        if(!installed_by_id(g_removed_plugins[i].id)) (void)plugin_property(g_removed_plugins[i],false);
     auto navs=b.dir("navigators","navigators",0);
     auto nav=b.dir("navigator","current",navs);
     b.at(b.add("nav/event","eventSink",stpp::Type::Void,nav)).binding="nav";
@@ -198,8 +240,7 @@ void publish_properties() {
             b.item(nodes,"plugin/repository","Plugin repository","directory","movian:repository");
             b.item(nodes,"plugin/zip","Install from ZIP","directory","movian:zip");
             for(int i=0;i<g_installed_count;++i) {
-                auto uri=std::string("movian:plugin:")+g_installed_plugins[i].id;
-                b.item(nodes,"plugin/installed/"+property_number(i),g_installed_plugins[i].title,"directory",uri.c_str());
+                b.at(nodes).children.push_back(installed_refs[i]);
             }
         }
     }
@@ -237,5 +278,7 @@ void publish_properties() {
             b.at(id).children.push_back(value.id); b.graph.nodes.push_back(std::move(value));
         }
     }
-    g_property_server.publish(std::move(b.graph));
+    const bool published=g_property_server.publish(std::move(b.graph));
+    if(!published) diagnostics::record("stpp","Property snapshot rejected");
+    return published;
 }

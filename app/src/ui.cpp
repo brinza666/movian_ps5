@@ -97,7 +97,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "v63";
+constexpr const char *kVersion = "v64";
 constexpr const char *kTitleId = "PPSA99456";
 constexpr const char *kBookmarksUri = "bookmarks:";
 constexpr const char *kSearchUri = "movian:local-search";
@@ -269,6 +269,8 @@ bool g_auto_advanced = false;
 
 plugins::Plugin g_installed_plugins[plugins::max_installed]{};
 int g_installed_count = 0;
+plugins::Plugin g_removed_plugins[plugins::max_installed]{};
+int g_removed_count = 0;
 int g_plugin_catalog_selection = 0;
 int g_active_plugin = 0;
 bool g_plugin_import = false;
@@ -288,17 +290,21 @@ plugins::Plugin g_detail_plugin{};
 plugins::Item g_detail_item{};
 int g_plugin_detail_row = 0;
 constexpr MenuEntry installed_actions[] = {
-    {MenuAction::plugin_open, "Open"}, {MenuAction::plugin_settings, "Settings"},
-    {MenuAction::plugin_update, "Check for updates"}, {MenuAction::plugin_remove, "Uninstall"},
-    {MenuAction::plugin_changelog, "Changelog"},
+    {MenuAction::plugin_remove, "Uninstall"},
 };
 constexpr MenuEntry package_actions[] = {
-    {MenuAction::plugin_install, "Install"}, {MenuAction::plugin_changelog, "Changelog"},
+    {MenuAction::plugin_install, "Install"},
 };
+const plugins::Plugin *installed_by_id(const char *id) noexcept;
+const plugins::Plugin *detail_installed() noexcept {
+    return installed_by_id(g_plugin_detail==PluginDetail::repository ? g_detail_item.id : g_detail_plugin.id);
+}
 std::span<const MenuEntry> plugin_detail_actions() noexcept
 {
-    return g_plugin_detail == PluginDetail::installed ? std::span<const MenuEntry>(installed_actions)
-                                                      : std::span<const MenuEntry>(package_actions);
+    if (g_plugin_detail == PluginDetail::local) return package_actions;
+    if (const auto *plugin=detail_installed())
+        return plugin->archive[0] ? std::span<const MenuEntry>(installed_actions) : std::span<const MenuEntry>{};
+    return package_actions;
 }
 bool open_zip_details(const char *path) noexcept;
 bool begin_file_inspection(const char *path, bool zip) noexcept;
@@ -311,7 +317,7 @@ unsigned g_plugin_repo_offset[plugin_page_limit]{};
 int g_plugin_depth = 0;
 struct PluginJob
 {
-    enum class Action { page, repository, repository_refresh, install, install_local, catalog, login };
+    enum class Action { page, repository, repository_refresh, install, install_local, catalog, login, remove };
     pthread_t thread{};
     std::atomic<bool> ready{false};
     bool busy = false;
@@ -1749,6 +1755,9 @@ void *load_plugin_page(void *userdata) noexcept
     case PluginJob::Action::install_local:
         job.success = plugins::install(job.url, job.error, sizeof job.error);
         break;
+    case PluginJob::Action::remove:
+        job.success = plugins::uninstall(job.plugin, job.error, sizeof job.error);
+        break;
     case PluginJob::Action::catalog:
         job.installed_count = plugins::catalog(job.installed);
         job.success = true;
@@ -1759,7 +1768,7 @@ void *load_plugin_page(void *userdata) noexcept
         break;
     }
     if (job.success && (job.action == PluginJob::Action::install ||
-                        job.action == PluginJob::Action::install_local))
+                        job.action == PluginJob::Action::install_local || job.action == PluginJob::Action::remove))
         job.installed_count = plugins::catalog(job.installed);
     job.ready.store(true, std::memory_order_release);
     return nullptr;
@@ -1772,7 +1781,7 @@ void open_plugin_job(PluginJob::Action action, const char *url, bool replace = f
     const int target = g_plugin_depth - (replace ? 1 : 0);
     if (job.busy || target < 0 || target >= plugin_page_limit)
         return;
-    job.plugin = g_installed_plugins[g_active_plugin];
+    job.plugin = action == PluginJob::Action::remove ? g_detail_plugin : g_installed_plugins[g_active_plugin];
     job.action = action;
     job.dismissed = false;
     job.offset = offset;
@@ -1840,7 +1849,7 @@ bool finish_plugin_page() noexcept
         append_log(event);
     }
     else if (job.dismissed && job.action != PluginJob::Action::install &&
-             job.action != PluginJob::Action::install_local)
+             job.action != PluginJob::Action::install_local && job.action != PluginJob::Action::remove)
     {
         append_log("v59 dismissed plugin page result");
     }
@@ -1856,6 +1865,27 @@ bool finish_plugin_page() noexcept
         screen::notify("Plugin installed");
         append_log(job.action == PluginJob::Action::install ? "v59 installed repository plugin"
                                                            : "v59 installed local plugin ZIP");
+    }
+    else if (job.action == PluginJob::Action::remove)
+    {
+        // Keep bounded metadata/status for an already-open native remote popup.
+        // Its reference must never be recycled to a different installed plugin.
+        int retained=0;
+        while(retained<g_removed_count && std::strcmp(g_removed_plugins[retained].id,job.plugin.id)) ++retained;
+        if(retained==plugins::max_installed) retained=0;
+        g_removed_plugins[retained]=job.plugin;
+        g_removed_count=std::min(plugins::max_installed,std::max(g_removed_count,retained+1));
+        apply_installed_catalog(job);
+        g_plugin_depth = 0;
+        for (auto &page : g_plugin_pages) page = {};
+        for (auto &url : g_plugin_page_urls) url[0] = 0;
+        std::memset(g_plugin_selection, 0, sizeof g_plugin_selection);
+        image::unload(g_plugin_artwork);
+        g_artwork_url[0] = g_artwork_plugin[0] = 0;
+        g_detail_plugin = {};
+        g_overlay = Overlay::none;
+        screen::notify("Plugin uninstalled");
+        append_log("Plugin package and private settings/stores removed");
     }
     else if (job.action == PluginJob::Action::login)
     {
@@ -2036,7 +2066,17 @@ bool open_zip_details(const char *path) noexcept
 
 void run_plugin_detail(const MenuEntry &entry) noexcept
 {
-    if (entry.id == MenuAction::plugin_open || entry.id == MenuAction::plugin_settings)
+    if (entry.id == MenuAction::plugin_remove)
+    {
+        if (g_plugin_job.busy) return;
+        const auto *installed = detail_installed();
+        if (!installed || !installed->archive[0]) return;
+        g_detail_plugin = *installed;
+        g_overlay = Overlay::none;
+        // Removal is not a navigation push, even from a full repository stack.
+        open_plugin_job(PluginJob::Action::remove, nullptr, g_plugin_depth > 0);
+    }
+    else if (entry.id == MenuAction::plugin_open || entry.id == MenuAction::plugin_settings)
     {
         g_overlay = Overlay::none;
         open_plugin_page(entry.id == MenuAction::plugin_settings ? "#settings" : nullptr);
@@ -2143,7 +2183,7 @@ void update_plugins(unsigned pressed) noexcept
         move_plugin_selection(pressed, g_plugin_catalog_selection, g_installed_count + 2);
         if (pressed & pad::triangle)
             begin_zip_picker();
-        else if (pressed & (pad::cross | pad::square))
+        else if (pressed & (pad::cross | pad::square | pad::r3))
         {
             if (g_plugin_catalog_selection == 0 && (pressed & pad::cross))
                 g_repo_categories = true;
@@ -2153,6 +2193,7 @@ void update_plugins(unsigned pressed) noexcept
             {
                 g_active_plugin = g_plugin_catalog_selection - 1;
                 if (pressed & pad::square) open_plugin_page("#settings");
+                else if (pressed & pad::r3) open_plugin_page(nullptr);
                 else
                 {
                     g_detail_plugin = *plugin;
@@ -2588,7 +2629,7 @@ void draw_plugins(screen::Canvas &c) noexcept
         const auto action = g_plugin_job.action;
         const char *status = action == PluginJob::Action::repository || action == PluginJob::Action::repository_refresh
             ? "Loading repository…" : action == PluginJob::Action::install || action == PluginJob::Action::install_local
-            ? "Installing plugin…" : "Loading plugin…";
+            ? "Installing plugin…" : action == PluginJob::Action::remove ? "Uninstalling plugin…" : "Loading plugin…";
         c.text(76.f, 300.f, status, font::regular, 24, Color::muted);
         c.text(48.f, 930.f, "Circle  Back", font::regular, 20, Color::muted);
         return;
@@ -2630,7 +2671,7 @@ void draw_plugins(screen::Canvas &c) noexcept
                 draw_plugin_row(c, i - first, i == g_plugin_catalog_selection, entry.title,
                                 entry.synopsis, entry.version, list_start, show_art ? 1230 : 1820);
             }
-        c.text(48.f, 930.f, "Cross  Open     Square  Plugin settings     Triangle  ZIP picker     Circle  Back",
+        c.text(48.f, 930.f, "Cross  Details     R3  Open     Square  Plugin settings     Triangle  ZIP picker     Circle  Back",
                font::regular, 20, Color::muted);
         return;
     }
@@ -3473,27 +3514,34 @@ void draw_plugin_details(screen::Canvas &c) noexcept
     const char *title = package ? g_detail_item.title : g_detail_plugin.title;
     const char *synopsis = package ? g_detail_item.detail : g_detail_plugin.synopsis;
     const char *version = package ? g_detail_item.version : g_detail_plugin.version;
-    draw_action_menu(c, "Plugin details", title, plugin_detail_actions(), g_plugin_detail_row);
-    c.round_rect(50, 100, 920, 878, 16, Color::surface);
+    // Field order and single button from the installed flat plugin_details.view.
+    // Controller shortcuts remain in the catalog, outside the native detail UI.
+    c.rect(0, 0, screen::width, screen::height, Color::bg);
     char shown[176];
-    c.text(96.f, 181.f, fit(title, 817, shown, sizeof shown, font::semibold, 38),
+    const auto *installed = detail_installed();
+    const char *author = package ? g_detail_item.author : g_detail_plugin.author;
+    const auto fitted = fit(title, 1600, shown, sizeof shown, font::semibold, 38);
+    c.text((screen::width-c.text_width(fitted,font::semibold,38))/2, 76.f, fitted,
            font::semibold, 38, Color::text);
-    if (*version)
-    {
-        char value[96];
-        snprintf(value, sizeof value, "Version %s", version);
-        c.text(96.f, 228.f, value, font::regular, 23, Color::muted);
+    (void)draw_selected_artwork(c, 58, 190, 240, 190);
+    c.text(342.f, 244.f, fit(synopsis, 1480, shown, sizeof shown, font::regular, 27),
+           font::regular, 27, Color::muted);
+    int y=300;
+    auto field=[&](const char *label,const char *value) {
+        c.text(306-c.text_width(label,font::regular,27),float(y),label,font::regular,27,Color::muted);
+        c.text(342.f,float(y),fit(value,1400,shown,sizeof shown,font::regular,27),font::regular,27,Color::text);
+        y+=52;
+    };
+    field("Status:",installed ? "Installed" : "Not installed");
+    field("Author:",author);
+    if(installed && installed->version[0]) field("Installed version:",installed->version);
+    if(g_plugin_detail != PluginDetail::installed && *version) field("Available version:",version);
+    const auto actions=plugin_detail_actions();
+    if(!actions.empty()) {
+        c.rect(324,y-12,200,76,Color::hover);
+        c.text(344.f,float(y+36),actions.front().label,font::semibold,28,Color::text);
     }
-    if (const auto *installed = package ? installed_by_id(g_detail_item.id) : nullptr)
-    {
-        char value[96];
-        snprintf(value, sizeof value, "Installed version %s", installed->version);
-        c.text(96.f, 265.f, value, font::regular, 22, Color::muted);
-    }
-    if (!draw_selected_artwork(c, 96, 288, 818, 490) && selected_plugin_icon()[0])
-        c.text(96.f, 554.f, "Artwork preview", font::regular, 21, Color::muted);
-    c.text(96.f, 855.f, fit(synopsis, 817, shown, sizeof shown, font::regular, 21),
-           font::regular, 21, Color::muted);
+    c.text(58.f,1028.f,"Circle  Back",font::regular,22,Color::muted);
 }
 
 void draw_browser_choices(screen::Canvas &c) noexcept
@@ -3645,7 +3693,7 @@ bool handle_overlay(unsigned pressed) noexcept
             g_plugin_detail_row = std::max(0, g_plugin_detail_row - 1);
         else if (pressed & pad::down)
             g_plugin_detail_row = std::min(static_cast<int>(entries.size()) - 1, g_plugin_detail_row + 1);
-        else if (pressed & pad::cross)
+        else if ((pressed & pad::cross) && !entries.empty())
             run_plugin_detail(entries[g_plugin_detail_row]);
         return true;
     }

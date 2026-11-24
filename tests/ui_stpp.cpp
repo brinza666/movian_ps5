@@ -9,6 +9,8 @@
 #include <chrono>
 #include <csignal>
 #include <deque>
+#include <filesystem>
+#include <fstream>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -142,6 +144,10 @@ struct Wire {
         else add_path(b,{"eventSink"},true);
         b.push_back(1);b.push_back(strlen(name));b.insert(b.end(),name,name+strlen(name));send(b);
     }
+    void dynamic(uint32_t base,const char *text) {
+        Bytes b{5};put32(b,base);b.push_back(0);b.push_back(27);
+        b.insert(b.end(),text,text+strlen(text));send(b);
+    }
     void write_value(uint32_t base,const Bytes &payload) {
         Bytes b{3};put32(b,base);add_path(b,{"value"},true);b.insert(b.end(),payload.begin(),payload.end());send(b);
     }
@@ -152,6 +158,7 @@ struct Wire {
 static volatile std::sig_atomic_t serving=1;
 static void stop_serving(int) { serving=0; }
 int main(int argc,char **argv) {
+    std::setvbuf(stdout,nullptr,_IOLBF,0);
     using namespace movian;using namespace movian::ui;
     host_ui_thread=pthread_self();
     assert(argc>=2&&font::load(argv[1]));assert(mkdir("download0",0700)==0||errno==EEXIST);
@@ -308,6 +315,68 @@ int main(int argc,char **argv) {
     while(host_exits==3) { assert(std::chrono::steady_clock::now()<list_deadline);pump(5); }
     assert(host_exits==4&&g_quit==QuitState::idle);
     puts("Quit waits for the real network listing worker and rejects replacement jobs");
+
+    // Real ZIP installation, Duktape routes/stores, worker removal and native
+    // pluginInfo properties. No personal profile or external network is used.
+    namespace fsys=std::filesystem;
+    fsys::create_directories("app0/assets/plugins");
+    fsys::copy_file(fsys::path(argv[1])/"../assets/plugins/host.js",
+                   "app0/assets/plugins/host.js",fsys::copy_options::overwrite_existing);
+    auto install_fixture=[](const char *id) {
+        const std::string input=std::string(id)+".zip";
+        char error[256];assert(plugins::install(input.c_str(),error,sizeof error));
+        plugins::Plugin plugin{};const std::string archive=std::string("download0/plugins-v23/")+id+".zip";
+        assert(plugins::inspect_package(archive.c_str(),plugin));
+        assert(plugins::set_option(plugin,"retention=private"));
+        plugins::Page page{};assert(plugins::open(plugin,nullptr,page,error,sizeof error)&&page.count==1);
+        assert(fsys::exists(std::string("download0/plugins-v23/")+id+".stores/retention.json"));
+        return plugin;
+    };
+    const auto local_plugin=install_fixture("remove-local");
+    const auto remote_plugin=install_fixture("remove-remote");
+    const auto keep_plugin=install_fixture("keep-fixture");
+    g_installed_count=plugins::catalog(g_installed_plugins);assert(g_installed_count==3);g_plugin_catalog_loaded=true;
+    g_place=Place::plugins;g_plugin_import=g_repo_categories=false;g_plugin_depth=2;
+    g_plugin_pages[1].count=1;strcpy(g_plugin_pages[1].items[0].url,"fixture:stale");
+    g_detail_plugin=local_plugin;g_plugin_detail=PluginDetail::installed;g_overlay=Overlay::plugin_details;
+    auto detail=plugin_detail_actions();assert(detail.size()==1&&detail[0].id==MenuAction::plugin_remove);
+    if(const char *capture=std::getenv("MOVIAN_UI_PLUGIN_CAPTURE")) assert(screen::preview(ui::draw,capture));
+    run_plugin_detail(detail[0]);assert(g_plugin_job.busy);
+    const auto local_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(4);
+    while(g_plugin_job.busy) {assert(std::chrono::steady_clock::now()<local_deadline);pump(5);}
+    assert(!installed_by_id(local_plugin.id)&&installed_by_id(keep_plugin.id));
+    assert(!fsys::exists(local_plugin.archive)&&!fsys::exists("download0/plugins-v23/remove-local.settings")&&
+           !fsys::exists("download0/plugins-v23/remove-local.stores"));
+    assert(g_plugin_depth==0&&g_plugin_pages[1].count==0);
+    property_open("movian:plugin:remove-local");assert(!g_plugin_job.busy);
+    wire.open("movian:plugins");pump(50);assert(publish_properties());
+    assert(g_place==Place::plugins&&g_plugin_depth==0&&g_overlay==Overlay::none);
+    Wire plugin_wire(g_property_server.port());
+    puts("Inspecting native plugin catalog exports");
+    auto plugin_nodes=plugin_wire.children(plugin_wire.subscribe(0,{"navigators","current","currentpage","model","nodes"}));
+    printf("Inspecting %zu plugin catalog rows\n",plugin_nodes.size());
+    assert(plugin_nodes.size()==static_cast<unsigned>(g_installed_count+2));
+    uint32_t removal_ref=0;
+    for(auto ref:plugin_nodes) if(plugin_wire.text(plugin_wire.subscribe(ref,{"url"}))=="movian:plugin:remove-remote") removal_ref=ref;
+    assert(removal_ref&&plugin_wire.text(plugin_wire.subscribe(removal_ref,{"type"}))=="plugin");
+    puts("Inspecting native plugin detail status");
+    const auto remote_status=plugin_wire.subscribe(removal_ref,{"status","statustxt"});
+    assert(plugin_wire.text(remote_status)=="Installed");
+    assert(plugin_wire.text(plugin_wire.subscribe(removal_ref,{"metadata","author"}))=="Local test");
+    assert(get32(plugin_wire.event(plugin_wire.subscribe(removal_ref,{"status","canUninstall"}),1),6)==1);
+    puts("Sending native dynamic uninstall");
+    plugin_wire.dynamic(removal_ref,"uninstall");pump(50);
+    const auto remote_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(4);
+    while(g_plugin_job.busy) {assert(std::chrono::steady_clock::now()<remote_deadline);pump(5);}
+    assert(!installed_by_id(remote_plugin.id)&&installed_by_id(keep_plugin.id));
+    assert(!fsys::exists(remote_plugin.archive)&&fsys::exists(keep_plugin.archive));
+    assert(plugin_wire.text(remote_status)=="Not installed");
+    // A removed reference must not get reassigned to another installed plugin.
+    plugin_wire.dynamic(removal_ref,"uninstall");pump(30);assert(!g_plugin_job.busy&&fsys::exists(keep_plugin.archive));
+    plugins::Page kept{};char plugin_error[256];
+    assert(plugins::open(keep_plugin,nullptr,kept,plugin_error,sizeof plugin_error)&&kept.count==1);
+    g_overlay=Overlay::none;g_place=Place::home;
+    puts("Local and native remote Uninstall remove real ZIP/settings/stores, invalidate pages and preserve other plugins");
 
     run_sidebar_action({MenuAction::exit,"Exit"});pump(50);
     assert(host_exits==5&&g_quit==QuitState::idle);

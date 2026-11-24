@@ -38,4 +38,16 @@ c++ -std=c++20 -pthread -ffunction-sections -fdata-sections -Wl,--gc-sections \
 run=$(mktemp -d "$out/run.XXXXXX")
 trap 'rm -rf -- "$run"' EXIT
 cd "$run"
+python3 - <<'PY'
+import json,zipfile
+script="""var store=require('movian/store').create('retention');store.marker='saved';
+require('movian/service').create('Removal fixture','fixture:start','video',true);
+new (require('movian/page').Route)('fixture:start',function(p){p.appendItem('fixture:child','directory',{title:'Child'});});
+"""
+for name in ('remove-local','remove-remote','keep-fixture'):
+    with zipfile.ZipFile(name+'.zip','w',zipfile.ZIP_DEFLATED) as package:
+        package.writestr('plugin.json',json.dumps(dict(apiversion=2,id=name,title='Removal fixture',
+            author='Local test',synopsis='Disposable plugin management observation',version='1.0.0',file='main.js')))
+        package.writestr('main.js',script)
+PY
 "$out/ui-stpp" "$root/app/fonts/" "$@"

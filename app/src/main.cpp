@@ -35,20 +35,20 @@ void checkpoint(const char *message)
 
 int main()
 {
-    checkpoint("v63 entered main");
-    checkpoint("v63 fresh reset begin");
+    checkpoint("v64 entered main");
+    checkpoint("v64 fresh reset begin");
     const bool reset=movian::profile::reset_requested();
-    checkpoint(reset?"v63 fresh reset complete":"v63 fresh reset not completed or not requested");
-    checkpoint("v63 title access begin");
+    checkpoint(reset?"v64 fresh reset complete":"v64 fresh reset not completed or not requested");
+    checkpoint("v64 title access begin");
     const auto access = movian::title_access::request_for_test();
     movian::diagnostics::record("startup", "title access enabled=%d data_verified=%d status=%u path=%s root_restored=%d",
         access.enabled, access.data_verified, access.status, access.path, access.root_restored);
     if (!movian::font::load(MOVIAN_APP0 "/assets/fonts/"))
         movian::screen::notify("Movian: fonts missing from title folder");
-    checkpoint("v63 fonts attempted");
+    checkpoint("v64 fonts attempted");
     (void)movian::pad::init();
-    checkpoint("v63 pad initialized");
+    checkpoint("v64 pad initialized");
     movian::ui::load();
-    checkpoint("v63 UI loaded; waiting for Cross");
+    checkpoint("v64 UI loaded; waiting for Cross");
     movian::screen::run(movian::ui::update, movian::ui::draw);
 }

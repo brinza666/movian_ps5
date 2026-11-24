@@ -7,6 +7,7 @@
 #include "torrent.hpp"
 #include "input_file.hpp"
 #include "settings.hpp"
+#include "plugin_storage.hpp"
 #include "stb_image.h"
 #include <strings.h>
 
@@ -604,6 +605,7 @@ bool parse_manifest(duk_context *ctx, const char *source, std::size_t size,
     property(ctx, -1, "title", plugin.title, sizeof plugin.title);
     property(ctx, -1, "version", plugin.version, sizeof plugin.version);
     property(ctx, -1, "synopsis", plugin.synopsis, sizeof plugin.synopsis);
+    property(ctx, -1, "author", plugin.author, sizeof plugin.author);
     char icon[sizeof plugin.icon]{};
     property(ctx, -1, "icon", icon, sizeof icon);
     constexpr char archive_scheme[] = "plugin:/";
@@ -815,6 +817,16 @@ bool install(const char *path, char *error, int capacity) noexcept
 #endif
 }
 
+bool uninstall(const Plugin &plugin, char *error, int capacity) noexcept
+{
+    if (!storage::remove_plugin(plugin.id, plugin.archive, error, capacity)) return false;
+    if (!std::strcmp(plugin.id, kinozal_id)) {
+        erase(g_kinozal_cookie, sizeof g_kinozal_cookie);
+        erase(g_kinozal_origin, sizeof g_kinozal_origin);
+    }
+    return true;
+}
+
 bool open(const Plugin &plugin, const char *url, Page &page, char *error, int capacity) noexcept
 {
     page = {};
@@ -980,6 +992,7 @@ bool repository(const char *url, unsigned offset, Page &page, char *error, int c
             property(ctx, -1, "icon", item.icon, sizeof item.icon);
             property(ctx, -1, "id", item.id, sizeof item.id);
             property(ctx, -1, "version", item.version, sizeof item.version);
+            property(ctx, -1, "author", item.author, sizeof item.author);
             char name[64]{};
             property(ctx, -1, "category", name, sizeof name);
             if ((category == Category::all || repo_category(name) == category) &&

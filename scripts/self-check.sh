@@ -7,6 +7,9 @@ trap 'rm -rf -- "$scratch"' EXIT
 
 python3 tests/stpp_protocol.py
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
+    tests/plugin_uninstall.cpp -o "$scratch/plugin-uninstall"
+(mkdir -p "$scratch/plugin-work" && cd "$scratch/plugin-work" && ../plugin-uninstall)
+"${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
     app/src/profile_reset.cpp app/src/title_access_io.cpp app/src/fs.cpp tests/profile_reset.cpp -o "$scratch/profile-reset"
 (mkdir -p "$scratch/profile-work" && cd "$scratch/profile-work" && ../profile-reset)
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -pthread -DMOVIAN_STPP_TEST -Iapp/src \

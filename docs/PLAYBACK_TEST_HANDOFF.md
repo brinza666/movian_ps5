@@ -1,3 +1,35 @@
+# Latest continuation — v64, 24 November 2026
+
+The user has just reported "PS5 is up". Rechecks at saved 192.168.10.238 on FTP2121,
+ShadowMount10101, Minion9180 and STPP42000 still time out (some HTTP attempts
+briefly refused). Laptop Wi-Fi is 192.168.10.29/24. The known console MAC remains
+in a stale neighbor entry. An async question asks the current PS5 IP; continue
+from its answer without losing the console STPP objective. No launch request or
+replacement upload occurred. v62 remains mounted.
+
+v64 is implemented and packaged: build/PPSA99456-v64.zip, 7,713,845 bytes, SHA-256
+422c96f03f906c9686f7e475770fc5c169848dd7cfd04887948c9ab3d82f6bae.
+Eboot SHA-256 605a9affb1765d331b1575fa9b4ff08ecdd9e612f83215ff3d0712e492814b1f.
+Full optional self-check, signed integrity and actual unmodified WSL remote
+plugin-details/Uninstall all PASS. Host fixture evidence: build/v64-console and
+build/v64-native. WSL is restored to its LOCAL Home; the owned host server was
+stopped. No v64 console result is claimed. See docs/UI_V64.md and release notes.
+
+P02 now has a real backend (plugin_storage.hpp / plugins::uninstall), asynchronous
+local/UI dispatch, native plugin metadata/status and dynamic STPP Uninstall.
+Metadata/status survive in a bounded removed-plugin history so an open native
+popup updates to Not installed. R3 opens a plugin from the catalog, Square opens
+settings. Full description/remote artwork, Upgrade and reinstall provenance are
+still unfinished. Next desktop feature is P03 only after controlled native
+Upgrade observation. Do not count it complete just because Install replaces ZIPs.
+
+First console action remains launch mounted v62 via the documented Minion API,
+collect helper/root/bind logs and test WSL against the ACTUAL PS5, then close only
+its confirmed app ID before deploying v64. Do not infer a process from its PFS
+mount or send eboot to9021. Use a fresh verified closed profile backup before any
+new reset request. No repeated profile wipe is needed. Console-only opt-ins stay
+out of public packages. All earlier authorization/scope below remains applicable.
+
 # Autonomous work handoff — 2026-11-24, v63
 
 Active checkout: `C:/Users/brinza/Documents/deep/movian_ps5-playback-publish`,

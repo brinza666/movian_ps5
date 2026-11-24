@@ -1,5 +1,13 @@
 # Status
 
+2026-11-24, v64: native-shaped plugin details and working Uninstall remove the
+selected ZIP/settings/stores and invalidate cached pages. Shared local/native
+STPP tests and the actual unmodified WSL Movian viewer passed; the retained
+fixture survived. Full optional self-check and signed package passed. PS5
+services at the saved address still time out after the user's online report;
+v62 remains mounted, v64 is not uploaded. [Evidence/limits](UI_V64.md).
+
+
 2026-11-24, v63: General Quit, sidebar Exit and STPP Quit now use one
 orderly shutdown callback. Full host self-check and signed packaging passed.
 Active FTP/listing and worker-drain regressions passed; PS5 lifecycle acceptance

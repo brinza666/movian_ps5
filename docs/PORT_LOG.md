@@ -474,3 +474,32 @@ not been uploaded. No new console picture, sound or STPP result is claimed.
 The latest one-shot access experiment remains authorized and separately gated.
 Completed the pending-settings inventory and per-feature tests from actual
 WSL/shipped-view evidence, without using old andoma source.
+
+## 2026-11-24 — v64 native details and plugin Uninstall
+
+Implemented P02's installed/local-package details and scoped Uninstall using
+installed WSL M7 7.0.273 runtime/shipped-view observations and retained REA
+artifact identity. Removed unverified Check for updates/Changelog detail actions.
+Author/status/version order and a single action now replace the old details menu.
+Uninstall runs on the plugin worker and removes only its package/private files,
+invalidates cached pages/artwork and clears its KinoZal session when applicable.
+Descriptor-relative, no-follow cleanup passed escape/link/depth/failure/retry tests.
+
+Full optional self-check passed. Shared UI tests installed real ZIPs, ran routes
+and stores, removed fixtures locally and by native dynamic STPP event, checked
+pushed status/old-reference isolation and ran the retained plugin again. The real
+unmodified WSL viewer then rendered the remote native plugin details; clicking
+Uninstall removed that fixture's ZIP/settings/stores, showed Not installed and
+cleared Installed version. Another fixture survived. Native WSL returned to its
+local Home and the owned acceptance server stopped. A saved capture helper had
+old import-time actions; those were removed from its test copy before the final
+explicit native sequence was repeated. No new REA runtime trace is claimed.
+
+Signed v64 package passed integrity: 29 files, 7,713,845 bytes, SHA-256
+422c96f03f906c9686f7e475770fc5c169848dd7cfd04887948c9ab3d82f6bae.
+Eboot SHA-256 605a9affb1765d331b1575fa9b4ff08ecdd9e612f83215ff3d0712e492814b1f.
+No authorization/reset request is packaged. The authorized explicit access
+experiment remains gated. v62 is mounted; v64 is not console-tested/uploaded.
+After the user reported PS5 online, the saved address's services alternated
+between refusal and timeout, ending in timeouts on FTP2121, SMP10101, Minion9180.
+Current IP clarification is pending. See [v64](UI_V64.md) for remaining checks.

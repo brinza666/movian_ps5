@@ -4,7 +4,7 @@ Native C++20 media-center homebrew, packaged as a signed ShadowMountPlus folder 
 
 **Playback test branch: `test/native-playback`, title `PPSA99456`.** The separate production title is `PPSA99455`. Keep their application folders and persistent profiles separate.
 
-As of 23 November 2026, [v60 is the latest STPP preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60). The signed package passed host and unmodified WSL Movian control tests. **PS5 v60 startup/access/transport are pending because the console went offline before upload.** v59 remains the last installed and startup-verified console build. See the [release notes](docs/release-notes/playback-test-v60.md), [v60 scope](docs/STPP_V60.md) and [port log](docs/PORT_LOG.md).
+As of 24 November 2026, [v64 is the latest preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64). It adds orderly local/remote Quit and native-style plugin details/Uninstall. Full host checks, real WSL Movian remote Uninstall and signed packaging passed. **PS5 v64 startup and control remain untested.** v61 reached Home and completed the requested fresh reset, but its listeners failed bind; v62 is mounted and awaiting launch/access/WSL verification. See the [release notes](docs/release-notes/playback-test-v64.md), [v64 evidence](docs/UI_V64.md) and [port log](docs/PORT_LOG.md).
 
 ## Capabilities and evidence
 
@@ -15,10 +15,10 @@ As of 23 November 2026, [v60 is the latest STPP preview](https://github.com/brin
 | SMB2 and FTP | Saved authenticated servers, background browsing and seekable input. The user separately confirmed playback, sound and seeks over both protocols in v57. Automatic server/share discovery is pending. |
 | Network imports | v58 supports bounded ZIP plugin installation and torrent-metainfo reads from shares; SMB/FTP ZIP installation and FTP torrent file lists were user-confirmed. |
 | Native BitTorrent | Verified pieces, bounded RAM/internal/USB cache choices, HTTP/UDP trackers and IPv4 DHT. v59 completed a small numeric-IP tracker transfer in RAM and decoded 180 HEVC 1080p hardware frames through EOF. Feature-length sustained playback and rolling-cache seeks remain open. |
-| Plugin API v2 | Duktape host, catalog, ZIP installation, routes, settings, stores and artwork. Compatibility and live account login depend on each plugin. |
+| Plugin API v2 | Duktape host, catalog, ZIP installation, routes, settings, stores and artwork. v64 adds working local/remote Uninstall, private-data cleanup and pushed native status. Compatibility and live account login depend on each plugin. |
 | STPP remote control | v60 server and shared Home/Settings callbacks passed against unmodified WSL M7, including a persisted native toggle and return Home. PS5 listener/startup remain pending; complete resources/settings/player coverage is separate. |
 
-The v59 hostname-based HTTP/UDP/DHT failure remains unresolved; the numeric-IP control succeeded. DNS work is deferred. The v59 diagnostics listener was denied by the title sandbox (bind error 13). The v60 ZIP includes optional one-shot title-access support but no authorization request; there is no verified v60 console result yet. The published v53 package excludes sandbox lift.
+The v59 hostname-based HTTP/UDP/DHT failure remains unresolved; the numeric-IP control succeeded. DNS work is deferred. The v59 diagnostics listener was denied by the title sandbox (bind error 13). The latest ZIP includes optional one-shot title-access support but no authorization request. The recovered v60 log shows an intentional exit after failed root restoration; v62 corrects the loader/owned-request path but needs console verification. The published v53 package excludes sandbox lift.
 
 ## Build in WSL2 Ubuntu 24.04
 

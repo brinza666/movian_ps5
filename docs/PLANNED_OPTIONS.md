@@ -78,6 +78,15 @@ Do not publish raw profiles, credentials, tracker responses, or private captures
    Search/Upgrade need new WSL evidence; they were absent from the recorded
    installed WSL Settings index. Never invent desktop defaults for these rows.
 
+## Current completion
+
+P01/B10 pass the v63 host acceptance; console Quit/relaunch is pending. P02's
+installed/local details and scoped Uninstall pass v64 shared-UI and real native
+WSL remote-viewer acceptance. [v64 evidence and remaining states](UI_V64.md)
+records Upgrade/reinstall provenance and visual/resource limits. The catalog
+keeps Open (R3) and Settings (Square) as PS5 navigation shortcuts outside the
+single-button detail action list.
+
 ## Immediate acceptance tests
 
 | ID | Feature | One acceptance test |
