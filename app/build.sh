@@ -104,6 +104,7 @@ if [[ $title_access_test == 1 ]]; then
     cp "$starter/kit/examples/sandbox-elevation/elevation.hpp" \
        "$starter/kit/examples/sandbox-elevation/protocol.hpp" "$client/"
     cp "$starter/kit/examples/sandbox-elevation/src/elevation.cpp" "$client/src/"
+    python3 "$repo/scripts/adapt-title-access-client.py" "$client/src/elevation.cpp"
     # The installed builder's fork URL is unavailable. Retain its pinned SDK,
     # logging header, protocol and manifest checks; replace source acquisition
     # with the reviewed exact-commit primary archive and its SHA-256.

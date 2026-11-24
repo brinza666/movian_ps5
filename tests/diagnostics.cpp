@@ -100,6 +100,13 @@ int main()
     assert(saved.find("[fallback] record written after TCP bind failed") != std::string::npos);
     close(occupied);
 
+    assert(capture_file() && !lan_enabled());
+    record("boot", "file-only capture before worker startup");
+    assert(enable(false));
+    std::ifstream boot_log("download0/remote-diagnostics.log");
+    const std::string boot_saved((std::istreambuf_iterator<char>(boot_log)), {});
+    assert(boot_saved.find("file-only capture before worker startup")!=std::string::npos);
+
     // A copied record's sequence and text must be one coherent publication even
     // while the ring wraps repeatedly on another thread.
     Entry before{};

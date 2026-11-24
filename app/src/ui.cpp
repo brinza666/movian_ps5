@@ -97,7 +97,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "v60";
+constexpr const char *kVersion = "v62";
 constexpr const char *kTitleId = "PPSA99456";
 constexpr const char *kBookmarksUri = "bookmarks:";
 constexpr const char *kSearchUri = "movian:local-search";

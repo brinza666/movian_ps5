@@ -312,4 +312,5 @@ bool enable(bool enabled) noexcept
 }
 
 bool lan_enabled() noexcept { return serving; }
+bool capture_file() noexcept { return start_fallback(); }
 }

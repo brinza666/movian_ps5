@@ -1,5 +1,15 @@
 # Status
 
+2026-11-24 follow-up: v61 reaches UI and completes the fresh plugin/config reset.
+Recovered v60 log identifies intentional shell exit after failed root-restoration
+loader lookups. v61 has filesystem access but no helper credential proof; both
+listeners still fail bind with errno13. v62 fixes loader lookup, explicitly uses
+the pinned owned helper protocol and captures startup diagnostics without a
+worker. Full host checks and signed packaging passed; v62 is verified/mounted,
+awaiting an autonomous launch path and the helper/bind/WSL acceptance. User
+authorizes further planned-option implementation while away10h.
+
+
 2026-11-24: Published v60 was uploaded via FTP2121, all 29 package files and
 both console-only opt-ins readback-verified, then activated and mounted. A new
 closed-profile backup was independently verified before the reset request.

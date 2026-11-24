@@ -415,3 +415,43 @@ that evidence folder precede the final socket/address dependency rebuild.
 - FTP startup/access/reset capture is running. A mounted title is not a
   startup result: awaiting its initial PS5 launch before checking markers,
   helper/root restoration, TCP42000 binding and native WSL control.
+
+
+## 2026-11-24 — v60 startup diagnosis, v61 fresh reset, v62 access correction
+
+- Recovered the private access log while v61 was open. v60 completed its
+  elevation request but its original-root check failed. Both RTLD_DEFAULT
+  root-function and loader-API lookups failed; the title intentionally requested
+  shell exit before fonts/UI. This was not a verified decoder/STPP crash.
+- v60's fresh reset was incomplete: old plugins remained and no completion
+  marker existed. Replaced opendir/readdir/lstat reset traversal with the
+  established console directory reader and no-follow opens. The access probe
+  now proves an actual directory read. Added bounded, multi-batch and symlink
+  preservation tests and durable startup/reset/access stages.
+- Signed/readback-verified/mounted v61 (01.000.061), ZIP SHA-256
+  `45abf4e030aa08f1c5ec8531df70729d97e7a8bd063b5391488cfa008155896f`.
+  Console startup reached fonts, pad and UI. Fresh-reset log and completion
+  marker confirm success; the previous plugins-v23 tree is absent.
+- v61 logs show existing file access, not a helper credential change. Both
+  STPP42000 and diagnostics42001 fail to bind with errno13. Thus filesystem
+  success cannot be used as the access experiment's completion criterion.
+- v62 explicitly requests the same pinned one-shot helper/owned PID protocol
+  without the existing-filesystem shortcut or resident request marker. Added
+  tests for existing-access bypass, acknowledgement/PID mismatch, corrupt proof,
+  unsupported capability and null helper path. The privileged helper is unchanged.
+- Replaced failed RTLD_DEFAULT loader lookup with public SDK imports and loaded
+  module symbol resolution. Verified the fallback kernel_sys file exists on
+  the console; no static kernel_sys startup dependency is introduced. Added
+  file-only startup capture before helper execution, with no listener/worker.
+- Full self-check (optional network/Matroska/UI fixtures and public client
+  regressions) and signed v62 packaging pass. ZIP 7,706,558 bytes, SHA-256
+  `2757c2c476427786a863c5c909af6e9ca0f8c6fa2dd70c8637315f03c99f33ae`;
+  eboot SHA-256
+  `b6e4fe60c66e90935f36c5bc72a6cc99c6a3f6cceb4bd7208f961cd82d64af4c`.
+- User permits autonomous further work while unavailable10h. Verified current
+  ShadowMount1.7beta12 API capabilities and remote unmount; bounded kernel/debug
+  logs are available through its API even with TCP3232 closed. PFS presence alone
+  is not proof that a process is live. Autonomous launch support is being checked.
+- v62 is readback-verified, activated and mounted with the one-shot access request. The
+  successful fresh v61 state is preserved. Native helper/bind/WSL control remain
+  pending the next actual v62 launch; no remote-control pass is claimed yet.

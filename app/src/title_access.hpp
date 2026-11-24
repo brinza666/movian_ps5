@@ -14,7 +14,7 @@ struct Result {
 // preloads and retains IME/videodec2 before access. Success verifies filesystem
 // access; the caller must separately prove bind/listen succeeds.
 // Requires /app0/stpp-title-access-test.request = "PPSA99456\n" and absence of
-// /download0/stpp-title-access-test.consumed. Consumes the request privately.
+// /download0/stpp-title-access-test-v62.consumed. Consumes the request privately.
 Result request_for_test() noexcept;
 // True only after the pinned helper exchange, data proof, UID 0 and root proof.
 // Existing/resident data access alone never establishes credential changes.

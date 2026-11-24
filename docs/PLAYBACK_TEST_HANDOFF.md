@@ -1,3 +1,44 @@
+# Autonomous work and v62 test — 2026-11-24
+
+Latest user says unavailable for 10h; continue planned missing options and use remote
+console lifecycle without asking for Cross/CloseGame. No webcam/Chiaki. Keep
+original STPP objective; do not stop other work if actual launch service is missing.
+
+Active checkout/branch unchanged. v62 is now mounted, sourcebaseline/signedZIP
+build/PPSA99456-v62.zip (7,706,558 bytes), SHA256
+2757c2c476427786a863c5c909af6e9ca0f8c6fa2dd70c8637315f03c99f33ae.
+Eboot SHA256 b6e4fe60c66e90935f36c5bc72a6cc99c6a3f6cceb4bd7208f961cd82d64af4c.
+All 29 files readback verified; exact one-shot request separate. v61 fresh reset done
+is preserved; no repeated wipe. Closed image backups again verified before62 under
+D:/GPTDEEP/PS5-Movian-Backups/2026-11-23/profiles (proofprivatefile
+build/v62-console/current-profile-proof.txt). Active folder /data/homebrew/PPSA99456.
+
+V60 failure recovered: helper status0 then original root check fails; RTLD_DEFAULT
+loader API lookup fails; requests shell exit before UI. V61 actual console PASS fresh reset,
+fonts/pad/UI; old plugins tree absent. Its access path=existing (not credential proof);
+STPP42000 and diagnostics42001 bind fail errno13. Actual private access log600 was
+retrieved by temporarily CHMOD644 over FTP, then restored600. Logs are private under
+build/v60-console/live-v61-20261124 and build/v61-console. Do notpublishrawlogs.
+
+V62 fixespublic SDK loader imports/module lookup and forces pinned owned helper protocol
+without filesystem shortcut/resident marker. Privileged helper unchanged. File-only
+startup capture before helper starts no thread. Full optional selfcheck + owned client
+regressions and signed build passed. Need actual62 launch, helper/pathproof, bind and
+nativeWSLcontrol. Capturer build/v62-console/live_capture.py stores
+build/v62-console/live-20261124. Ignore older loop PIDs/stale ports; redo inventory.
+
+Remote lifecycle: SMP1.7beta12 version/capabilities has mount/unmount + bounded
+kernel-log/debug-log APIs, not launch/terminate. PFS root presence is not process proof;
+remote unmount succeeded after user closed61. POST /api/v1/kernel-log max_bytes131072
+provides kernel log with TCP3232 closed. User states ELF loader9021 enabled; external
+portrefused so only actual title localhost test establishes availability.
+Agent shadowmount_control investigates existing Suite TCP port from private FTP metadata;
+no protocol guesses/mutations. User authorized own Movian lifecycle. WSL UI currently
+owned by ui_options_research; coordinate before PS5 STPP view test. planned_quit owns
+ui.cpp/ui_stpp.inc/settings_menu/networkshutdown/tests touches for nextv63; do not
+mix those unverified worktree changes into the compiled v62 artifact claim. Root compiled
+UI snapshot isbuild/v62-console/ui-compiled.cpp for baseline commit.
+
 # v60 console deployment — 2026-11-24
 
 v60 is now uploaded/readback-verified, activated and mounted. Version/hash are

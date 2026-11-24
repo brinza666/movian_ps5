@@ -7,11 +7,15 @@ trap 'rm -rf -- "$scratch"' EXIT
 
 python3 tests/stpp_protocol.py
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
-    app/src/profile_reset.cpp tests/profile_reset.cpp -o "$scratch/profile-reset"
+    app/src/profile_reset.cpp app/src/title_access_io.cpp app/src/fs.cpp tests/profile_reset.cpp -o "$scratch/profile-reset"
 (mkdir -p "$scratch/profile-work" && cd "$scratch/profile-work" && ../profile-reset)
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -pthread -DMOVIAN_STPP_TEST -Iapp/src \
     tests/stpp_server.cpp app/src/stpp.cpp -l:libcrypto.so.3 -o "$scratch/stpp-server"
 "$scratch/stpp-server"
+starter=${PS5_STARTER:-/mnt/c/Users/brinza/Documents/deep/ps5-homebrew-starter}
+if [[ -f $starter/kit/tests/test_elevation.cpp ]]; then
+    python3 tests/title_access_client.py "$starter" "$scratch" "${CXX:-c++}"
+fi
 
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HAVE_SMB2 -Iapp/src \
     tests/input_file.cpp -o "$scratch/input-file"

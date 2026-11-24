@@ -18,5 +18,7 @@ std::size_t copy_entries(Entry *entries, std::size_t capacity) noexcept;
 void record(const char *area, const char *format, ...) noexcept
     __attribute__((format(printf, 2, 3)));
 bool enable(bool enabled) noexcept;
+// File-only startup capture: no socket or worker before the owned-helper test.
+bool capture_file() noexcept;
 bool lan_enabled() noexcept;
 }

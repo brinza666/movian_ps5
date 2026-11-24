@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "title_access.hpp"
 #include "diagnostics.hpp"
+#include "title_access_io.hpp"
 
 #if defined(MOVIAN_TITLE_ACCESS_LAPY) && !defined(MOVIAN_HOST_PREVIEW)
 // The build copies the installed public starter client with its original
@@ -11,22 +12,32 @@
 #include <cstring>
 #include <cerrno>
 #include <cstdio>
-#include <dlfcn.h>
+#include <iterator>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 extern "C" int __real_sceSysmoduleLoadModule(std::uint16_t id);
 extern "C" int __real_sceSysmoduleUnloadModule(std::uint16_t id);
+// Public SDK imports; these resolve through the title's existing libkernel.
+extern "C" int sceKernelLoadStartModule(const char *,std::uint64_t,const void *,std::uint32_t,void *,int *);
+extern "C" int sceKernelDlsym(int,const char *,void **);
+extern "C" int sceKernelGetModuleList(int *,std::size_t,std::size_t *);
+namespace elevation {
+Status request_owned_for_test(Capability,const char *) noexcept;
+}
 
 namespace {
+int access_log_fd=-1;
 struct KeptModule { std::uint16_t id; bool loaded; };
 KeptModule kept_modules[] = {{0x0096, false}, {207, false}};
 
 void probe(int descriptor, const char *stage, int result) noexcept {
+    const int error=result<0?errno:0;
+    movian::diagnostics::record("title-access-stage","%s result=0x%x errno=%d",stage,static_cast<unsigned>(result),error);
     char message[160];
     const int size = std::snprintf(message, sizeof message, "%s result=0x%x errno=%d\n",
-        stage, static_cast<unsigned>(result), result < 0 ? errno : 0);
+        stage, static_cast<unsigned>(result), error);
     if (size <= 0 || static_cast<unsigned>(size) >= sizeof message) return;
     if (descriptor >= 0) (void)write(descriptor, message, static_cast<unsigned>(size));
     (void)write(STDERR_FILENO, message, static_cast<unsigned>(size));
@@ -56,8 +67,6 @@ bool exact_request(const char *path) noexcept {
         std::memcmp(contents, expected, sizeof(expected) - 1) == 0;
 }
 
-using LoadModule = int (*)(const char *, std::uint64_t, const void *, std::uint32_t, void *, int *);
-using ResolveModule = int (*)(int, const char *, void **);
 using ChangeRoot = int (*)(const char *);
 using ChangeDirectoryFd = int (*)(int);
 
@@ -68,23 +77,27 @@ bool same_root(int root_fd) noexcept {
 }
 
 bool restore_own_root(int root_fd, int log_fd) noexcept {
-    // These are ordinary public loader APIs in the already-imported libkernel.
-    // Resolve the privileged libc functions only after access, avoiding any
-    // libkernel_sys dependency during title startup.
-    auto root = reinterpret_cast<ChangeRoot>(dlsym(RTLD_DEFAULT, "chroot"));
-    auto directory = reinterpret_cast<ChangeDirectoryFd>(dlsym(RTLD_DEFAULT, "fchdir"));
-    probe(log_fd, "resolve loaded chroot/fchdir", root && directory ? 0 : -1);
-    if (!root || !directory) {
-        auto load = reinterpret_cast<LoadModule>(dlsym(RTLD_DEFAULT, "sceKernelLoadStartModule"));
-        auto resolve = reinterpret_cast<ResolveModule>(dlsym(RTLD_DEFAULT, "sceKernelDlsym"));
-        if (!load || !resolve) {
-            probe(log_fd, "resolve public loader APIs", -1);
-            return false;
+    // RTLD_DEFAULT name lookup failed on the console in v60. Import the public
+    // loader APIs normally and resolve optional root functions in loaded modules.
+    ChangeRoot root=nullptr; ChangeDirectoryFd directory=nullptr;
+    int modules[256]; std::size_t count=0;
+    const int listed=sceKernelGetModuleList(modules,std::size(modules),&count);
+    probe(log_fd,"list loaded modules",listed);
+    if(listed==0 && count<=std::size(modules)) {
+        for(std::size_t i=0;i<count && (!root || !directory);++i) {
+            void *root_symbol=nullptr,*directory_symbol=nullptr;
+            if(sceKernelDlsym(modules[i],"chroot",&root_symbol)==0 && root_symbol &&
+               sceKernelDlsym(modules[i],"fchdir",&directory_symbol)==0 && directory_symbol) {
+                root=reinterpret_cast<ChangeRoot>(root_symbol);
+                directory=reinterpret_cast<ChangeDirectoryFd>(directory_symbol);
+            }
         }
+    }
+    probe(log_fd,"resolve loaded chroot/fchdir",root && directory?0:-1);
+    if (!root || !directory) {
         int module_status = 0;
-        // Exact SONAME exported by the installed public SDK; no guessed NIDs,
-        // syscall numbers, system paths or alternate kernel implementation.
-        const int handle = load("libkernel_sys.sprx", 0, nullptr, 0, nullptr, &module_status);
+        // File presence independently verified on the console through FTP.
+        const int handle = sceKernelLoadStartModule("/system/common/lib/libkernel_sys.sprx", 0, nullptr, 0, nullptr, &module_status);
         if (log_fd >= 0) {
             char message[128];
             const int size = std::snprintf(message, sizeof message,
@@ -95,10 +108,10 @@ bool restore_own_root(int root_fd, int log_fd) noexcept {
         }
         if (handle < 0) return false;
         void *root_symbol = nullptr, *directory_symbol = nullptr;
-        int result = resolve(handle, "chroot", &root_symbol);
+        int result = sceKernelDlsym(handle, "chroot", &root_symbol);
         probe(log_fd, "resolve libkernel_sys chroot", result);
         if (result < 0 || !root_symbol) return false;
-        result = resolve(handle, "fchdir", &directory_symbol);
+        result = sceKernelDlsym(handle, "fchdir", &directory_symbol);
         probe(log_fd, "resolve libkernel_sys fchdir", result);
         if (result < 0 || !directory_symbol) return false;
         root = reinterpret_cast<ChangeRoot>(root_symbol);
@@ -117,7 +130,7 @@ bool restore_own_root(int root_fd, int log_fd) noexcept {
     if (result != 0) return false;
     const bool verified = same_root(root_fd) &&
         exact_request(MOVIAN_APP0 "/stpp-title-access-test.request") &&
-        exact_request(MOVIAN_DOWNLOAD0 "/stpp-title-access-test.consumed");
+        exact_request(MOVIAN_DOWNLOAD0 "/stpp-title-access-test-v62.consumed");
     probe(log_fd, "restore original root and title paths proof", verified ? 0 : -1);
     return verified;
 }
@@ -132,6 +145,10 @@ bool restore_own_root(int root_fd, int log_fd) noexcept {
     (void)movian::title_access::request_exit();
     for (;;) (void)usleep(100000);
 }
+}
+
+extern "C" void movian_title_access_trace(const char *stage,int result) noexcept {
+    probe(access_log_fd,stage,result);
 }
 
 extern "C" int __wrap_sceSysmoduleLoadModule(std::uint16_t id) {
@@ -162,10 +179,11 @@ Result request_for_test() noexcept {
     // another launch. The operator removes that marker for an explicit retry.
     constexpr char source[] = MOVIAN_APP0 "/stpp-title-access-test.request";
     constexpr char marker[] = MOVIAN_DOWNLOAD0 "/stpp-title-access-test";
-    constexpr char consumed[] = MOVIAN_DOWNLOAD0 "/stpp-title-access-test.consumed";
+    constexpr char consumed[] = MOVIAN_DOWNLOAD0 "/stpp-title-access-test-v62.consumed";
     constexpr char expected[] = "PPSA99456\n";
     if (!exact_request(source))
         return {false, false, 0, "disabled"};
+    (void)diagnostics::capture_file();
     const int claim = open(consumed, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (claim < 0) return {false, false, 0, "disabled"};
     const bool claimed = write(claim, expected, sizeof(expected) - 1) == sizeof(expected) - 1;
@@ -192,7 +210,7 @@ Result request_for_test() noexcept {
         diagnostics::record("title-access", "could not open private probe log; skipping helper");
         return {true, false, static_cast<unsigned>(elevation::Status::prepare_failed), "none"};
     }
-    probe(log_fd, "v60 explicit request consumed", 0);
+    probe(log_fd, "v62 explicit request consumed", 0);
     if (!preload_modules(log_fd)) {
         diagnostics::record("title-access", "required module preload failed; skipping helper");
         (void)close(log_fd);
@@ -215,7 +233,9 @@ Result request_for_test() noexcept {
         return {true, false, static_cast<unsigned>(elevation::Status::prepare_failed), "none"};
     }
     probe(log_fd, "before public elevation request", 0);
-    const auto status = elevation::request(elevation::Capability::filesystem);
+    access_log_fd=log_fd;
+    const auto status = elevation::request_owned_for_test(elevation::Capability::filesystem,MOVIAN_APP0 "/lapy.elf");
+    access_log_fd=-1;
     probe(log_fd, "public elevation status", static_cast<int>(status));
     const bool verified = status == elevation::Status::ok;
     bool root_restored = same_root(root_fd);
