@@ -6,6 +6,7 @@ scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 
 python3 tests/stpp_protocol.py
+python3 tests/ps5_title_control.py
 "${CXX:-c++}" -std=c++20 -Wall -Wextra -Werror -DMOVIAN_HOST_PREVIEW -Iapp/src \
     tests/plugin_uninstall.cpp -o "$scratch/plugin-uninstall"
 (mkdir -p "$scratch/plugin-work" && cd "$scratch/plugin-work" && ../plugin-uninstall)

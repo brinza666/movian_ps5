@@ -50,6 +50,22 @@ PS5 Suite source contains a launch command, but its failed-launch fallback can c
 
 ## Safe deployment and verification sequence
 
+The host CLI `scripts/ps5-title-control.py` implements the observed Minion routes:
+
+```powershell
+python scripts/ps5-title-control.py status --host CURRENT_PS5_IP
+python scripts/ps5-title-control.py launch --host CURRENT_PS5_IP
+python scripts/ps5-title-control.py close --host CURRENT_PS5_IP
+```
+
+It requires an explicit verified private IPv4 address and controls only PPSA99456.
+Tokens remain in memory. It rejects malformed/ambiguous process state, refuses
+launch when another game runs, rechecks the test app ID before closing, and
+requires a process transition after acknowledgment. Six host tests cover these
+guards, including a changed instance and an acknowledgment without a transition.
+They do not prove console launch/close. The first real read-only status attempt
+was refused by port9180; no launch or close request was sent.
+
 1. Acquire Minion token, read processes, and identify the exact test title. If another title is running, leave it untouched.
 2. If needed, close only the freshly identified `PPSA99456` app ID; verify its process disappears and capture lifecycle logs.
 3. Use the existing verified backup/deployment procedure. Mount the test title through ShadowMountPlus and verify the intended build files/hashes.

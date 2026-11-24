@@ -1,3 +1,23 @@
+# Publication and remote lifecycle checkpoint — 24 November 2026
+
+v64 release is public and all three asset digests match local files:
+https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64
+Source tag points to 318631e. Branch website update is 36e9a9e; main publication
+is 24fda04, followed by main README link correction ed167fa. Pages workflow
+45435801322 succeeded on attempt2 after a transient deployment-backend failure;
+HTTP200 page now contains v64 at https://brinza666.github.io/movian_ps5/.
+Unrelated camera prototypes remain untracked and unpublished.
+
+New guarded host script scripts/ps5-title-control.py targets only PPSA99456,
+with six tests in tests/ps5_title_control.py and a self-check entry. Use status
+first against the current verified console IP, then the documented Minion
+launch/close sequence. Host tests pass; actual console status failed at the token
+GET with connection refusal, so no launch/close mutation was sent. Both Windows
+and WSL currently refuse saved-address ports2121/10101/9180. The async current-IP
+question remains unanswered. No console-only one-shot opt-in was changed.
+No existing browser console-control tab supplied a newer address. WSL is local
+Home; the owned v64 host server is stopped. Do not restart webcam/Chiaki.
+
 # Latest continuation — v64, 24 November 2026
 
 The user has just reported "PS5 is up". Rechecks at saved 192.168.10.238 on FTP2121,

@@ -503,3 +503,18 @@ experiment remains gated. v62 is mounted; v64 is not console-tested/uploaded.
 After the user reported PS5 online, the saved address's services alternated
 between refusal and timeout, ending in timeouts on FTP2121, SMP10101, Minion9180.
 Current IP clarification is pending. See [v64](UI_V64.md) for remaining checks.
+
+## 2026-11-24 — v64 publication and lifecycle guard
+
+Published the v64 prerelease with binary ZIP, matching dependency source archive
+and SHA256SUMS. GitHub asset digests match local files. Updated development/main
+README and project page; Pages workflow45435801322 succeeded on attempt2 after
+an initial transient backend deployment failure. HTTP200 page includes v64.
+The v60 release now records its actual startup failure and links to v64.
+
+Added a host-only Minion control CLI restricted to PPSA99456. Six tests pass for
+other-game refusal, exact app-ID recheck, malformed/ambiguous state and verifying
+a process transition rather than trusting an ACK. A real status call failed at
+token GET; no launch/close command was sent. Both Windows and WSL now report
+connection refused on saved-address FTP2121, SMP10101 and Minion9180. Current-IP
+clarification remains pending. The PS5 active build remains mounted v62.

@@ -1,9 +1,12 @@
 # Movian PS5 v60 — STPP remote-control preview
 
 Native ShadowMountPlus test title **PPSA99456**, version **01.000.060**.
-This prerelease is host-tested and signed. **PS5 v60 startup, access, listener
-binding and remote operation are pending: the console went offline before upload.**
-The last installed/startup-verified console build remains v59.
+This is a historical host-tested preview. **The first v60 console launch exited
+before Home after a root-restoration loader lookup failed.** A subsequent v61
+reached Home and completed the requested reset, but STPP/diagnostics binds failed
+with errno13. v62 corrects loader/owned-helper handling and remains mounted,
+awaiting console acceptance. See the newer [v64 preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64)
+for shared Quit, native plugin removal and current verification limits.
 
 ## What changed
 
