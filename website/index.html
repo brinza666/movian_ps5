@@ -84,30 +84,35 @@
   </header>
   <main>
     <section>
-      <h2>Latest preview: v60 — STPP remote control</h2>
-      <p>The signed <strong>v60</strong> package, title <code>PPSA99456</code>, adds
-        a compatible property server and shared Home/Settings callbacks. Unmodified WSL
-        Movian rendered the interface and changed/restored a persisted setting.</p>
-      <p><strong>PS5 v60 startup and transport are pending.</strong> The console went
-        offline before upload. This is a host-tested preview; v59 remains the last
-        installed and startup-verified console build.</p>
-      <p><a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60">v60 release notes and assets</a>
-        · <a href="https://github.com/brinza666/movian_ps5/releases/download/playback-test-v60/PPSA99456-v60.zip">Download v60 ZIP</a>
-        · <a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v53">Previous v53 release</a></p>
-      <p class="subtle">ZIP: 7,706,570 bytes. SHA-256<br>
-        <code>73b8b7a940703cf24abe6668ee53368ed74a451096b6c82c5e3b8421d419ef19</code></p>
-      <h2>Development after v53</h2>
-      <p>v54–v59 add expanded settings, authenticated SMB2/FTP browsing and seekable playback,
-        plugin ZIP/torrent imports from shares and tracker protocol controls. The user confirmed
-        SMB and FTP playback, sound and seeks on v57, and network imports on v58.</p>
-      <p><strong>v59 is the last installed and startup-verified console build.</strong>
-        A small numeric-IP torrent completed a verified RAM transfer and 180 HEVC 1080p
-        hardware frames through EOF. Hostname-based tracker/DHT discovery remains unresolved;
-        sustained feature-length torrent playback and rolling-cache seeks remain open.</p>
-      <p>v60 includes optional one-shot title-access and fresh-profile reset support.
-        Public ZIPs contain no authorization requests and do not erase profiles on installation.
-        Discovery, complete settings/dialog controls, artwork, screenshots and autonomous relaunch
-        remain separate implementation steps.</p>
+      <h2>Latest preview: v64 — Quit and native plugin removal</h2>
+      <p>The signed <strong>v64</strong> package, title <code>PPSA99456</code>, adds
+        orderly local/remote Quit, native-style plugin details and working Uninstall.
+        The unmodified WSL Movian viewer displayed the remote details, removed a
+        disposable plugin and received its updated status. Another plugin survived.</p>
+      <p><strong>v64 has not been tested on PS5.</strong> Full host checks and signed
+        packaging passed. v61 reached Home and completed the requested reset, but
+        listeners failed bind. v62 remains mounted awaiting startup/access/STPP checks;
+        the console services were unreachable on the last attempt.</p>
+      <p><a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64">v64 release notes and assets</a>
+        · <a href="https://github.com/brinza666/movian_ps5/releases/download/playback-test-v64/PPSA99456-v64.zip">Download v64 ZIP</a>
+        · <a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60">Previous v60 preview</a></p>
+      <p class="subtle">ZIP: 7,713,845 bytes. SHA-256<br>
+        <code>422c96f03f906c9686f7e475770fc5c169848dd7cfd04887948c9ab3d82f6bae</code></p>
+      <h2>Verified behavior and open work</h2>
+      <p>v54–v59 added expanded settings, SMB2/FTP browsing and seekable playback,
+        plugin ZIP/torrent imports from shares and tracker protocol controls. The user
+        confirmed SMB and FTP playback, sound and seeking, and network ZIP imports.</p>
+      <p>A small numeric-IP torrent completed verified RAM transfer and 180 HEVC 1080p
+        hardware frames through EOF on v59. Hostname discovery, sustained feature-length
+        playback and rolling-cache seeks remain open.</p>
+      <p>The recovered v60 failure was an intentional exit after root-restoration
+        lookup failed. v62 corrects the loader/owned helper request but needs console
+        verification. Access support is optional and separately gated; public ZIPs
+        contain no authorization/reset requests and do not erase profiles by installation.</p>
+      <p>Complete desktop UI/settings parity, Upgrade/reinstall provenance, remote
+        artwork resources, discovery and autonomous console relaunch still need work.
+        <a href="https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/UI_V64.md">v64 evidence and limitations</a>
+        records host, native WSL and console results separately.</p>
       <p><a href="https://github.com/brinza666/movian_ps5/tree/test/native-playback">Development branch and current instructions</a>
         · <a href="https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/REMOTE_CONTROL_STPP.md">STPP findings</a></p>
     </section>
