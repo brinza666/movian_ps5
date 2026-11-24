@@ -1,3 +1,13 @@
+# Final publication check — 24 November 2026
+
+Console deployment/test report and lifecycle ACK correction were pushed in14c86fe.
+Main project page/README update is9ec4751; Pages run45471657776 succeeded and
+HTTP200 page shows uploaded/mounted/running v64 plus FAILED STPP control. Release
+notes were updated; asset hashes and source tag remain unchanged. Source worktree
+has no unrelated tracked edits; camera prototypes stay untracked. v64 remains
+running; the WSL reference is local Home with debug enabled. See next section for
+the exact current console blocker and next build acceptance.
+
 # Active console checkpoint — v64, 24 November 2026
 
 Latest request: upload/mount v64 via FTP2121, test real WSL STPP, update log.
@@ -47,8 +57,9 @@ ftpsrv0.19 DELE returned226 (operation had succeeded; Python FTP.delete expected
 All original PC copies and remaining remote files were reverified before resume.
 No /data/.PPSA99456-* backup/stage folders remain; production/media unchanged.
 
-Current uncommitted source changes are only host CLI ACK validation and its test,
-plus this documentation. No PS5 application binary source changed in this turn.
+Host CLI ACK validation, its seventh test and the console report are committed
+in 14c86fe. The final handoff follow-up is documentation only. No PS5 application
+binary source changed in this turn.
 Preserve the unrelated untracked camera prototypes. Public v64 release remains
 same assets; update its runtime report without retagging/rebuilding that ZIP.
 
