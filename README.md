@@ -4,7 +4,7 @@ Native C++20 media-center homebrew, packaged as a signed ShadowMountPlus folder 
 
 **Playback test branch: `test/native-playback`, title `PPSA99456`.** The separate production title is `PPSA99455`. Keep their application folders and persistent profiles separate.
 
-As of 24 November 2026, [v64 is the latest preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64). It adds orderly local/remote Quit and native-style plugin details/Uninstall. Full host checks, real WSL Movian remote Uninstall and signed packaging passed. **PS5 v64 startup and control remain untested.** v61 reached Home and completed the requested fresh reset, but its listeners failed bind; v62 is mounted and awaiting launch/access/WSL verification. See the [release notes](docs/release-notes/playback-test-v64.md), [v64 evidence](docs/UI_V64.md) and [port log](docs/PORT_LOG.md).
+As of 24 November 2026, [v64 is the latest preview](https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64). It adds orderly local/remote Quit and native-style plugin details/Uninstall. Full host checks, real WSL Movian remote Uninstall and signed packaging passed. **PS5 v64 startup and control remain untested.** v61 reached Home and completed the requested fresh reset, but its listeners failed bind; v62 is mounted and awaiting launch/access/WSL verification. See the [release notes](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/release-notes/playback-test-v64.md), [v64 evidence](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/UI_V64.md) and [port log](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/PORT_LOG.md).
 
 ## Capabilities and evidence
 
@@ -39,7 +39,7 @@ bash app/build.sh
 
 `app/build.sh` fetches pinned Duktape/miniz/Gumbo sources, builds libsmb2 as needed, links existing static FFmpeg libraries and signs/packages `eboot.bin` through the kit. Run the FFmpeg step first for a fresh checkout. Generated dependencies and artifacts stay under ignored `.deps/` and `build/`. The title ID comes from `app/sce_sys/param.json`; older production documents use `PPSA99455`.
 
-From PowerShell in this checkout, run the required check with `wsl -d Ubuntu-24.04 -- bash scripts/self-check.sh`. Optional plugin, Matroska and real SMB2/FTP fixtures require the `MOVIAN_HOST_*` paths in [the script](scripts/self-check.sh). A base check does not imply optional fixtures ran. Host results and console results are recorded separately.
+From PowerShell in this checkout, run the required check with `wsl -d Ubuntu-24.04 -- bash scripts/self-check.sh`. Optional plugin, Matroska and real SMB2/FTP fixtures require the `MOVIAN_HOST_*` paths in [the script](https://github.com/brinza666/movian_ps5/blob/test/native-playback/scripts/self-check.sh). A base check does not imply optional fixtures ran. Host results and console results are recorded separately.
 
 ## Install and verify on PS5
 
@@ -59,7 +59,7 @@ Settings and installed plugins persist in the title's `/download0` profile acros
 
 ## Remote control and diagnostics
 
-[STPP findings and implementation plan](docs/REMOTE_CONTROL_STPP.md) describes the observed Movian-to-Movian property protocol. Discovery uses UDP 42000; connect to the advertised HTTP port. STPP upgrades at `/api/stpp` and carries navigation, settings and live properties. Pixel/audio inspection requires separate verification.
+[STPP findings and implementation plan](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/REMOTE_CONTROL_STPP.md) describes the observed Movian-to-Movian property protocol. Discovery uses UDP 42000; connect to the advertised HTTP port. STPP upgrades at `/api/stpp` and carries navigation, settings and live properties. Pixel/audio inspection requires separate verification.
 
 This controller has been verified against an existing Movian peer. The PS5 title attempts STPP TCP 42000 when Network → Allow remote control is enabled. Diagnostics now use TCP 42001. Console binding is pending verification; use the actual reachable endpoint, not a claimed test pass.
 
@@ -82,17 +82,17 @@ The CLI defaults to observation and emits JSON events. Explicit `--open-url sett
 - **v59:** native network initialization, precise HTTP-stage diagnostics and persisted TCP & UDP / TCP / UDP tracker selection. Small numeric-IP RAM torrent playback passed through hardware EOF; hostname discovery remains blocked.
 - **v60:** STPP server/shared property adapter, native WSL control acceptance and default-off one-shot access/fresh-profile requests. Signed package and hashes are published; PS5 upload/runtime and fresh-profile execution remain pending.
 
-See [Network v55](docs/NETWORK_V55.md), [v58](docs/NETWORK_V58.md), [v59](docs/NETWORK_V59.md) and the [UI work list](docs/UI_WORK_LIST.md) for test details.
+See [Network v55](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/NETWORK_V55.md), [v58](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/NETWORK_V58.md), [v59](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/NETWORK_V59.md) and the [UI work list](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/UI_WORK_LIST.md) for test details.
 
 ## Source and credits
 
-`app/` is the live native application; `scripts/` holds build/test tools; `tests/` holds host fixtures; `website/` is the GitHub Pages source. `archive/` contains superseded experiments. Current desktop behavior comes from the inspected M7 7.0.273 WSL build and retained evidence; TorrServer and its pinned engine inform the torrent implementation. See [SPEC.md](SPEC.md), [desktop inventory](docs/M7_CAPABILITIES.md), [credits](docs/CREDITS.md), [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE).
+`app/` is the live native application; `scripts/` holds build/test tools; `tests/` holds host fixtures; `website/` is the GitHub Pages source. `archive/` contains superseded experiments. Current desktop behavior comes from the inspected M7 7.0.273 WSL build and retained evidence; TorrServer and its pinned engine inform the torrent implementation. See [SPEC.md](SPEC.md), [desktop inventory](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/M7_CAPABILITIES.md), [credits](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/CREDITS.md), [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE).
 
 Repository-authored code is GPL-3.0-or-later; dependencies retain their licenses. This independent project is unaffiliated with Sony. PlayStation and PS5 are Sony Interactive Entertainment trademarks.
 
 
 The v60 access experiment requires `MOVIAN_TITLE_ACCESS_TEST=1` at build time
 and a separate one-shot console request. Standard `bash app/build.sh` omits
-helper support. See [the exact opt-in/reset procedure](docs/STPP_V60.md). Public
+helper support. See [the exact opt-in/reset procedure](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/STPP_V60.md). Public
 ZIPs contain no request markers. Host UI acceptance can be rerun with
 `bash scripts/test-ui-stpp.sh` after provisioning its documented host dependencies.
