@@ -89,10 +89,11 @@
         orderly local/remote Quit, native-style plugin details and working Uninstall.
         The unmodified WSL Movian viewer displayed the remote details, removed a
         disposable plugin and received its updated status. Another plugin survived.</p>
-      <p><strong>v64 has not been tested on PS5.</strong> Full host checks and signed
-        packaging passed. v61 reached Home and completed the requested reset, but
-        listeners failed bind. v62 remains mounted awaiting startup/access/STPP checks;
-        the console services were unreachable on the last attempt.</p>
+      <p><strong>v64 is now uploaded, mounted and running on PS5.</strong> All29 packaged
+        files match exact signed readback; startup logs reach UI initialization.
+        <strong>STPP control failed:</strong> the listener was denied bind with errno13,
+        and the real WSL client connection reset. Remote navigation/setting writes
+        remain unverified. <a href="https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/STPP_V64_CONSOLE.md">Console results</a>.</p>
       <p><a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v64">v64 release notes and assets</a>
         · <a href="https://github.com/brinza666/movian_ps5/releases/download/playback-test-v64/PPSA99456-v64.zip">Download v64 ZIP</a>
         · <a href="https://github.com/brinza666/movian_ps5/releases/tag/playback-test-v60">Previous v60 preview</a></p>
@@ -106,8 +107,8 @@
         hardware frames through EOF on v59. Hostname discovery, sustained feature-length
         playback and rolling-cache seeks remain open.</p>
       <p>The recovered v60 failure was an intentional exit after root-restoration
-        lookup failed. v62 corrects the loader/owned helper request but needs console
-        verification. Access support is optional and separately gated; public ZIPs
+        lookup failed. the recovered v62 access attempt lacks successful title-root restoration
+        proof. v64 did not repeat the consumed experiment. Access support is optional and separately gated; public ZIPs
         contain no authorization/reset requests and do not erase profiles by installation.</p>
       <p>Complete desktop UI/settings parity, Upgrade/reinstall provenance, remote
         artwork resources, discovery and autonomous console relaunch still need work.
