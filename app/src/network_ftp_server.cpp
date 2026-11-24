@@ -22,6 +22,7 @@
 namespace movian::network {
 namespace {
 std::atomic<bool> serving{false};
+std::atomic<bool> server_done{true};
 int listener=-1;
 pthread_t server_thread;
 bool started=false;
@@ -228,8 +229,16 @@ void *loop(void *) {
         int client=accept(listener,nullptr,nullptr);
         if(client>=0) session(client);
     }
+    server_done.store(true,std::memory_order_release);
     return nullptr;
 }
+}
+void server_begin_shutdown() noexcept { serving=false; }
+bool server_is_quiescent() noexcept {
+    if(started && !server_done.load(std::memory_order_acquire)) return false;
+    if(started) { pthread_join(server_thread,nullptr); started=false; }
+    if(listener>=0) { ::close(listener); listener=-1; }
+    return true;
 }
 bool server_running() noexcept { return serving.load(); }
 bool restart_server() noexcept {
@@ -251,8 +260,9 @@ bool restart_server() noexcept {
         if(listener>=0) ::close(listener); listener=-1; return false;
     }
     serving=true;
+    server_done.store(false,std::memory_order_relaxed);
     started=pthread_create(&server_thread,nullptr,loop,nullptr)==0;
-    if(!started) { serving=false; ::close(listener); listener=-1; }
+    if(!started) { serving=false; server_done=true; ::close(listener); listener=-1; }
     return started;
 }
 } // namespace movian::network

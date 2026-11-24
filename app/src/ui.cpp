@@ -97,7 +97,7 @@ std::uint64_t g_started_ms = 0;
 char g_status[96] = "shell ready";
 int g_log_ok = 0;
 
-constexpr const char *kVersion = "v62";
+constexpr const char *kVersion = "v63";
 constexpr const char *kTitleId = "PPSA99456";
 constexpr const char *kBookmarksUri = "bookmarks:";
 constexpr const char *kSearchUri = "movian:local-search";
@@ -3112,6 +3112,7 @@ void reload_current_page() noexcept
     }
 }
 
+void request_quit() noexcept;
 void run_sidebar_action(const MenuEntry &entry) noexcept
 {
     switch (entry.id)
@@ -3192,6 +3193,7 @@ void run_sidebar_action(const MenuEntry &entry) noexcept
         g_place = Place::home;
         return;
     case MenuAction::settings: open_settings(true); return;
+    case MenuAction::exit: request_quit(); return;
     default:
         menu_info(entry.label, "This action is planned for a later PS5 build.");
         return;
@@ -3533,6 +3535,66 @@ void draw_status_strip(screen::Canvas &c) noexcept
              static_cast<unsigned long long>(ms / 1000), title_access::mode(), hwdec_status());
     c.text(48.f, 980.f, line, font::mono_medium, 16, Color::faint);
 }
+// All exit work runs on the UI thread. Workers keep their objects until their
+// completion flag is acquired and their thread has joined; no pthread_cancel.
+enum class QuitState { idle, draining, requested };
+QuitState g_quit = QuitState::idle;
+void request_quit() noexcept
+{
+    if (g_quit != QuitState::idle) return;
+    g_quit = QuitState::draining;
+    g_torrent_job.cancel.store(true, std::memory_order_release);
+    g_plugin_job.dismissed = true;
+    g_file_inspection.dismissed = true;
+    // close() persists playback resume and releases the decoder's cache reader.
+    player::close();
+    network::begin_shutdown();
+    diagnostics::record("ui", "Quit requested; waiting for owned workers");
+}
+void advance_quit() noexcept
+{
+    if (g_quit != QuitState::draining) return;
+    auto join_ready = [](auto &job) {
+        if (job.busy && job.ready.load(std::memory_order_acquire)) {
+            pthread_join(job.thread, nullptr);
+            job.busy = false;
+        }
+        return !job.busy;
+    };
+    // Evaluate each independently so an unfinished plugin cannot delay joining
+    // another completed worker. Do not apply results or start replacement jobs.
+    const bool plugin_done = join_ready(g_plugin_job);
+    const bool artwork_done = join_ready(g_artwork_job);
+    const bool inspection_done = join_ready(g_file_inspection);
+    const bool torrent_done = join_ready(g_torrent_job);
+    const bool network_done = network::is_quiescent();
+    // A native IME owns its buffer until it has finished closing. Discard its
+    // result without launching a login, network request or plugin callback.
+    const bool keyboard_done = keyboard::poll() != keyboard::State::open;
+    if (!plugin_done || !artwork_done || !inspection_done || !torrent_done ||
+        !network_done || !keyboard_done) return;
+    clear_login(g_plugin_job);
+    image::unload(g_artwork_job.result);
+    g_torrent_job.stream.reset();
+    keyboard::clear();
+    g_network_keyboard = -1;
+    g_settings_keyboard = g_home_keyboard = g_torrent_peer_input = false;
+    g_login_input = LoginInput::none;
+    g_plugin_text_key[0] = 0;
+    settings::save();
+    const bool saved_network = network::save();
+    diagnostics::record("ui", "Quit workers joined; network settings saved=%d", saved_network);
+    // The successful request may return before the shell closes the title.
+    // Remain in the main loop with live globals and never return from main.
+    g_quit = QuitState::requested;
+    const int result = title_access::request_exit();
+    if (result < 0) {
+        g_quit = QuitState::idle;
+        const bool resumed = network::cancel_shutdown();
+        diagnostics::record("ui", "Shell exit failed result=%d; network resumed=%d", result, resumed);
+        screen::notify("Could not close Movian. Please try Quit again.");
+    }
+}
 #include "ui_stpp.inc"
 } // namespace
 
@@ -3782,6 +3844,7 @@ bool handle_overlay(unsigned pressed) noexcept
                 g_settings_parent_row = g_settings_row;
                 g_settings_row = move_setting_row(-1, 1);
             }
+            else if(row.action==quit) request_quit();
             else if(row.action==network_servers) { g_overlay=Overlay::home_network; }
             else if(row.action==system_name || row.action==ftp_port || row.action==ftp_user || row.action==ftp_password || row.action==custom_repository)
             {
@@ -4115,13 +4178,24 @@ bool update_local() noexcept
 
 bool update() noexcept
 {
+    if (g_quit != QuitState::idle) {
+        advance_quit();
+        if (g_quit == QuitState::requested && g_property_server.port()) g_property_server.stop();
+        return true;
+    }
     stpp::Command command;
     bool dirty=false;
     // Bound work per frame even when a controller floods valid commands.
     for(unsigned count=0;count<16 && g_property_server.poll(command);++count) {
         property_command(command); dirty=true;
+        if (g_quit != QuitState::idle) break;
     }
-    dirty=update_local() || dirty;
+    if (g_quit == QuitState::idle) dirty=update_local() || dirty;
+    if (g_quit != QuitState::idle) {
+        advance_quit();
+        if (g_quit == QuitState::requested && g_property_server.port()) g_property_server.stop();
+        return true;
+    }
     if (!settings::get().remote_control && g_property_server.port()) g_property_server.stop();
     if (settings::get().remote_control && !g_property_server.port()) {
         static std::uint64_t retry=0;
@@ -4136,6 +4210,14 @@ bool update() noexcept
 
 void draw(screen::Canvas &canvas) noexcept
 {
+    if (g_quit != QuitState::idle) {
+        canvas.rect(0, 0, screen::width, screen::height, Color::bg);
+        canvas.text(72.f, 170.f, "Closing Movian", font::semibold, 38, Color::text);
+        canvas.text(72.f, 232.f, g_quit == QuitState::draining ?
+                    "Stopping playback and waiting for background tasks..." :
+                    "Waiting for the PS5 to close this title...", font::regular, 24, Color::muted);
+        return;
+    }
     const bool playing = player::active();
     if (playing)
     {

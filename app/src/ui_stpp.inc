@@ -102,6 +102,10 @@ void property_command(const stpp::Command &command) noexcept {
     }
     if(command.kind!=stpp::Command::Kind::Action && command.kind!=stpp::Command::Kind::Dynamic) return;
     const auto &action=command.text;
+    if ((command.binding=="nav" && action=="Quit") ||
+        (command.binding=="quit" && (action=="Activate" || action=="Enter" || action=="Quit"))) {
+        request_quit(); return;
+    }
     if(action=="Back" || action=="back") {
         if(g_overlay==Overlay::none && g_place==Place::home) return;
         g_remote_pressed|=pad::circle;
@@ -175,7 +179,10 @@ void publish_properties() {
                             }
                         }
                     }
-                } else b.at(b.add(key+"/event","eventSink",stpp::Type::Void,item)).binding="pending";
+                } else {
+                    const char *binding=row.action==settings_menu::quit ? "quit" : "pending";
+                    b.at(b.add(key+"/event","eventSink",stpp::Type::Void,item)).binding=binding;
+                }
             }
         }
     } else if(g_place==Place::videos) {

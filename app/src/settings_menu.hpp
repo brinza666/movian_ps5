@@ -13,7 +13,7 @@ enum Action {
     torrent_settings, about_info, manage_bookmarks, extensions, playback_clock, custom_repository,
     peer_connections, peer_requests, retrackers,
     system_name, smb_large, smb_attributes, ftp_enabled, ftp_port, ftp_user, ftp_password, network_servers,
-    tracker_protocols, remote_control,
+    tracker_protocols, remote_control, quit,
 };
 struct Row
 {
@@ -46,7 +46,7 @@ inline constexpr Row general[] = {
     heading("File browsing"), toggle("Enable file deletion from item menu"),
     toggle("Store per-file settings in filesystem"), toggle("Show filename extensions", extensions),
     toggle("Browse archives as folders"),
-    heading("Starting and stopping"), {"Quit"},
+    heading("Starting and stopping"), {"Quit", quit},
     heading("Plugins"), text("Launch plugin on M7 start"), text("Alternate plugin Repository URL", custom_repository),
     heading("Reset"), {"Clear cached files"}, {"Clear all metadata"}, {"Forget remembered passwords"},
     heading("PS5"), select("Plugin repository", repository), {"Plugin settings", plugins},

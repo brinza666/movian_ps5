@@ -1,5 +1,13 @@
 # Status
 
+2026-11-24, v63: General Quit, sidebar Exit and STPP Quit now use one
+orderly shutdown callback. Full host self-check and signed packaging passed.
+Active FTP/listing and worker-drain regressions passed; PS5 lifecycle acceptance
+remains pending. v62 is mounted but unlaunched: FTP 2121, ShadowMount 10101 and
+Minion 9180 time out. See [v63 scope](UI_V63.md), [planned options](PLANNED_OPTIONS.md)
+and [autonomous lifecycle APIs](SHADOWMOUNT_CONTROL.md).
+
+
 2026-11-24 follow-up: v61 reaches UI and completes the fresh plugin/config reset.
 Recovered v60 log identifies intentional shell exit after failed root-restoration
 loader lookups. v61 has filesystem access but no helper credential proof; both

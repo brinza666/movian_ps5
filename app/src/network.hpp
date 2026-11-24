@@ -27,6 +27,13 @@ void load() noexcept;
 bool save() noexcept;
 bool restart_server() noexcept;
 bool server_running() noexcept;
+// UI-thread shutdown: stop accepting work, then poll completion without blocking.
+// Saved server preferences and worker-owned memory remain intact.
+void begin_shutdown() noexcept;
+bool is_quiescent() noexcept;
+bool cancel_shutdown() noexcept; // only after quiescence, if shell exit failed
+void server_begin_shutdown() noexcept;
+bool server_is_quiescent() noexcept;
 bool valid_url(const char *url) noexcept;
 bool is_path(const char *path) noexcept;
 void root_path(int index, char *out, unsigned cap) noexcept;

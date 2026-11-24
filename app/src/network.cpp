@@ -45,6 +45,7 @@ extern "C" {
 namespace movian::network {
 namespace {
 Config cfg;
+bool shutting_down=false;
 constexpr char config_path[] = MOVIAN_DOWNLOAD0 "/network-private.bin";
 constexpr char magic[] = "MOVIAN-NET-2";
 bool clean(const char *s, unsigned cap) {
@@ -290,8 +291,23 @@ bool poll() noexcept {
     if(!running || !done.load(std::memory_order_acquire)) return false;
     pthread_join(worker,nullptr); running=false; ready=listing_generation==generation; return true;
 }
+void begin_shutdown() noexcept {
+    shutting_down=true;
+    server_begin_shutdown();
+}
+bool is_quiescent() noexcept {
+    (void)poll();
+    const bool server_done=server_is_quiescent();
+    return !running && server_done;
+}
+bool cancel_shutdown() noexcept {
+    if(!is_quiescent()) return false;
+    shutting_down=false;
+    return restart_server();
+}
 int list(const char *path,fs::Entry *out,int cap,int *count,int *error,bool other,fs::SortOrder sort,bool folders) noexcept {
     *count=0; *error=0;
+    if(shutting_down) { *error=ECANCELED; return -1; }
     if(!running && ready && !std::strcmp(path,listing.path) && other==listing.other && sort==listing.sort && folders==listing.folders) {
         if(listing.error) { *error=listing.error; return -1; }
         *count=std::min(cap,listing.count);

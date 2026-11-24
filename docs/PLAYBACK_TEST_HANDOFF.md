@@ -1,43 +1,79 @@
-# Autonomous work and v62 test — 2026-11-24
+# Autonomous work handoff — 2026-11-24, v63
 
-Latest user says unavailable for 10h; continue planned missing options and use remote
-console lifecycle without asking for Cross/CloseGame. No webcam/Chiaki. Keep
-original STPP objective; do not stop other work if actual launch service is missing.
+Active checkout: `C:/Users/brinza/Documents/deep/movian_ps5-playback-publish`,
+branch `test/native-playback`, origin `brinza666/movian_ps5`. The user is away
+for 10 hours and authorizes autonomous test-title launch/close and further
+planned-option work. Do not ask for physical Cross or Close Game. No webcam or
+Chiaki. The explicit default-off access experiment and backed-up fresh profile
+are authorized; never package request files. Production PPSA99455 stays separate.
 
-Active checkout/branch unchanged. v62 is now mounted, sourcebaseline/signedZIP
-build/PPSA99456-v62.zip (7,706,558 bytes), SHA256
-2757c2c476427786a863c5c909af6e9ca0f8c6fa2dd70c8637315f03c99f33ae.
-Eboot SHA256 b6e4fe60c66e90935f36c5bc72a6cc99c6a3f6cceb4bd7208f961cd82d64af4c.
-All 29 files readback verified; exact one-shot request separate. v61 fresh reset done
-is preserved; no repeated wipe. Closed image backups again verified before62 under
-D:/GPTDEEP/PS5-Movian-Backups/2026-11-23/profiles (proofprivatefile
-build/v62-console/current-profile-proof.txt). Active folder /data/homebrew/PPSA99456.
+## Saved builds and console state
 
-V60 failure recovered: helper status0 then original root check fails; RTLD_DEFAULT
-loader API lookup fails; requests shell exit before UI. V61 actual console PASS fresh reset,
-fonts/pad/UI; old plugins tree absent. Its access path=existing (not credential proof);
-STPP42000 and diagnostics42001 bind fail errno13. Actual private access log600 was
-retrieved by temporarily CHMOD644 over FTP, then restored600. Logs are private under
-build/v60-console/live-v61-20261124 and build/v61-console. Do notpublishrawlogs.
+- v62 remains mounted at `/data/homebrew/PPSA99456`, metadata `01.000.062`.
+  Its 29 files were readback-verified. ZIP SHA-256:
+  `2757c2c476427786a863c5c909af6e9ca0f8c6fa2dd70c8637315f03c99f33ae`.
+  Eboot: `b6e4fe60c66e90935f36c5bc72a6cc99c6a3f6cceb4bd7208f961cd82d64af4c`.
+  It has not been launched or accepted on console.
+- v63 is built and host-tested, not uploaded. `build/PPSA99456-v63.zip` is
+  7,707,847 bytes; SHA-256
+  `416dc0e6332c94c959046933960f892153f1dfb76630a641ef05f9bf994e6e14`.
+  Eboot: `70225f7753097d9dbbb8e61c2129e49269f873fca28780bf3728ca1b83a33436`.
+  See `build/v63-console/self-check.log`, `build.log`, `package-verification.json`.
+- v61 actually reached Home and completed the fresh reset; old plugins absent.
+  Filesystem access was `path=existing`, not helper credential proof. STPP42000
+  and diagnostics42001 both failed bind with errno13.
+- Recovered v60 access log proves deliberate shell exit after failed root-restore
+  loader lookup. v62 fixes direct loader imports/module lookup and explicitly
+  requests the unchanged pinned owned helper protocol. Full host regressions
+  passed; actual helper/root/listener acceptance remains open.
 
-V62 fixespublic SDK loader imports/module lookup and forces pinned owned helper protocol
-without filesystem shortcut/resident marker. Privileged helper unchanged. File-only
-startup capture before helper starts no thread. Full optional selfcheck + owned client
-regressions and signed build passed. Need actual62 launch, helper/pathproof, bind and
-nativeWSLcontrol. Capturer build/v62-console/live_capture.py stores
-build/v62-console/live-20261124. Ignore older loop PIDs/stale ports; redo inventory.
+## Next unfinished acceptance
 
-Remote lifecycle: SMP1.7beta12 version/capabilities has mount/unmount + bounded
-kernel-log/debug-log APIs, not launch/terminate. PFS root presence is not process proof;
-remote unmount succeeded after user closed61. POST /api/v1/kernel-log max_bytes131072
-provides kernel log with TCP3232 closed. User states ELF loader9021 enabled; external
-portrefused so only actual title localhost test establishes availability.
-Agent shadowmount_control investigates existing Suite TCP port from private FTP metadata;
-no protocol guesses/mutations. User authorized own Movian lifecycle. WSL UI currently
-owned by ui_options_research; coordinate before PS5 STPP view test. planned_quit owns
-ui.cpp/ui_stpp.inc/settings_menu/networkshutdown/tests touches for nextv63; do not
-mix those unverified worktree changes into the compiled v62 artifact claim. Root compiled
-UI snapshot isbuild/v62-console/ui-compiled.cpp for baseline commit.
+FTP2121, ShadowMount10101 and Minion9180 initially worked, then refused and now
+all time out before any autonomous launch request. Recheck after meaningful work.
+When reachable, use the existing Minion exact-title API, documented in
+`docs/SHADOWMOUNT_CONTROL.md`: acquire a token only in memory, read actual processes,
+launch PPSA99456 only when no other game runs, and close only its freshly confirmed
+app ID. Never infer a process from a profile mount. Mount/unmount is not launch/close.
+
+First launch mounted v62; read startup/access logs, verify helper status, root
+proof and listener42000. Then use actual WSL Movian against the PS5 endpoint to
+navigate Settings and change/restore a real setting with pushed updates. A host
+preview on42011 is not console proof. Afterward deploy v63, verify local/remote
+Quit and relaunch. Never send a signed eboot.bin to9021.
+
+Private console scripts/evidence are in `build/v62-console`; current closed-image
+backup proof is in `current-profile-proof.txt`. PC backups are consolidated under
+`D:/GPTDEEP/PS5-Movian-Backups/2026-11-23`. The v61-before-v62 rollback folder still
+needs verified archival. Do not run the old archive script while any needed staged
+build exists: it archives every `/data/.PPSA99456-*` folder. Media remains intact.
+
+## Planned-option progress
+
+v63 implements General Quit, sidebar Exit and STPP Quit via one callback. Full
+optional self-check, worker/IME/FTP/listing drain tests, refusal recovery and signed
+build pass. Shell/playback/IME host boundaries are fakes; no PS5/audio claim.
+`docs/UI_V63.md` describes it. `docs/PLANNED_OPTIONS.md` inventories each pending
+setting with its own test; regenerate its table using `scripts/planned-settings.cpp`.
+
+Next independent feature is P02 plugin details/Uninstall. Actual installed WSL
+M7 7.0.273 and shipped flat view show ONE status-dependent Install/Upgrade/Uninstall
+button. Changelog is commented out; the current PS5 five-action menu is incorrect.
+Native Uninstall immediately removes installed ZIP and plugin settings/stores,
+without observed confirmation, unloads settings/routes and retains other plugins.
+Disposable fixture evidence is under `build/planned-options-20261124`. No backend
+uninstall exists yet. Avoid introducing invented desktop actions/defaults.
+
+The installed WSL reference `/usr/bin/showtime` SHA-256 is
+`da133c4a6ee509da8f3b74dd2dfd1b445988381c5b3210d57b15a2e3a96ac9b1`.
+Use installed WSL + retained REA evidence for behavior, never old andoma source.
+Use pinned YouROK/TorrServer for torrents. WSL native HTTP42000 and old host preview
+42011 may be running; rediscover before testing. Research fixture was fully removed.
+
+Three prior helpers stopped on workspace credits; no implementation work remains
+owned by a running agent. Preserve unrelated untracked camera prototypes and do
+not publish them. Latest public release is v60; it is not a verified working
+console STPP release. Avanpost/DNS/scanner work remains deferred.
 
 # v60 console deployment — 2026-11-24
 

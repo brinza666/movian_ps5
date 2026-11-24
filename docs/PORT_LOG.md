@@ -455,3 +455,22 @@ that evidence folder precede the final socket/address dependency rebuild.
 - v62 is readback-verified, activated and mounted with the one-shot access request. The
   successful fresh v61 state is preserved. Native helper/bind/WSL control remain
   pending the next actual v62 launch; no remote-control pass is claimed yet.
+
+## 2026-11-24 — v63 orderly Quit and autonomous control findings
+
+Implemented and tested General Quit, sidebar Exit and native STPP activation
+through one production callback. Shutdown cancels torrent work, drains FTP and
+network listings without blocking UI updates, joins completed owned workers,
+waits for IME ownership, saves settings and requests shell exit. Shell refusal
+restores input/server; successful asynchronous exit keeps main alive. The full
+optional host self-check and signed SDK build passed. See [v63](UI_V63.md) for
+package hashes, evidence and test boundaries.
+
+Read-only investigation identified installed PS5Upload Minion 12.6.23 on 9180,
+its exact-title launch guard and app-ID close API. ShadowMount only mounts the
+filesystem. Console services became unreachable before the launch request, so
+v62 remains mounted without startup/helper/bind/WSL verification, and v63 has
+not been uploaded. No new console picture, sound or STPP result is claimed.
+The latest one-shot access experiment remains authorized and separately gated.
+Completed the pending-settings inventory and per-feature tests from actual
+WSL/shipped-view evidence, without using old andoma source.

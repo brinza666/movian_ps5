@@ -1,5 +1,13 @@
 # PS5 UI work list
 
+2026-11-24, v63: General Quit, sidebar Exit and STPP Quit now use one
+orderly shutdown callback. Full host self-check and signed packaging passed.
+Active FTP/listing and worker-drain regressions passed; PS5 lifecycle acceptance
+remains pending. v62 is mounted but unlaunched: FTP 2121, ShadowMount 10101 and
+Minion 9180 time out. See [v63 scope](UI_V63.md), [planned options](PLANNED_OPTIONS.md)
+and [autonomous lifecycle APIs](SHADOWMOUNT_CONTROL.md).
+
+
 2026-11-23, v60: STPP server and shared UI callbacks are implemented. Actual WSL
 M7 rendered Home/Settings and changed/restored the real extension setting.
 Full host/native WSL checks and signed packaging passed. v60 console upload
