@@ -393,3 +393,25 @@ that evidence folder precede the final socket/address dependency rebuild.
   Pages deploy hit artifact-metadata visibility timing; a bounded metadata wait
   repaired it. Pages run `45241805249` completed successfully.
   [Project page](https://brinza666.github.io/movian_ps5/).
+
+
+## 2026-11-24 — v60 upload and access/fresh-profile console test
+
+- FTP2121 and ShadowMount10101 are reachable again. Closed title state was
+  checked before staging. Kernel-log3232 and the payload-loader9021 endpoint
+  are closed; access-helper availability must be judged from its runtime log.
+- Saved a new closed 336,789,504-byte profile image in the consolidated PC
+  backup folder and verified it against a second independent FTP read. The
+  current image differs from the previous backup, which remains preserved.
+- Uploaded published v60 ZIP SHA-256
+  `73b8b7a940703cf24abe6668ee53368ed74a451096b6c82c5e3b8421d419ef19`.
+  Readback verified all 29 package files (signed files against their decrypted
+  load segments where needed), execute permissions and metadata01.000.060.
+  Uploaded/readback-verified the separate exact one-shot access and fresh-reset
+  requests. They remain absent from the public ZIP.
+- Unmounted closed v59, activated the staged v60 folder, scanned and mounted
+  PPSA99456 successfully. Archived, independently verified and removed the
+  temporary v59 rollback folder from console storage (14,881,877 bytes).
+- FTP startup/access/reset capture is running. A mounted title is not a
+  startup result: awaiting its initial PS5 launch before checking markers,
+  helper/root restoration, TCP42000 binding and native WSL control.

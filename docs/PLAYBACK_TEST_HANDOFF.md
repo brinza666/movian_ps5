@@ -1,3 +1,27 @@
+# v60 console deployment — 2026-11-24
+
+v60 is now uploaded/readback-verified, activated and mounted. Version/hash are
+unchanged from the published v60 below. All 29 package files and two separate
+console-only opt-ins have execute permissions. New closed 336,789,504-byte
+profile backup was double-read verified in the same PC backup root/profiles;
+its proof path is private build/v60-console/current-profile-proof.txt. Do not
+reuse yesterday's profile proof: content changed before today's backup.
+
+Next unfinished action: initial manual PS5 launch, then inspect runtime files
+and TCP42000 before attempting WSL STPP control. User launch question is pending.
+No runtime path/listener has been observed yet. The helper's loader9021 and
+klog3232 endpoints are closed. Do not claim fresh reset or access succeeded.
+The title itself consumes /app0 opt-ins once and writes reset/access evidence.
+
+Activation is recorded in build/v60-console/activation.json; mounted source is
+/data/homebrew/PPSA99456. Old v59 folder was archived/readback-verified and
+removed from console (14,881,877 bytes). Media and production title remain intact.
+FTP capture runs from build/v60-console/live_capture.py, saves under
+build/v60-console/live-20261124 (30-minute bounded run); inspect events, private
+runtime listing, startup/access logs and reset/consumed markers. Reconnect WSL
+to actual PS5 endpoint 42000, not the still-running host preview 42011/proxy 42010.
+The installed WSL viewer runs HTTP 42000 locally; rediscover processes/ports.
+
 # Active v60 implementation — 2026-11-23
 
 Current request authorizes the STPP property server, shared callbacks, native

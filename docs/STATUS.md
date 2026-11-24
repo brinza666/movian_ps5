@@ -1,5 +1,13 @@
 # Status
 
+2026-11-24: Published v60 was uploaded via FTP2121, all 29 package files and
+both console-only opt-ins readback-verified, then activated and mounted. A new
+closed-profile backup was independently verified before the reset request.
+The v59 rollback folder was moved to the consolidated PC backup and removed
+from the console. Initial launch, fresh-reset/access execution and native
+WSL→PS5 STPP acceptance are pending; no runtime files/listener observed yet.
+
+
 2026-11-23, v60: STPP server and shared UI callbacks are implemented. Actual WSL
 M7 rendered Home/Settings and changed/restored the real extension setting.
 Full host/native WSL checks and signed packaging passed. v60 console upload
