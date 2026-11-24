@@ -1,3 +1,57 @@
+# Active console checkpoint — v64, 24 November 2026
+
+Latest request: upload/mount v64 via FTP2121, test real WSL STPP, update log.
+This is DONE as a deployment/test, with STPP FAILED. v64 is currently RUNNING
+on PS5 (Minion fresh process observation: test app32791, pid104; re-query before
+any lifecycle operation). Active path /data/homebrew/PPSA99456; contentVersion
+01.000.064. All29 active packaged files match exact signed ZIP bytes with FTP
+SELF decryption disabled. Package hash remains422c96f03f906c9686f7e475770fc5c169848dd7cfd04887948c9ab3d82f6bae.
+
+Read docs/STPP_V64_CONSOLE.md and build/v64-console/console-result-private.json.
+Console main/fonts/pad/UI checkpoints passed. Both remote preferences are ON.
+STPP42000 and diagnostics42001 bind fail13. Existing consumed marker
+/download0/stpp-title-access-test-v62.consumed prevents helper execution; v64 logs
+enabled0/pathdisabled. Do not delete/rearm it just to repeat unchanged code.
+Recovered actual v62 private access log ends after loaded chroot/fchdir resolution
+failed, before any successful root restoration. Earlier handoffs saying v62 was
+never launched are superseded by this newly recovered evidence. Next code task:
+resolve the original title-root restoration failure, host-test it, build a new
+version, explicitly retry the owned access request, then verify listener/WSL.
+No new UI-option slice is needed before that acceptance.
+
+WSL installed showtime7.0.273 was started with -d against the actual PS5 endpoint.
+Its log reports Connection reset by peer, so no STPP navigation or setting change
+passed. Native window was minimized, preventing CUA screenshot; HTTP/protocol/log
+evidence is retained. WSL was restored to local page:home and remains running
+with debug logging for subsequent tests (execsession2596; PID271612; rediscover).
+No webcam/Chiaki. No raw profiles/credentials/logs should be committed.
+
+Controller recovery: current ShadowMount is1.7beta2, not beta12. Its config parser
+ignored [api]bind_address and bound localhost. Original config double-read/backed
+up to the consolidated PC configs folder; added api_bind_address=0.0.0.0 alongside
+modern key, hot reload restored10101. Existing Minion12.6.23 ELF matched official
+SHA68a4c2135477aa0d2a9f396565c50cac7d672bbc0f158e718986616a14c6b71b and
+was sent immediately through9021 (never a silent probe/eboot). Minion9180 works.
+SMP first refused unmount because Prospero Multi Tools was active. That utility
+ceased before the guarded close query, so no close request was sent to it.
+Mount/launch then succeeded. The CLI had wrongly required an ok field from launch;
+native ACK is HTTP200{}. Fixed and seven host tests pass; actual process checking
+is still required. No title eboot was sent to9021.
+
+Closed profile336789504bytes double-read backup before v64 is verified, SHA
+629236b525da72ac11dae020d1ead68b3d06b8d6685097ab7d63cba747f37f46. Proofpath
+build/v64-console/current-profile-proof.txt. No fresh reset uploaded. Old v61/v62
+folders are now archived+verified on PC and removed fromconsole. Archive root
+D:/GPTDEEP/PS5-Movian-Backups/2026-11-23, manifest includes resumed cleanup after
+ftpsrv0.19 DELE returned226 (operation had succeeded; Python FTP.delete expected250).
+All original PC copies and remaining remote files were reverified before resume.
+No /data/.PPSA99456-* backup/stage folders remain; production/media unchanged.
+
+Current uncommitted source changes are only host CLI ACK validation and its test,
+plus this documentation. No PS5 application binary source changed in this turn.
+Preserve the unrelated untracked camera prototypes. Public v64 release remains
+same assets; update its runtime report without retagging/rebuilding that ZIP.
+
 # Publication and remote lifecycle checkpoint — 24 November 2026
 
 v64 release is public and all three asset digests match local files:

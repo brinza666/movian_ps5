@@ -51,12 +51,16 @@ class Minion:
                 raise RuntimeError('Minion did not provide a valid token')
             self._token = token  # Memory only. Never included in results/logs.
         result = self._request(route, body)
-        if result.get('ok') is not True:
+        # v12.6.23 launch returns HTTP 200 {}. Lifecycle responses are ACKs;
+        # control() separately requires the actual process transition.
+        if ('ok' in result and result['ok'] is not True) or result.get('error'):
             raise RuntimeError(f'Minion did not accept {route}')
         return result
 
     def processes(self):
         result = self.post('/api/proc/list', {})
+        if result.get('ok') is not True:
+            raise RuntimeError('Cannot establish the console process state')
         procs = result.get('procs')
         if not isinstance(procs, list) or not procs or len(procs) > 4096:
             raise RuntimeError('Cannot establish the console process state')

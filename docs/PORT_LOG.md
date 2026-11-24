@@ -518,3 +518,34 @@ a process transition rather than trusting an ACK. A real status call failed at
 token GET; no launch/close command was sent. Both Windows and WSL now report
 connection refused on saved-address FTP2121, SMP10101 and Minion9180. Current-IP
 clarification remains pending. The PS5 active build remains mounted v62.
+
+## 2026-11-24 — v64 uploaded/mounted/running; WSL STPP failed
+
+FTP2121 was reachable. Verified the published ZIP hash, independently backed up
+the closed profile image to PC, staged v64 with executable permissions and
+verified all29 packaged files. Final readback with SELF decryption disabled
+matched the exact signed ZIP bytes. No fresh-reset request or repeated wipe.
+
+Restored the running ShadowMount1.7beta2 LAN API by backing up its config and
+adding its supported legacy api_bind_address alias; the newer bind_address key
+had been ignored. The initial Device busy response was caused by another active
+utility. That utility was no longer active when the guarded close was about to
+run; no close request was sent. v64 was promoted to the active test folder and
+mounted with status0. The existing Minion12.6.23 ELF was verified against its
+release digest and started through the existing loader. Minion launched the test
+title; fresh process observations and v64 diagnostics confirm main/fonts/pad/UI
+initialization and a still-running title. No physical-screen/audio claim.
+
+STPP42000 and diagnostics42001 still fail bind with errno13. Both saved remote
+options are enabled. The prior v62 consumed marker remains, so v64 skipped the
+access helper. Recovered earlier v62 evidence stops during root restoration
+without success proof; no unchanged helper retry was attempted. Real WSL M7
+7.0.273 attempted the PS5 URL and logged Connection reset by peer. STPP handshake,
+remote navigation and setting mutation FAILED/not reached. WSL returned to local
+Home; v64 remains running. [Full results and next acceptance](STPP_V64_CONSOLE.md).
+
+Fixed the host lifecycle wrapper's false rejection of native HTTP200 {} launch
+ACKs; process verification remains mandatory. Seven focused tests pass on both
+Windows and WSL. v61/v62 rollback folders were independently archived to the
+consolidated PC backup and removed from PS5, with the ftpsrv226 deletion-response
+recovery recorded in the backup manifest. Public packages are unchanged.

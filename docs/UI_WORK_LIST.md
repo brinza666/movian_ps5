@@ -1,5 +1,13 @@
 # PS5 UI work list
 
+2026-11-24 console follow-up: v64 is uploaded, exact signed-file readback verified,
+mounted and running; diagnostics reached UI initialization. Actual WSL STPP
+connection failed: console bind errno13, native client Connection reset by peer.
+Existing v62 consumed marker retained; no helper retry or fresh reset. The next
+acceptance is title-root restoration and listener/WSL control, not more UI rows.
+[Console results](STPP_V64_CONSOLE.md).
+
+
 2026-11-24, v64: native-shaped plugin details and working Uninstall remove the
 selected ZIP/settings/stores and invalidate cached pages. Shared local/native
 STPP tests and the actual unmodified WSL Movian viewer passed; the retained

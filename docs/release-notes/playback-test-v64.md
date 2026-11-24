@@ -2,8 +2,10 @@
 
 Native ShadowMountPlus test title **PPSA99456**, version **01.000.064**.
 This prerelease passed the full host self-check, real WSL Movian remote-viewer
-tests and signed packaging. **v64 has not been tested on PS5.** v62 remains
-mounted; FTP 2121 and remote lifecycle services were unreachable on the last check.
+tests and signed packaging. **v64 is now uploaded, mounted and running on PS5.** All29 packaged files
+matched exact signed readback and startup reached UI initialization. **STPP
+failed:** the console listener was denied bind with errno13, and the real WSL
+client reported Connection reset by peer. [Console report](https://github.com/brinza666/movian_ps5/blob/test/native-playback/docs/STPP_V64_CONSOLE.md).
 
 ## Changes since v60
 
@@ -42,8 +44,9 @@ Do not send signed `eboot.bin` to the payload loader.
 
 ## Limits
 
-PS5 startup, helper credential/root proof, listener binding, WSL→PS5 control,
-Quit/relaunch and plugin removal need console acceptance. Host tests do not
+PS5 startup checkpoints passed; physical picture/sound were not checked here.
+Listener binding and WSL→PS5 control failed. Helper credential/root proof,
+Quit/relaunch and plugin removal still need console acceptance. Host tests do not
 prove hardware picture or sound. Large Avanpost torrent playback/hostname
 discovery, Upgrade/reinstall provenance, full descriptions/artwork resources and
 complete desktop UI/settings parity remain unfinished.

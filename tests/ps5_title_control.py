@@ -67,6 +67,17 @@ class Tests(unittest.TestCase):
             with self.assertRaises(RuntimeError): client.processes()
         with self.assertRaises(ValueError): module.Minion('https://example.com/')
 
+    def test_native_empty_ack_and_explicit_error(self):
+        client = module.Minion('192.168.10.238')
+        client._token = 'disposable-test-token'
+        client._request = lambda *args: {}
+        self.assertEqual(client.post('/api/apps/launch', {'title_id': module.TITLE}), {})
+        for result in ({'ok': False}, {'ok': 0}, {'error': 'refused'}):
+            client._request = lambda *args: result
+            with self.assertRaises(RuntimeError): client.post('/api/apps/launch', {})
+        client._request = lambda *args: {'procs': [SYSTEM]}
+        with self.assertRaises(RuntimeError): client.processes()
+
 
 if __name__ == '__main__':
     unittest.main()

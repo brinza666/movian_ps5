@@ -1,5 +1,11 @@
 # v64: native plugin details and Uninstall
 
+**Console follow-up, 24 November:** v64 is now uploaded/mounted/running, and
+startup logs reach UI initialization. WSL STPP failed because the console
+listener cannot bind (errno13). See [the console report](STPP_V64_CONSOLE.md).
+The offline/deployment-pending notes below describe the earlier host acceptance.
+
+
 The reference remains the installed WSL M7 7.0.273, identified by the retained
 REA ELF evidence in [planned options](PLANNED_OPTIONS.md). Its shipped flat view
 uses title/artwork/synopsis, Status, Author, Installed version, Available version
